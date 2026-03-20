@@ -103,7 +103,6 @@ export default function DashboardPage() {
 
   const conflicts = useMemo(() => {
     if (!scheduleData) return [];
-    const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
     const result: string[] = [];
     for (const day of DAYS) {
       const dayData = scheduleData[day];
@@ -124,6 +123,8 @@ export default function DashboardPage() {
     }
     return result;
   }, [scheduleData, employees]);
+
+  const empMap = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees]);
 
   const colorMap = useMemo(() => {
     if (!scheduleData) return {} as Record<string, string>;
@@ -211,8 +212,7 @@ export default function DashboardPage() {
 
   function handleDownload() {
     if (!scheduleData) return;
-    const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
-    const conflicts: string[] = [];
+    const downloadConflicts: string[] = [];
 
     for (const day of DAYS) {
       const dayData = scheduleData[day];
@@ -226,15 +226,15 @@ export default function DashboardPage() {
           const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
           if (availability === "unavailable") {
             const name = slot.employeeNames[i] ?? emp.name ?? emp.email;
-            conflicts.push(`${name} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
+            downloadConflicts.push(`${name} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
           }
         });
       }
     }
 
     const open = () => window.open(`/print?weekStart=${weekStart.toISOString()}`, "_blank");
-    if (conflicts.length > 0) {
-      setConflictDialog({ lines: conflicts, onIgnore: open });
+    if (downloadConflicts.length > 0) {
+      setConflictDialog({ lines: downloadConflicts, onIgnore: open });
     } else {
       open();
     }
@@ -440,6 +440,8 @@ export default function DashboardPage() {
                             {names.map((name, ni) => {
                               const empId = slot?.employeeIds?.[ni];
                               const isPinned = !!empId && pinnedIds.includes(empId);
+                              const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
+                              const avDot = av === "available" ? "bg-green-400" : av === "prefer_not" ? "bg-amber-400" : "bg-red-500";
                               return (
                               <div key={name} className="group relative">
                                 <button
@@ -451,8 +453,11 @@ export default function DashboardPage() {
                                     selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-400" : "hover:opacity-80"
                                   )}
                                 >
-                                  {isPinned && <span className="me-0.5 text-[9px]">📌</span>}
-                                  {name.split(" ")[0]}
+                                  <span className="flex items-center justify-center gap-1">
+                                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", avDot)} />
+                                    {isPinned && <span className="text-[9px]">📌</span>}
+                                    {name.split(" ")[0]}
+                                  </span>
                                 </button>
                                 {/* Remove button */}
                                 <button
