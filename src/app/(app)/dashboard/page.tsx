@@ -82,6 +82,30 @@ export default function DashboardPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [editingCell]);
 
+  const conflicts = useMemo(() => {
+    if (!scheduleData) return [];
+    const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
+    const result: string[] = [];
+    for (const day of DAYS) {
+      const dayData = scheduleData[day];
+      if (!dayData) continue;
+      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
+        const slot = dayData[shift];
+        if (!slot) continue;
+        slot.employeeIds.forEach((empId, i) => {
+          const emp = empMap[empId];
+          if (!emp) return;
+          const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+          if (availability === "unavailable") {
+            const name = slot.employeeNames[i] ?? emp.name ?? emp.email;
+            result.push(`${name} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
+          }
+        });
+      }
+    }
+    return result;
+  }, [scheduleData, employees]);
+
   const colorMap = useMemo(() => {
     if (!scheduleData) return {} as Record<string, string>;
     const names = new Set<string>();
@@ -324,6 +348,16 @@ export default function DashboardPage() {
           <CardContent className="py-3">
             <p className="text-xs font-semibold text-yellow-800 mb-1">אזהרות:</p>
             <ul className="space-y-0.5">{warnings.map((w, i) => <li key={i} className="text-xs text-yellow-700">• {w}</li>)}</ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Conflicts */}
+      {conflicts.length > 0 && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-3">
+            <p className="text-xs font-semibold text-red-800 mb-1">התנגשויות זמינות:</p>
+            <ul className="space-y-0.5">{conflicts.map((c, i) => <li key={i} className="text-xs text-red-700">• {c}</li>)}</ul>
           </CardContent>
         </Card>
       )}
