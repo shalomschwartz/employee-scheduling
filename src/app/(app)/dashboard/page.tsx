@@ -17,9 +17,9 @@ interface Employee { id: string; name: string | null; email: string; constraints
 
 const EMP_COLORS = [
   "bg-blue-300 text-blue-900", "bg-violet-300 text-violet-900",
-  "bg-emerald-300 text-emerald-900", "bg-rose-300 text-rose-900",
-  "bg-amber-300 text-amber-900", "bg-cyan-300 text-cyan-900",
-  "bg-orange-300 text-orange-900", "bg-teal-300 text-teal-900",
+  "bg-pink-300 text-pink-900", "bg-indigo-300 text-indigo-900",
+  "bg-sky-300 text-sky-900", "bg-fuchsia-300 text-fuchsia-900",
+  "bg-purple-300 text-purple-900", "bg-slate-300 text-slate-900",
 ];
 
 export default function DashboardPage() {
