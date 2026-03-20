@@ -605,7 +605,7 @@ const weekStart = getNextWeekStart();
                   יום
                 </th>
                 {shiftKeys.map(shift => {
-                  const color = shift === "MORNING" ? "#15803d" : shift === "AFTERNOON" ? "#c2410c" : "#3730a3";
+                  const color = shift === "MORNING" ? "#15803d" : shift === "AFTERNOON" ? "#ca8a04" : "#3730a3";
                   return (
                     <th key={shift} style={{ padding: "12px", textAlign: "center", backgroundColor: "#f0f0f0", borderBottom: "1px solid #ddd", fontWeight: "700" }}>
                       <span style={{ color, fontSize: "15px" }}>{SHIFTS[shift].label}</span>
@@ -630,16 +630,13 @@ const weekStart = getNextWeekStart();
                     </td>
                     {shiftKeys.map(shift => {
                       const names = scheduleData[day]?.[shift]?.employeeNames ?? [];
-                      const color = shift === "MORNING" ? "#15803d" : shift === "AFTERNOON" ? "#c2410c" : "#3730a3";
                       return (
                         <td key={shift} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle" }}>
                           {names.length === 0
                             ? <span style={{ color: "#d1d5db", fontSize: "13px" }}>—</span>
                             : names.map((name, ni) => {
-                                const idx = employees.findIndex(e => (e.name ?? e.email) === name);
-                                const hex = EMP_HEX[idx >= 0 ? idx % EMP_HEX.length : 0];
                                 return (
-                                  <div key={ni} style={{ display: "inline-block", margin: "2px 3px", backgroundColor: hex, borderRadius: "6px", padding: "3px 10px", fontSize: "13px", fontWeight: "700", color }}>
+                                  <div key={ni} style={{ display: "inline-block", margin: "2px 3px", padding: "3px 10px", fontSize: "13px", fontWeight: "700", color: "#111827" }}>
                                     {name.split(" ")[0]}
                                   </div>
                                 );
