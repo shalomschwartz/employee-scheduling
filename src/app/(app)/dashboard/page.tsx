@@ -41,6 +41,12 @@ export default function DashboardPage() {
   const [editingCell, setEditingCell] = useState<{ day: string; shift: ShiftKey } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  // Bottom constraints panel
+  const [cvEmpId, setCvEmpId] = useState<string | null>(null);
+  const [cvData, setCvData] = useState<ConstraintData>(defaultConstraintData());
+  const [cvEditing, setCvEditing] = useState(false);
+  const [cvSaving, setCvSaving] = useState(false);
+
   const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
@@ -50,7 +56,13 @@ export default function DashboardPage() {
       fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
     ]).then(([sched, emps]) => {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
-      if (Array.isArray(emps)) setEmployees(emps);
+      if (Array.isArray(emps)) {
+        setEmployees(emps);
+        if (emps.length > 0) {
+          setCvEmpId(emps[0].id);
+          setCvData((emps[0].constraints[0]?.data as ConstraintData) ?? defaultConstraintData());
+        }
+      }
       setLoading(false);
     }).catch(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,6 +202,27 @@ export default function DashboardPage() {
     const res = await fetch("/api/schedule/publish", { method: "POST" });
     if (res.ok) setExisting(prev => prev ? { ...prev, status: "PUBLISHED" } : prev);
     setPublishing(false);
+  }
+
+  function selectCvEmp(emp: Employee) {
+    setCvEmpId(emp.id);
+    setCvData((emp.constraints[0]?.data as ConstraintData) ?? defaultConstraintData());
+    setCvEditing(false);
+  }
+
+  async function saveCvConstraints() {
+    if (!cvEmpId) return;
+    setCvSaving(true);
+    await fetch("/api/admin/constraints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: cvEmpId, weekStart: weekStart.toISOString(), data: cvData }),
+    });
+    // Update local employees state
+    setEmployees(prev => prev.map(e => e.id === cvEmpId ? { ...e, constraints: [{ data: cvData }] } : e));
+    setCvEditing(false);
+    setCvSaving(false);
+    await generate();
   }
 
   const submitted = employees.filter(e => e.constraints.length > 0).length;
@@ -392,6 +425,52 @@ export default function DashboardPage() {
             </Card>
           )}
         </>
+      )}
+
+      {/* Employee constraints panel */}
+      {!loading && employees.length > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
+              {cvEditing ? (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="md" onClick={() => setCvEditing(false)}>ביטול</Button>
+                  <Button size="md" loading={cvSaving} onClick={saveCvConstraints}>שמור ועדכן סידור</Button>
+                </div>
+              ) : (
+                <Button variant="outline" size="md" onClick={() => setCvEditing(true)}>ערוך</Button>
+              )}
+            </div>
+
+            {/* Employee tabs */}
+            <div className="flex gap-1.5 flex-wrap mb-4">
+              {employees.map((emp, i) => (
+                <button
+                  key={emp.id}
+                  onClick={() => selectCvEmp(emp)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
+                    cvEmpId === emp.id
+                      ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent")
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  )}
+                >
+                  {emp.name ?? emp.email}
+                  {emp.constraints.length === 0 && (
+                    <span className="ms-1 text-amber-500">•</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+
+          {cvEmpId && (
+            <CardContent className="pt-0 pb-4">
+              <AvailabilityGrid value={cvData} onChange={setCvData} disabled={!cvEditing || cvSaving} />
+            </CardContent>
+          )}
+        </Card>
       )}
     </div>
   );
