@@ -406,7 +406,14 @@ export default function DashboardPage() {
                       const slot = scheduleData[day]?.[shift];
                       const names = slot?.employeeNames ?? [];
                       const isEditingThis = editingCell?.day === day && editingCell?.shift === shift;
-                      const availableToAdd = employees.filter(e => !(slot?.employeeIds ?? []).includes(e.id));
+                      const AVAIL_ORDER = { available: 0, prefer_not: 1, unavailable: 2 };
+                      const availableToAdd = employees
+                        .filter(e => !(slot?.employeeIds ?? []).includes(e.id))
+                        .sort((a, b) => {
+                          const av = a.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+                          const bv = b.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+                          return AVAIL_ORDER[av] - AVAIL_ORDER[bv];
+                        });
                       const pinnedIds = slot?.pinnedIds ?? [];
 
                       return (
@@ -446,15 +453,22 @@ export default function DashboardPage() {
                               <div ref={pickerRef} className="rounded-lg border border-gray-200 bg-white shadow-md overflow-hidden z-20 relative">
                                 {availableToAdd.length === 0 ? (
                                   <p className="px-2 py-1.5 text-xs text-gray-400">כולם כבר מוקצים</p>
-                                ) : availableToAdd.map(emp => (
-                                  <button
-                                    key={emp.id}
-                                    onClick={() => addToSlot(emp, day, shift)}
-                                    className="block w-full text-right px-2.5 py-1.5 text-xs hover:bg-gray-50 transition-colors"
-                                  >
-                                    {emp.name ?? emp.email}
-                                  </button>
-                                ))}
+                                ) : availableToAdd.map(emp => {
+                                  const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+                                  const dot = av === "available" ? "bg-green-400" : av === "prefer_not" ? "bg-amber-400" : "bg-red-400";
+                                  const label = av === "available" ? "זמין" : av === "prefer_not" ? "מעדיף לא" : "לא זמין";
+                                  return (
+                                    <button
+                                      key={emp.id}
+                                      onClick={() => addToSlot(emp, day, shift)}
+                                      className="flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
+                                    >
+                                      <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
+                                      <span className="flex-1">{emp.name ?? emp.email}</span>
+                                      <span className="text-[10px] text-gray-400">{label}</span>
+                                    </button>
+                                  );
+                                })}
                               </div>
                             ) : (
                               <button
