@@ -257,7 +257,6 @@ export default function DashboardPage() {
 
   async function generate() {
     setGenerating(true);
-    setWarnings([]);
     const res = await fetch("/api/schedule/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -449,8 +448,7 @@ export default function DashboardPage() {
                                   className={cn(
                                     "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full transition-all",
                                     colorMap[name] ?? "bg-gray-100 text-gray-700",
-                                    isPinned ? "ring-2 ring-inset ring-gray-400/60" : "",
-                                    selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-400" : "hover:opacity-80"
+                                    selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-500 brightness-95" : "hover:opacity-80"
                                   )}
                                 >
                                   <span className="flex items-center justify-center gap-1">
