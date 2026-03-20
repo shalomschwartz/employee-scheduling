@@ -10,7 +10,7 @@ import { getNextWeekStart, SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day } from "@/l
 
 type ShiftKey = "MORNING" | "AFTERNOON" | "EVENING";
 
-interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; }
+interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; pinnedIds?: string[]; }
 type ScheduleData = Record<string, Record<ShiftKey, ShiftSlot>>;
 interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; }
 interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; }
@@ -102,6 +102,7 @@ export default function DashboardPage() {
     const slot = scheduleData[day][shift];
     const idx = slot.employeeNames.indexOf(name);
     if (idx === -1) return;
+    const removedId = slot.employeeIds[idx];
     const updated = {
       ...scheduleData,
       [day]: {
@@ -110,6 +111,7 @@ export default function DashboardPage() {
           ...slot,
           employeeIds: slot.employeeIds.filter((_, i) => i !== idx),
           employeeNames: slot.employeeNames.filter((_, i) => i !== idx),
+          pinnedIds: (slot.pinnedIds ?? []).filter(id => id !== removedId),
         },
       },
     };
@@ -130,6 +132,7 @@ export default function DashboardPage() {
           ...slot,
           employeeIds: [...slot.employeeIds, emp.id],
           employeeNames: [...slot.employeeNames, name],
+          pinnedIds: [...(slot.pinnedIds ?? []), emp.id], // mark as pinned
         },
       },
     };
@@ -266,7 +269,7 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">לחץ על שם לעריכת זמינות • X להסרה • + להוספה</p>
+            <p className="text-xs text-gray-400">לחץ על שם לעריכת זמינות • X להסרה • + להוספה ידנית 📌</p>
             {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
           <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -298,20 +301,26 @@ export default function DashboardPage() {
                       const names = slot?.employeeNames ?? [];
                       const isEditingThis = editingCell?.day === day && editingCell?.shift === shift;
                       const availableToAdd = employees.filter(e => !(slot?.employeeIds ?? []).includes(e.id));
+                      const pinnedIds = slot?.pinnedIds ?? [];
 
                       return (
                         <td key={day} className="py-2 px-2 align-top">
                           <div className="flex flex-col gap-1">
-                            {names.map(name => (
+                            {names.map((name, ni) => {
+                              const empId = slot?.employeeIds?.[ni];
+                              const isPinned = !!empId && pinnedIds.includes(empId);
+                              return (
                               <div key={name} className="group relative">
                                 <button
                                   onClick={() => handleNameClick(name)}
                                   className={cn(
                                     "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full transition-all",
                                     colorMap[name] ?? "bg-gray-100 text-gray-700",
+                                    isPinned ? "ring-2 ring-inset ring-gray-400/60" : "",
                                     selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-400" : "hover:opacity-80"
                                   )}
                                 >
+                                  {isPinned && <span className="me-0.5 text-[9px]">📌</span>}
                                   {name.split(" ")[0]}
                                 </button>
                                 {/* Remove button */}
@@ -323,7 +332,8 @@ export default function DashboardPage() {
                                   ×
                                 </button>
                               </div>
-                            ))}
+                              );
+                            })}
 
                             {/* Add employee picker */}
                             {isEditingThis ? (

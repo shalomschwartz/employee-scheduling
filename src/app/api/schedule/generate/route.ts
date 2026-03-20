@@ -34,7 +34,23 @@ export async function POST(req: NextRequest) {
 
   const nameMap = Object.fromEntries(employees.map((e) => [e.id, e.name ?? e.email]));
 
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, minPerShift);
+  // Preserve any manual pins from the existing schedule
+  const existing = await prisma.generatedSchedule.findUnique({
+    where: { organizationId_weekStart: { organizationId: session.user.organizationId, weekStart } },
+  });
+  const pinnedSlots: Record<string, Record<string, string[]>> = {};
+  if (existing?.schedule) {
+    for (const [day, dayData] of Object.entries(existing.schedule as Record<string, Record<string, { pinnedIds?: string[] }>>)) {
+      for (const [shift, slot] of Object.entries(dayData)) {
+        if (slot.pinnedIds?.length) {
+          pinnedSlots[day] ??= {};
+          pinnedSlots[day][shift] = slot.pinnedIds;
+        }
+      }
+    }
+  }
+
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, minPerShift, pinnedSlots);
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};
@@ -44,6 +60,7 @@ export async function POST(req: NextRequest) {
       schedule[day][shift] = {
         employeeIds: slot.employeeIds,
         employeeNames: slot.employeeIds.map((id) => nameMap[id] ?? id),
+        pinnedIds: pinnedSlots[day]?.[shift] ?? [],
         understaffed: slot.understaffed,
       };
     }

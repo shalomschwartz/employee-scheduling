@@ -18,7 +18,8 @@ export type ScheduleData = Record<Day, Record<ShiftKey, ShiftSlot>>;
 
 export function runScheduler(
   employees: EmployeeForScheduling[],
-  minPerShift = 2
+  minPerShift = 2,
+  pinnedSlots: Record<string, Record<string, string[]>> = {}
 ): { schedule: ScheduleData; warnings: string[] } {
   const shiftCounts: Record<string, number> = {};
   for (const emp of employees) shiftCounts[emp.id] = 0;
@@ -30,10 +31,21 @@ export function runScheduler(
     schedule[day] = {} as Record<ShiftKey, ShiftSlot>;
 
     for (const shift of Object.keys(SHIFTS) as ShiftKey[]) {
+      const pinnedIds = pinnedSlots[day]?.[shift] ?? [];
+
+      // Always include pinned employees first (manager overrides)
+      const pinned = pinnedIds
+        .map(id => employees.find(e => e.id === id))
+        .filter(Boolean) as EmployeeForScheduling[];
+      const assigned: EmployeeForScheduling[] = [...pinned];
+      for (const emp of pinned) shiftCounts[emp.id]++;
+
+      // Fill remaining slots with available employees
       const available: EmployeeForScheduling[] = [];
       const preferNot: EmployeeForScheduling[] = [];
 
       for (const emp of employees) {
+        if (pinnedIds.includes(emp.id)) continue; // already pinned
         const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
         if (val === "available") available.push(emp);
         else if (val === "prefer_not") preferNot.push(emp);
@@ -44,11 +56,7 @@ export function runScheduler(
       available.sort(byCount);
       preferNot.sort(byCount);
 
-      const pool = [...available, ...preferNot];
-      const assigned: EmployeeForScheduling[] = [];
-
-      // Fill slots, balanced by shift count
-      for (const emp of pool) {
+      for (const emp of [...available, ...preferNot]) {
         if (assigned.length >= minPerShift) break;
         assigned.push(emp);
         shiftCounts[emp.id]++;
