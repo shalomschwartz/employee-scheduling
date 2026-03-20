@@ -544,46 +544,92 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Employee constraints panel */}
+      {/* Employee constraints overview */}
       {!loading && employees.length > 0 && (
         <Card>
-          <CardContent className="pt-4 pb-0">
+          <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
-              {cvEditing ? (
+              <div>
+                <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
+                <p className="text-xs text-gray-400 mt-0.5">לחץ על שם לעריכה</p>
+              </div>
+              {cvEditing && (
                 <div className="flex gap-2">
-                  <Button variant="outline" size="md" onClick={() => setCvEditing(false)}>ביטול</Button>
+                  <Button variant="outline" size="md" onClick={() => { setCvEditing(false); }}>ביטול</Button>
                   <Button size="md" loading={cvSaving} onClick={saveCvConstraints}>שמור ועדכן סידור</Button>
                 </div>
-              ) : (
-                <Button variant="outline" size="md" onClick={() => setCvEditing(true)}>ערוך</Button>
               )}
             </div>
 
-            {/* Employee tabs */}
-            <div className="flex gap-1.5 flex-wrap mb-4">
-              {employees.map((emp, i) => (
-                <button
-                  key={emp.id}
-                  onClick={() => selectCvEmp(emp)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border",
-                    cvEmpId === emp.id
-                      ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent")
-                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                  )}
-                >
-                  {emp.name ?? emp.email}
-                  {emp.constraints.length === 0 && (
-                    <span className="ms-1 text-amber-500">•</span>
-                  )}
-                </button>
-              ))}
+            {/* Overview table */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-right py-2 ps-3 pe-2 font-semibold text-gray-500 w-24 whitespace-nowrap">משמרת</th>
+                    {DAYS.map(day => (
+                      <th key={day} className="py-2 px-1 text-center font-semibold text-gray-700 min-w-[72px]">
+                        {DAY_LABELS_HE[day as Day]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {shiftKeys.map(shift => (
+                    <tr key={shift} className="border-b border-gray-100 last:border-0">
+                      <td className="py-2 ps-3 pe-2 align-middle">
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn("w-2 h-2 rounded-full flex-shrink-0",
+                            shift === "MORNING" ? "bg-yellow-400" : shift === "AFTERNOON" ? "bg-orange-400" : "bg-indigo-400"
+                          )} />
+                          <span className="font-semibold text-gray-700">{SHIFTS[shift].label}</span>
+                        </div>
+                      </td>
+                      {DAYS.map(day => (
+                        <td key={day} className="py-1 px-1 align-top">
+                          <div className="flex flex-col gap-0.5">
+                            {employees.map(emp => {
+                              const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+                              const chipStyle = av === "available"
+                                ? "bg-green-100 text-green-800 hover:bg-green-200"
+                                : av === "prefer_not"
+                                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                : "bg-red-100 text-red-800 hover:bg-red-200";
+                              return (
+                                <button
+                                  key={emp.id}
+                                  onClick={() => selectCvEmp(emp)}
+                                  className={cn(
+                                    "text-[10px] px-1.5 py-0.5 rounded font-medium text-center w-full transition-colors",
+                                    chipStyle,
+                                    cvEmpId === emp.id ? "ring-2 ring-gray-400 ring-offset-1" : ""
+                                  )}
+                                >
+                                  {(emp.name ?? emp.email).split(" ")[0]}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
 
+          {/* Edit panel for selected employee */}
           {cvEmpId && (
-            <CardContent className="pt-0 pb-4">
+            <CardContent className="pt-0 pb-4 border-t border-gray-100 mt-2">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-gray-800">
+                  {employees.find(e => e.id === cvEmpId)?.name ?? "עובד"}
+                </p>
+                {!cvEditing && (
+                  <Button variant="outline" size="md" onClick={() => setCvEditing(true)}>ערוך</Button>
+                )}
+              </div>
               <AvailabilityGrid value={cvData} onChange={setCvData} disabled={!cvEditing || cvSaving} />
             </CardContent>
           )}
