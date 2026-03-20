@@ -388,15 +388,15 @@ const weekStart = getNextWeekStart();
                               const empId = slot?.employeeIds?.[ni];
                               const isPinned = !!empId && pinnedIds.includes(empId);
                               const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
-                              const avDot = av === "available" ? "bg-green-500" : av === "prefer_not" ? "bg-yellow-400" : "bg-red-600";
+                              const avBorder = av === "available" ? "border-2 border-green-500" : av === "prefer_not" ? "border-2 border-yellow-400" : "border-2 border-red-500";
                               return (
                               <div key={name} className="group relative">
                                 <div className={cn(
                                   "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full",
-                                  colorMap[name] ?? "bg-gray-100 text-gray-700"
+                                  colorMap[name] ?? "bg-gray-100 text-gray-700",
+                                  avBorder
                                 )}>
                                   <span className="flex items-center justify-center gap-1">
-                                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0 shadow-sm", avDot)} />
                                     {isPinned && <span className="text-[9px]">📌</span>}
                                     {name.split(" ")[0]}
                                   </span>
