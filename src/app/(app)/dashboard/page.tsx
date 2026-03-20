@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const [minPerShift, setMinPerShift] = useState(2);
 
   // Employee filter for overview
-  const [empFilter, setEmpFilter] = useState("");
+  const [empFilter, setEmpFilter] = useState<string[]>([]);
 
   // Schedule table ref for PDF capture
   const scheduleTableRef = useRef<HTMLDivElement>(null);
@@ -496,21 +496,21 @@ const weekStart = getNextWeekStart();
               <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
               <div className="flex gap-1.5 flex-wrap justify-end">
                 <button
-                  onClick={() => setEmpFilter("")}
+                  onClick={() => setEmpFilter([])}
                   className={cn(
                     "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-                    empFilter === "" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                    empFilter.length === 0 ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                   )}
                 >
                   הכל
                 </button>
                 {employees.map((emp, i) => {
                   const name = emp.name ?? emp.email;
-                  const selected = empFilter === name;
+                  const selected = empFilter.includes(name);
                   return (
                     <button
                       key={emp.id}
-                      onClick={() => setEmpFilter(selected ? "" : name)}
+                      onClick={() => setEmpFilter(prev => selected ? prev.filter(n => n !== name) : [...prev, name])}
                       className={cn(
                         "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
                         selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
@@ -550,7 +550,7 @@ const weekStart = getNextWeekStart();
                       {DAYS.map(day => (
                         <td key={day} className="py-1 px-1 align-top">
                           <div className="flex flex-col gap-0.5">
-                            {employees.filter(e => !empFilter || (e.name ?? e.email) === empFilter).map(emp => {
+                            {employees.filter(e => empFilter.length === 0 || empFilter.includes(e.name ?? e.email)).map(emp => {
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                               const chipStyle = av === "available"
                                 ? "bg-green-100 text-green-800 hover:bg-green-200"
