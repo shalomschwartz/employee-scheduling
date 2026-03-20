@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, addDays } from "date-fns";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AvailabilityGrid, defaultConstraintData, type ConstraintData } from "@/components/availability/AvailabilityGrid";
+import { type ConstraintData } from "@/components/availability/AvailabilityGrid";
 import { getNextWeekStart, SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day } from "@/lib/utils";
 
 type ShiftKey = "MORNING" | "AFTERNOON" | "EVENING";
@@ -29,11 +29,11 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [minPerShift, setMinPerShift] = useState(2);
 
-  // Constraint editing
-  const [selectedEmp, setSelectedEmp] = useState<{ id: string; name: string } | null>(null);
-  const [empConstraints, setEmpConstraints] = useState<ConstraintData>(defaultConstraintData());
-  const [loadingConstraints, setLoadingConstraints] = useState(false);
-  const [savingConstraints, setSavingConstraints] = useState(false);
+  // Employee filter for overview
+  const [empFilter, setEmpFilter] = useState("");
+
+  // Schedule table ref for PDF capture
+  const scheduleTableRef = useRef<HTMLDivElement>(null);
 
   // Manual slot editing
   const [editingCell, setEditingCell] = useState<{ day: string; shift: ShiftKey } | null>(null);
@@ -127,14 +127,6 @@ const weekStart = getNextWeekStart();
     return map;
   }, [scheduleData]);
 
-  const nameToId = useMemo(() => {
-    if (!scheduleData) return {} as Record<string, string>;
-    const map: Record<string, string> = {};
-    for (const dayData of Object.values(scheduleData))
-      for (const slot of Object.values(dayData))
-        (slot.employeeIds ?? []).forEach((id, i) => { const n = (slot.employeeNames ?? [])[i]; if (n) map[n] = id; });
-    return map;
-  }, [scheduleData]);
 
   async function persistSchedule(updated: ScheduleData) {
     setScheduleData(updated);
@@ -222,27 +214,27 @@ const weekStart = getNextWeekStart();
       }
     }
 
-    const open = () => window.open(`/print?weekStart=${weekStart.toISOString()}`, "_blank");
-    if (downloadConflicts.length > 0) {
-      setConflictDialog({ lines: downloadConflicts, onIgnore: open });
-    } else {
-      open();
-    }
-  }
+    const doDownload = async () => {
+      const { default: html2canvas } = await import("html2canvas");
+      const { default: jsPDF } = await import("jspdf");
+      if (!scheduleTableRef.current) return;
+      const canvas = await html2canvas(scheduleTableRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const scale = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
+      const w = canvas.width * scale;
+      const h = canvas.height * scale;
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
+      pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}.pdf`);
+    };
 
-  async function handleNameClick(name: string) {
-    const id = nameToId[name];
-    if (!id) return;
-    if (selectedEmp?.id === id) { setSelectedEmp(null); return; }
-    setSelectedEmp({ id, name });
-    setLoadingConstraints(true);
-    const res = await fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`);
-    if (res.ok) {
-      const emps = await res.json();
-      const emp = emps.find((e: { id: string }) => e.id === id);
-      setEmpConstraints(emp?.constraints[0]?.data ?? defaultConstraintData());
+    if (downloadConflicts.length > 0) {
+      setConflictDialog({ lines: downloadConflicts, onIgnore: doDownload });
+    } else {
+      await doDownload();
     }
-    setLoadingConstraints(false);
   }
 
   async function generate() {
@@ -256,22 +248,8 @@ const weekStart = getNextWeekStart();
       const data = await res.json();
       setExisting(data.schedule);
       setScheduleData(data.schedule.schedule as ScheduleData);
-      setSelectedEmp(null);
     }
     setGenerating(false);
-  }
-
-  async function saveEmpConstraints() {
-    if (!selectedEmp) return;
-    setSavingConstraints(true);
-    await fetch("/api/admin/constraints", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: selectedEmp.id, weekStart: weekStart.toISOString(), data: empConstraints }),
-    });
-    setSelectedEmp(null);
-    setSavingConstraints(false);
-    await generate();
   }
 
 
@@ -362,10 +340,10 @@ const weekStart = getNextWeekStart();
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">לחץ על שם לעריכת זמינות • X להסרה • + להוספה ידנית 📌</p>
+            <p className="text-xs text-gray-400">X להסרה • + להוספה ידנית 📌</p>
             {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <div ref={scheduleTableRef} className="overflow-x-auto rounded-xl border border-gray-200">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -413,20 +391,16 @@ const weekStart = getNextWeekStart();
                               const avDot = av === "available" ? "bg-green-400" : av === "prefer_not" ? "bg-amber-400" : "bg-red-500";
                               return (
                               <div key={name} className="group relative">
-                                <button
-                                  onClick={() => handleNameClick(name)}
-                                  className={cn(
-                                    "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full transition-all",
-                                    colorMap[name] ?? "bg-gray-100 text-gray-700",
-                                    selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-500 brightness-95" : "hover:opacity-80"
-                                  )}
-                                >
+                                <div className={cn(
+                                  "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full",
+                                  colorMap[name] ?? "bg-gray-100 text-gray-700"
+                                )}>
                                   <span className="flex items-center justify-center gap-1">
                                     <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", avDot)} />
                                     {isPinned && <span className="text-[9px]">📌</span>}
                                     {name.split(" ")[0]}
                                   </span>
-                                </button>
+                                </div>
                                 {/* Remove button */}
                                 <button
                                   onClick={e => { e.stopPropagation(); removeFromSlot(name, day, shift); }}
@@ -480,28 +454,6 @@ const weekStart = getNextWeekStart();
             </table>
           </div>
 
-          {/* Inline constraint editor */}
-          {selectedEmp && (
-            <Card className="border-brand-200 bg-brand-50/30">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="font-semibold text-sm text-gray-900">זמינות: {selectedEmp.name}</p>
-                  <button onClick={() => setSelectedEmp(null)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100">סגור</button>
-                </div>
-                {loadingConstraints ? (
-                  <div className="h-40 rounded-lg bg-gray-100 animate-pulse" />
-                ) : (
-                  <AvailabilityGrid value={empConstraints} onChange={setEmpConstraints} disabled={savingConstraints} />
-                )}
-              </CardContent>
-              {!loadingConstraints && (
-                <CardFooter className="flex justify-end gap-2 pt-0">
-                  <Button variant="outline" size="md" onClick={() => setSelectedEmp(null)}>ביטול</Button>
-                  <Button size="md" loading={savingConstraints} onClick={saveEmpConstraints}>שמור ועדכן סידור</Button>
-                </CardFooter>
-              )}
-            </Card>
-          )}
         </>
       )}
 
@@ -539,7 +491,16 @@ const weekStart = getNextWeekStart();
       {!loading && employees.length > 0 && (
         <Card>
           <CardContent className="pt-4">
-            <h2 className="font-semibold text-sm text-gray-900 mb-3">זמינות עובדים</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
+              <input
+                value={empFilter}
+                onChange={e => setEmpFilter(e.target.value)}
+                placeholder="חפש עובד..."
+                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 w-36 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white text-gray-700 placeholder-gray-400"
+                dir="rtl"
+              />
+            </div>
 
             {/* Overview table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -568,7 +529,7 @@ const weekStart = getNextWeekStart();
                       {DAYS.map(day => (
                         <td key={day} className="py-1 px-1 align-top">
                           <div className="flex flex-col gap-0.5">
-                            {employees.map(emp => {
+                            {employees.filter(e => (e.name ?? e.email).toLowerCase().includes(empFilter.toLowerCase())).map(emp => {
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                               const chipStyle = av === "available"
                                 ? "bg-green-100 text-green-800 hover:bg-green-200"
