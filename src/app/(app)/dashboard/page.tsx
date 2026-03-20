@@ -118,15 +118,12 @@ const weekStart = getNextWeekStart();
   }, [scheduleData, employees]);
 
   const colorMap = useMemo(() => {
-    if (!scheduleData) return {} as Record<string, string>;
-    const names = new Set<string>();
-    for (const dayData of Object.values(scheduleData))
-      for (const slot of Object.values(dayData))
-        for (const n of slot.employeeNames ?? []) names.add(n);
     const map: Record<string, string> = {};
-    [...names].forEach((name, i) => { map[name] = EMP_COLORS[i % EMP_COLORS.length]; });
+    employees.forEach((emp, i) => {
+      map[emp.name ?? emp.email] = EMP_COLORS[i % EMP_COLORS.length];
+    });
     return map;
-  }, [scheduleData]);
+  }, [employees]);
 
 
   async function persistSchedule(updated: ScheduleData) {
