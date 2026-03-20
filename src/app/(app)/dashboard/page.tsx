@@ -42,13 +42,7 @@ export default function DashboardPage() {
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
 
-  // Bottom constraints panel
-  const [cvEmpId, setCvEmpId] = useState<string | null>(null);
-  const [cvData, setCvData] = useState<ConstraintData>(defaultConstraintData());
-  const [cvEditing, setCvEditing] = useState(false);
-  const [cvSaving, setCvSaving] = useState(false);
-
-  const weekStart = getNextWeekStart();
+const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
   useEffect(() => {
@@ -59,10 +53,6 @@ export default function DashboardPage() {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
       if (Array.isArray(emps)) {
         setEmployees(emps);
-        if (emps.length > 0) {
-          setCvEmpId(emps[0].id);
-          setCvData((emps[0].constraints[0]?.data as ConstraintData) ?? defaultConstraintData());
-        }
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -284,26 +274,6 @@ export default function DashboardPage() {
     await generate();
   }
 
-  function selectCvEmp(emp: Employee) {
-    setCvEmpId(emp.id);
-    setCvData((emp.constraints[0]?.data as ConstraintData) ?? defaultConstraintData());
-    setCvEditing(false);
-  }
-
-  async function saveCvConstraints() {
-    if (!cvEmpId) return;
-    setCvSaving(true);
-    await fetch("/api/admin/constraints", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: cvEmpId, weekStart: weekStart.toISOString(), data: cvData }),
-    });
-    // Update local employees state
-    setEmployees(prev => prev.map(e => e.id === cvEmpId ? { ...e, constraints: [{ data: cvData }] } : e));
-    setCvEditing(false);
-    setCvSaving(false);
-    await generate();
-  }
 
   const submitted = employees.filter(e => e.constraints.length > 0).length;
   const shiftKeys: ShiftKey[] = ["MORNING", "AFTERNOON", "EVENING"];
@@ -569,18 +539,7 @@ export default function DashboardPage() {
       {!loading && employees.length > 0 && (
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
-                <p className="text-xs text-gray-400 mt-0.5">לחץ על שם לעריכה</p>
-              </div>
-              {cvEditing && (
-                <div className="flex gap-2">
-                  <Button variant="outline" size="md" onClick={() => { setCvEditing(false); }}>ביטול</Button>
-                  <Button size="md" loading={cvSaving} onClick={saveCvConstraints}>שמור ועדכן סידור</Button>
-                </div>
-              )}
-            </div>
+            <h2 className="font-semibold text-sm text-gray-900 mb-3">זמינות עובדים</h2>
 
             {/* Overview table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -617,17 +576,15 @@ export default function DashboardPage() {
                                 ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
                                 : "bg-red-100 text-red-800 hover:bg-red-200";
                               return (
-                                <button
+                                <div
                                   key={emp.id}
-                                  onClick={() => selectCvEmp(emp)}
                                   className={cn(
-                                    "text-[10px] px-1.5 py-0.5 rounded font-medium text-center w-full transition-colors",
-                                    chipStyle,
-                                    cvEmpId === emp.id ? "ring-2 ring-gray-400 ring-offset-1" : ""
+                                    "text-[10px] px-1.5 py-0.5 rounded font-medium text-center w-full",
+                                    chipStyle
                                   )}
                                 >
                                   {(emp.name ?? emp.email).split(" ")[0]}
-                                </button>
+                                </div>
                               );
                             })}
                           </div>
@@ -640,20 +597,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
 
-          {/* Edit panel for selected employee */}
-          {cvEmpId && (
-            <CardContent className="pt-0 pb-4 border-t border-gray-100 mt-2">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-800">
-                  {employees.find(e => e.id === cvEmpId)?.name ?? "עובד"}
-                </p>
-                {!cvEditing && (
-                  <Button variant="outline" size="md" onClick={() => setCvEditing(true)}>ערוך</Button>
-                )}
-              </div>
-              <AvailabilityGrid value={cvData} onChange={setCvData} disabled={!cvEditing || cvSaving} />
-            </CardContent>
-          )}
         </Card>
       )}
     </div>
