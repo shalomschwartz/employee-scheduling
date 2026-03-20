@@ -81,6 +81,8 @@ export default function DashboardPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [editingCell]);
 
+  const empMap = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees]);
+
   const warnings = useMemo(() => {
     if (!scheduleData) return [];
     const result: string[] = [];
@@ -123,8 +125,6 @@ export default function DashboardPage() {
     }
     return result;
   }, [scheduleData, employees]);
-
-  const empMap = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees]);
 
   const colorMap = useMemo(() => {
     if (!scheduleData) return {} as Record<string, string>;
