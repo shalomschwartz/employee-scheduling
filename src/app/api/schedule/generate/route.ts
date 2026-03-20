@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const minPerShift = typeof body.minPerShift === "number" ? Math.max(1, body.minPerShift) : 2;
 
-  const weekStart = getNextWeekStart();
+  // Use weekStart from client to ensure it matches the saved constraints
+  const weekStart = body.weekStart ? new Date(body.weekStart) : getNextWeekStart();
 
   const employees = await prisma.user.findMany({
     where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },

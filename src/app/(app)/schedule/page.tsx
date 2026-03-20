@@ -147,7 +147,7 @@ export default function SchedulePage() {
     const res = await fetch("/api/schedule/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ minPerShift }),
+      body: JSON.stringify({ minPerShift, weekStart: weekStart.toISOString() }),
     });
     if (res.ok) {
       const data = await res.json();
