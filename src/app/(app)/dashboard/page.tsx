@@ -127,6 +127,30 @@ const weekStart = getNextWeekStart();
     return map;
   }, [employees]);
 
+  const hoursMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!scheduleData) return map;
+    function shiftHours(shift: ShiftKey) {
+      const { start, end } = SHIFTS[shift];
+      const [sh, sm] = start.split(":").map(Number);
+      const [eh, em] = end.split(":").map(Number);
+      const startMins = sh * 60 + sm;
+      const endMins = eh * 60 + em;
+      return (endMins > startMins ? endMins - startMins : 1440 - startMins + endMins) / 60;
+    }
+    for (const day of DAYS) {
+      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
+        const slot = scheduleData[day]?.[shift];
+        if (!slot) continue;
+        const h = shiftHours(shift);
+        slot.employeeIds.forEach(id => {
+          map[id] = (map[id] ?? 0) + h;
+        });
+      }
+    }
+    return map;
+  }, [scheduleData]);
+
 
   async function persistSchedule(updated: ScheduleData) {
     setScheduleData(updated);
@@ -266,11 +290,6 @@ const weekStart = getNextWeekStart();
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            {existing && (
-              <Badge variant={existing.status === "PUBLISHED" ? "success" : "warning"}>
-                {existing.status === "PUBLISHED" ? "פורסם" : "טיוטה"}
-              </Badge>
-            )}
             <Button onClick={generate} loading={generating} variant="outline" size="md">
               {scheduleData ? "צור מחדש" : "צור סידור"}
             </Button>
@@ -291,11 +310,10 @@ const weekStart = getNextWeekStart();
 
       {/* Stats strip */}
       {!loading && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {[
             { label: "עובדים", value: employees.length },
             { label: "הגישו זמינות", value: submitted, color: submitted === employees.length && employees.length > 0 ? "text-green-600" : "text-amber-600" },
-            { label: "סטטוס", value: existing?.status === "PUBLISHED" ? "פורסם" : existing ? "טיוטה" : "אין", color: existing?.status === "PUBLISHED" ? "text-green-600" : "text-gray-500" },
           ].map(s => (
             <Card key={s.label}>
               <CardContent className="py-3">
@@ -304,6 +322,26 @@ const weekStart = getNextWeekStart();
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Employee hours cards */}
+      {!loading && employees.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {employees.map((emp, i) => {
+            const name = emp.name ?? emp.email;
+            const hours = hoursMap[emp.id] ?? 0;
+            const colorClass = EMP_COLORS[i % EMP_COLORS.length];
+            return (
+              <Card key={emp.id} className="overflow-hidden">
+                <div className={cn("h-1.5 w-full", colorClass.split(" ")[0])} />
+                <CardContent className="py-3">
+                  <p className="text-xs font-semibold text-gray-700 truncate">{name}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{hours}<span className="text-xs font-normal text-gray-400 mr-1">שעות</span></p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
