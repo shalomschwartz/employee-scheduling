@@ -40,6 +40,9 @@ export default function DashboardPage() {
   const [editingCell, setEditingCell] = useState<{ day: string; shift: ShiftKey } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  // Conflict dialog
+  const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
+
   // Bottom constraints panel
   const [cvEmpId, setCvEmpId] = useState<string | null>(null);
   const [cvData, setCvData] = useState<ConstraintData>(defaultConstraintData());
@@ -135,19 +138,63 @@ export default function DashboardPage() {
     const slot = scheduleData[day][shift];
     if (slot.employeeIds.includes(emp.id)) return;
     const name = emp.name ?? emp.email;
-    const updated = {
-      ...scheduleData,
-      [day]: {
-        ...scheduleData[day],
-        [shift]: {
-          ...slot,
-          employeeIds: [...slot.employeeIds, emp.id],
-          employeeNames: [...slot.employeeNames, name],
-          pinnedIds: [...(slot.pinnedIds ?? []), emp.id], // mark as pinned
+
+    const doAdd = () => {
+      const updated = {
+        ...scheduleData,
+        [day]: {
+          ...scheduleData[day],
+          [shift]: {
+            ...slot,
+            employeeIds: [...slot.employeeIds, emp.id],
+            employeeNames: [...slot.employeeNames, name],
+            pinnedIds: [...(slot.pinnedIds ?? []), emp.id],
+          },
         },
-      },
+      };
+      persistSchedule(updated);
     };
-    persistSchedule(updated);
+
+    const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+    if (availability === "unavailable") {
+      setConflictDialog({
+        lines: [`${name} ציין/ה שאינו/ה זמין/ה למשמרת זו`],
+        onIgnore: doAdd,
+      });
+      return;
+    }
+    doAdd();
+  }
+
+  function handleDownload() {
+    if (!scheduleData) return;
+    const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
+    const conflicts: string[] = [];
+
+    for (const day of DAYS) {
+      const dayData = scheduleData[day];
+      if (!dayData) continue;
+      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
+        const slot = dayData[shift];
+        if (!slot) continue;
+        slot.employeeIds.forEach((empId, i) => {
+          const emp = empMap[empId];
+          if (!emp) return;
+          const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+          if (availability === "unavailable") {
+            const name = slot.employeeNames[i] ?? emp.name ?? emp.email;
+            conflicts.push(`${name} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
+          }
+        });
+      }
+    }
+
+    const open = () => window.open(`/print?weekStart=${weekStart.toISOString()}`, "_blank");
+    if (conflicts.length > 0) {
+      setConflictDialog({ lines: conflicts, onIgnore: open });
+    } else {
+      open();
+    }
   }
 
   async function handleNameClick(name: string) {
@@ -239,12 +286,7 @@ export default function DashboardPage() {
               {scheduleData ? "צור מחדש" : "צור סידור"}
             </Button>
             {scheduleData && (
-              <Button
-                onClick={() => window.open(`/print?weekStart=${weekStart.toISOString()}`, "_blank")}
-                size="md"
-              >
-                הורדה
-              </Button>
+              <Button onClick={handleDownload} size="md">הורדה</Button>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -422,6 +464,36 @@ export default function DashboardPage() {
             </Card>
           )}
         </>
+      )}
+
+      {/* Conflict dialog */}
+      {conflictDialog && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full relative" dir="rtl">
+            <button
+              onClick={() => setConflictDialog(null)}
+              className="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-xl leading-none"
+            >
+              ×
+            </button>
+            <h3 className="font-bold text-gray-900 text-base mb-1">התנגשות בזמינות</h3>
+            <p className="text-xs text-gray-500 mb-3">העובדים הבאים ציינו שאינם זמינים:</p>
+            <ul className="space-y-1 mb-5">
+              {conflictDialog.lines.map((line, i) => (
+                <li key={i} className="text-sm text-red-600 font-medium">• {line}</li>
+              ))}
+            </ul>
+            <div className="flex gap-2 justify-start">
+              <Button
+                size="md"
+                onClick={() => { conflictDialog.onIgnore(); setConflictDialog(null); }}
+              >
+                התעלם
+              </Button>
+              <Button variant="outline" size="md" onClick={() => setConflictDialog(null)}>סגור</Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Employee constraints panel */}
