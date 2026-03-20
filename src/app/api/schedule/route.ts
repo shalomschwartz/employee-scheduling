@@ -27,3 +27,21 @@ export async function GET(req: NextRequest) {
   if (!schedule) return NextResponse.json(null);
   return NextResponse.json(schedule);
 }
+
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "MANAGER")
+    return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
+  if (!session.user.organizationId)
+    return NextResponse.json({ error: "אין ארגון" }, { status: 400 });
+
+  const body = await req.json();
+  const weekStart = new Date(body.weekStart);
+
+  const updated = await prisma.generatedSchedule.update({
+    where: { organizationId_weekStart: { organizationId: session.user.organizationId, weekStart } },
+    data: { schedule: body.schedule, updatedAt: new Date() },
+  });
+
+  return NextResponse.json(updated);
+}

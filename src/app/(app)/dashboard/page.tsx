@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, addDays } from "date-fns";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,16 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [minPerShift, setMinPerShift] = useState(2);
+
+  // Constraint editing
   const [selectedEmp, setSelectedEmp] = useState<{ id: string; name: string } | null>(null);
   const [empConstraints, setEmpConstraints] = useState<ConstraintData>(defaultConstraintData());
   const [loadingConstraints, setLoadingConstraints] = useState(false);
   const [savingConstraints, setSavingConstraints] = useState(false);
+
+  // Manual slot editing
+  const [editingCell, setEditingCell] = useState<{ day: string; shift: ShiftKey } | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
@@ -49,6 +55,18 @@ export default function DashboardPage() {
     }).catch(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Close picker when clicking outside
+  useEffect(() => {
+    if (!editingCell) return;
+    function handleClick(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setEditingCell(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [editingCell]);
 
   const colorMap = useMemo(() => {
     if (!scheduleData) return {} as Record<string, string>;
@@ -69,6 +87,54 @@ export default function DashboardPage() {
         (slot.employeeIds ?? []).forEach((id, i) => { const n = (slot.employeeNames ?? [])[i]; if (n) map[n] = id; });
     return map;
   }, [scheduleData]);
+
+  async function persistSchedule(updated: ScheduleData) {
+    setScheduleData(updated);
+    await fetch("/api/schedule", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekStart: weekStart.toISOString(), schedule: updated }),
+    });
+  }
+
+  function removeFromSlot(name: string, day: string, shift: ShiftKey) {
+    if (!scheduleData) return;
+    const slot = scheduleData[day][shift];
+    const idx = slot.employeeNames.indexOf(name);
+    if (idx === -1) return;
+    const updated = {
+      ...scheduleData,
+      [day]: {
+        ...scheduleData[day],
+        [shift]: {
+          ...slot,
+          employeeIds: slot.employeeIds.filter((_, i) => i !== idx),
+          employeeNames: slot.employeeNames.filter((_, i) => i !== idx),
+        },
+      },
+    };
+    persistSchedule(updated);
+  }
+
+  function addToSlot(emp: Employee, day: string, shift: ShiftKey) {
+    if (!scheduleData) return;
+    setEditingCell(null);
+    const slot = scheduleData[day][shift];
+    if (slot.employeeIds.includes(emp.id)) return;
+    const name = emp.name ?? emp.email;
+    const updated = {
+      ...scheduleData,
+      [day]: {
+        ...scheduleData[day],
+        [shift]: {
+          ...slot,
+          employeeIds: [...slot.employeeIds, emp.id],
+          employeeNames: [...slot.employeeNames, name],
+        },
+      },
+    };
+    persistSchedule(updated);
+  }
 
   async function handleNameClick(name: string) {
     const id = nameToId[name];
@@ -200,7 +266,7 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">לחץ על שם עובד לעריכת זמינות</p>
+            <p className="text-xs text-gray-400">לחץ על שם לעריכת זמינות • X להסרה • + להוספה</p>
             {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
           <div className="overflow-x-auto rounded-xl border border-gray-200">
@@ -230,23 +296,60 @@ export default function DashboardPage() {
                     {DAYS.map(day => {
                       const slot = scheduleData[day]?.[shift];
                       const names = slot?.employeeNames ?? [];
+                      const isEditingThis = editingCell?.day === day && editingCell?.shift === shift;
+                      const availableToAdd = employees.filter(e => !(slot?.employeeIds ?? []).includes(e.id));
+
                       return (
-                        <td key={day} className="py-2.5 px-2 align-top">
-                          {names.length === 0 ? (
-                            <span className="block text-center text-xs text-gray-300">—</span>
-                          ) : (
-                            <div className="flex flex-col gap-1">
-                              {names.map(name => (
-                                <button key={name} onClick={() => handleNameClick(name)}
-                                  className={cn("text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full transition-all",
+                        <td key={day} className="py-2 px-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            {names.map(name => (
+                              <div key={name} className="group relative">
+                                <button
+                                  onClick={() => handleNameClick(name)}
+                                  className={cn(
+                                    "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full transition-all",
                                     colorMap[name] ?? "bg-gray-100 text-gray-700",
-                                    selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-400 scale-105" : "hover:opacity-80"
-                                  )}>
+                                    selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-400" : "hover:opacity-80"
+                                  )}
+                                >
                                   {name.split(" ")[0]}
                                 </button>
-                              ))}
-                            </div>
-                          )}
+                                {/* Remove button */}
+                                <button
+                                  onClick={e => { e.stopPropagation(); removeFromSlot(name, day, shift); }}
+                                  className="absolute -top-1 -start-1 w-4 h-4 rounded-full bg-gray-400 hover:bg-red-500 text-white text-[9px] font-bold hidden group-hover:flex items-center justify-center z-10 transition-colors"
+                                  title="הסר ממשמרת"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+
+                            {/* Add employee picker */}
+                            {isEditingThis ? (
+                              <div ref={pickerRef} className="rounded-lg border border-gray-200 bg-white shadow-md overflow-hidden z-20 relative">
+                                {availableToAdd.length === 0 ? (
+                                  <p className="px-2 py-1.5 text-xs text-gray-400">כולם כבר מוקצים</p>
+                                ) : availableToAdd.map(emp => (
+                                  <button
+                                    key={emp.id}
+                                    onClick={() => addToSlot(emp, day, shift)}
+                                    className="block w-full text-right px-2.5 py-1.5 text-xs hover:bg-gray-50 transition-colors"
+                                  >
+                                    {emp.name ?? emp.email}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
+                                className="w-full text-center text-gray-300 hover:text-gray-500 text-sm py-0.5 rounded hover:bg-gray-50 transition-colors leading-none"
+                                title="הוסף עובד"
+                              >
+                                +
+                              </button>
+                            )}
+                          </div>
                         </td>
                       );
                     })}
