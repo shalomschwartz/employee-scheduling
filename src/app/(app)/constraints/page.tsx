@@ -4,9 +4,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getNextWeekStart, DAYS, SHIFTS, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
+import { cn, getNextWeekStart, DAYS, SHIFTS, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
 import { format, addDays } from "date-fns";
-import { cn } from "@/lib/utils";
 
 const OPTION_CELL: Record<AvailabilityOption, string> = {
   available: "bg-green-100 text-green-700",
