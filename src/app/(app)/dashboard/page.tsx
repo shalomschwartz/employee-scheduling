@@ -25,7 +25,6 @@ export default function DashboardPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [existing, setExisting] = useState<GeneratedSchedule | null>(null);
   const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [minPerShift, setMinPerShift] = useState(2);
@@ -81,6 +80,26 @@ export default function DashboardPage() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [editingCell]);
+
+  const warnings = useMemo(() => {
+    if (!scheduleData) return [];
+    const result: string[] = [];
+    for (const day of DAYS) {
+      const dayData = scheduleData[day];
+      if (!dayData) continue;
+      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
+        const slot = dayData[shift];
+        if (!slot) continue;
+        const count = slot.employeeIds.length;
+        if (count === 0) {
+          result.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: אין עובדים משובצים`);
+        } else if (count < minPerShift) {
+          result.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: רק ${count}/${minPerShift} עובדים`);
+        }
+      }
+    }
+    return result;
+  }, [scheduleData, minPerShift]);
 
   const conflicts = useMemo(() => {
     if (!scheduleData) return [];
@@ -248,7 +267,6 @@ export default function DashboardPage() {
       const data = await res.json();
       setExisting(data.schedule);
       setScheduleData(data.schedule.schedule as ScheduleData);
-      setWarnings(data.warnings ?? []);
       setSelectedEmp(null);
     }
     setGenerating(false);
