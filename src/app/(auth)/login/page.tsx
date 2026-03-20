@@ -14,8 +14,9 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(hasError ? "אימייל או סיסמה שגויים." : "");
+  const [error, setError] = useState(hasError ? "אימייל שגוי." : "");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,14 +25,14 @@ function LoginForm() {
 
     const result = await signIn("credentials", {
       email,
-      password,
+      password: isManager ? password : "",
       redirect: false,
     });
 
     setLoading(false);
 
     if (result?.error) {
-      setError("אימייל או סיסמה שגויים.");
+      setError(isManager ? "אימייל או סיסמה שגויים." : "אימייל לא נמצא.");
     } else {
       router.push("/");
       router.refresh();
@@ -41,7 +42,9 @@ function LoginForm() {
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
       <h2 className="text-lg font-semibold text-gray-900 mb-1">כניסה</h2>
-      <p className="text-sm text-gray-500 mb-6">הזן אימייל וסיסמה.</p>
+      <p className="text-sm text-gray-500 mb-6">
+        {isManager ? "הזן אימייל וסיסמה." : "הזן את האימייל שלך."}
+      </p>
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
@@ -61,22 +64,34 @@ function LoginForm() {
           autoFocus
           autoComplete="email"
         />
-        <Input
-          id="password"
-          type="password"
-          label="סיסמה"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+        {isManager && (
+          <Input
+            id="password"
+            type="password"
+            label="סיסמה"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        )}
         <Button type="submit" className="w-full" size="lg" loading={loading}>
           כניסה
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
+      <p className="mt-4 text-center text-sm">
+        <button
+          type="button"
+          onClick={() => { setIsManager(v => !v); setError(""); setPassword(""); }}
+          className="text-gray-400 hover:text-brand-600 transition-colors"
+        >
+          {isManager ? "כניסה כעובד" : "כניסת מנהל"}
+        </button>
+      </p>
+
+      <p className="mt-4 text-center text-sm text-gray-500">
         אין לך חשבון?{" "}
         <Link href="/register" className="text-brand-600 font-medium hover:underline">
           הירשם

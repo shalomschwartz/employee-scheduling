@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials.password) return null;
+        if (!credentials?.email) return null;
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email.toLowerCase() },
@@ -28,8 +28,12 @@ export const authOptions: NextAuthOptions = {
 
         if (!user) return null;
 
-        const valid = await bcrypt.compare(credentials.password, user.password);
-        if (!valid) return null;
+        // Managers require a password; employees log in with email only
+        if (user.role === "MANAGER") {
+          if (!credentials.password) return null;
+          const valid = await bcrypt.compare(credentials.password, user.password);
+          if (!valid) return null;
+        }
 
         return { id: user.id, name: user.name, email: user.email };
       },
