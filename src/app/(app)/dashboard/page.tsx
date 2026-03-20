@@ -22,6 +22,9 @@ const EMP_COLORS = [
   "bg-purple-300 text-purple-900", "bg-slate-300 text-slate-900",
 ];
 
+// Hex equivalents of EMP_COLORS for PDF rendering (html2canvas needs inline styles)
+const EMP_HEX = ["#93c5fd","#c4b5fd","#f9a8d4","#a5b4fc","#7dd3fc","#f0abfc","#d8b4fe","#cbd5e1"];
+
 export default function DashboardPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [existing, setExisting] = useState<GeneratedSchedule | null>(null);
@@ -33,8 +36,8 @@ export default function DashboardPage() {
   // Employee filter for overview
   const [empFilter, setEmpFilter] = useState<string[]>([]);
 
-  // Schedule table ref for PDF capture
-  const scheduleTableRef = useRef<HTMLDivElement>(null);
+  // Hidden print-calendar ref for PDF capture
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Manual slot editing
   const [editingCell, setEditingCell] = useState<{ day: string; shift: ShiftKey } | null>(null);
@@ -215,8 +218,8 @@ const weekStart = getNextWeekStart();
     const doDownload = async () => {
       const { default: html2canvas } = await import("html2canvas");
       const { default: jsPDF } = await import("jspdf");
-      if (!scheduleTableRef.current) return;
-      const canvas = await html2canvas(scheduleTableRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      if (!printRef.current) return;
+      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
@@ -341,7 +344,7 @@ const weekStart = getNextWeekStart();
             <p className="text-xs text-gray-400">X להסרה • + להוספה ידנית 📌</p>
             {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
-          <div ref={scheduleTableRef} className="overflow-x-auto rounded-xl border border-gray-200">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -577,6 +580,82 @@ const weekStart = getNextWeekStart();
           </CardContent>
 
         </Card>
+      )}
+      {/* Hidden print calendar — captured by html2canvas for PDF download */}
+      {scheduleData && (
+        <div
+          ref={printRef}
+          style={{
+            position: "absolute", left: "-9999px", top: 0,
+            width: "1060px", backgroundColor: "white",
+            padding: "36px 44px", fontFamily: "'Heebo', Arial, sans-serif", direction: "rtl",
+          }}
+        >
+          {/* Header */}
+          <div style={{ textAlign: "center", paddingBottom: "18px", borderBottom: "2px solid #e5e7eb", marginBottom: "22px" }}>
+            <p style={{ fontSize: "22px", fontWeight: "800", color: "#111827", margin: 0 }}>סידור עבודה שבועי</p>
+            <p style={{ fontSize: "13px", color: "#6b7280", marginTop: "4px", margin: "4px 0 0" }}>{weekLabel}</p>
+          </div>
+
+          {/* Calendar table */}
+          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+            <thead>
+              <tr>
+                <th style={{ width: "88px" }} />
+                {DAYS.map((day, di) => (
+                  <th key={day} style={{ padding: "8px 4px 12px", textAlign: "center", borderBottom: "2px solid #e5e7eb" }}>
+                    <div style={{ fontSize: "15px", fontWeight: "700", color: "#111827" }}>{DAY_LABELS_HE[day as Day]}</div>
+                    <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>{format(addDays(weekStart, di), "d/M")}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {shiftKeys.map(shift => {
+                const cfg = {
+                  MORNING:   { bg: "#fffbeb", border: "#fde68a", hdr: "#92400e", dot: "#f59e0b" },
+                  AFTERNOON: { bg: "#fff7ed", border: "#fed7aa", hdr: "#9a3412", dot: "#f97316" },
+                  EVENING:   { bg: "#eef2ff", border: "#c7d2fe", hdr: "#3730a3", dot: "#6366f1" },
+                }[shift];
+                return (
+                  <tr key={shift}>
+                    <td style={{ padding: "10px 8px 10px 0", verticalAlign: "middle", borderBottom: `1px solid ${cfg.border}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: cfg.dot, display: "inline-block", flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: "13px", fontWeight: "700", color: cfg.hdr }}>{SHIFTS[shift].label}</div>
+                          <div style={{ fontSize: "10px", color: "#9ca3af" }}>{SHIFTS[shift].start}–{SHIFTS[shift].end}</div>
+                        </div>
+                      </div>
+                    </td>
+                    {DAYS.map(day => {
+                      const names = scheduleData[day]?.[shift]?.employeeNames ?? [];
+                      return (
+                        <td key={day} style={{ padding: "10px 6px", verticalAlign: "top", backgroundColor: cfg.bg, border: `1px solid ${cfg.border}` }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                            {names.length === 0
+                              ? <span style={{ fontSize: "11px", color: "#d1d5db" }}>—</span>
+                              : names.map((name, ni) => {
+                                  const idx = employees.findIndex(e => (e.name ?? e.email) === name);
+                                  const hex = EMP_HEX[idx >= 0 ? idx % EMP_HEX.length : 0];
+                                  return (
+                                    <div key={ni} style={{ fontSize: "13px", fontWeight: "600", color: "#1f2937", backgroundColor: hex, borderRadius: "6px", padding: "4px 10px", textAlign: "center" }}>
+                                      {name.split(" ")[0]}
+                                    </div>
+                                  );
+                                })}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div style={{ marginTop: "14px", textAlign: "center", fontSize: "10px", color: "#d1d5db" }}>הופק ע"י ShiftSync</div>
+        </div>
       )}
     </div>
   );
