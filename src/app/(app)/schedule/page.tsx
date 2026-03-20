@@ -136,8 +136,9 @@ export default function SchedulePage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: selectedEmp.id, weekStart: weekStart.toISOString(), data: empConstraints }),
     });
-    setSavingConstraints(false);
     setSelectedEmp(null);
+    setSavingConstraints(false);
+    await generate();
   }
 
   async function generate() {
@@ -367,7 +368,7 @@ export default function SchedulePage() {
                     ביטול
                   </Button>
                   <Button size="md" loading={savingConstraints} onClick={saveEmpConstraints}>
-                    שמור זמינות
+                    שמור ועדכן סידור
                   </Button>
                 </CardFooter>
               )}
