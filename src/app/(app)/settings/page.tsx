@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "MANAGER") redirect("/my-schedule");
+  if (!session || session.user.role !== "MANAGER") redirect("/availability");
 
   return (
     <div className="space-y-4 max-w-lg">

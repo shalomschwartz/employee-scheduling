@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +11,7 @@ import type { ShiftType } from "@prisma/client";
 export default async function MySchedulePage() {
   const session = await getServerSession(authOptions);
   if (!session) return null;
+  redirect("/availability");
 
   const thisWeek = getCurrentWeekStart();
   const nextWeek = getNextWeekStart();

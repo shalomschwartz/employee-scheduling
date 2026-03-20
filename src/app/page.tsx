@@ -13,5 +13,5 @@ export default async function HomePage() {
     redirect("/dashboard");
   }
 
-  redirect("/my-schedule");
+  redirect("/availability");
 }

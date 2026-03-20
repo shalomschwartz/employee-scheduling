@@ -12,7 +12,6 @@ const managerLinks = [
 ];
 
 const employeeLinks = [
-  { href: "/my-schedule", label: "המשמרות שלי" },
   { href: "/availability", label: "זמינות שלי" },
 ];
 
