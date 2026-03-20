@@ -16,9 +16,10 @@ interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedul
 interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; }
 
 const EMP_COLORS = [
-  "bg-blue-100 text-blue-800", "bg-violet-100 text-violet-800",
-  "bg-emerald-100 text-emerald-800", "bg-rose-100 text-rose-800",
-  "bg-amber-100 text-amber-800", "bg-cyan-100 text-cyan-800",
+  "bg-blue-300 text-blue-900", "bg-violet-300 text-violet-900",
+  "bg-emerald-300 text-emerald-900", "bg-rose-300 text-rose-900",
+  "bg-amber-300 text-amber-900", "bg-cyan-300 text-cyan-900",
+  "bg-orange-300 text-orange-900", "bg-teal-300 text-teal-900",
 ];
 
 export default function DashboardPage() {
@@ -388,7 +389,7 @@ const weekStart = getNextWeekStart();
                               const empId = slot?.employeeIds?.[ni];
                               const isPinned = !!empId && pinnedIds.includes(empId);
                               const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
-                              const avDot = av === "available" ? "bg-green-400" : av === "prefer_not" ? "bg-amber-400" : "bg-red-500";
+                              const avDot = av === "available" ? "bg-green-500" : av === "prefer_not" ? "bg-yellow-400" : "bg-red-600";
                               return (
                               <div key={name} className="group relative">
                                 <div className={cn(
@@ -396,7 +397,7 @@ const weekStart = getNextWeekStart();
                                   colorMap[name] ?? "bg-gray-100 text-gray-700"
                                 )}>
                                   <span className="flex items-center justify-center gap-1">
-                                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", avDot)} />
+                                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0 shadow-sm", avDot)} />
                                     {isPinned && <span className="text-[9px]">📌</span>}
                                     {name.split(" ")[0]}
                                   </span>
@@ -420,7 +421,7 @@ const weekStart = getNextWeekStart();
                                   <p className="px-2 py-1.5 text-xs text-gray-400">כולם כבר מוקצים</p>
                                 ) : availableToAdd.map(emp => {
                                   const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
-                                  const dot = av === "available" ? "bg-green-400" : av === "prefer_not" ? "bg-amber-400" : "bg-red-400";
+                                  const dot = av === "available" ? "bg-green-500" : av === "prefer_not" ? "bg-yellow-400" : "bg-red-600";
                                   const label = av === "available" ? "זמין" : av === "prefer_not" ? "מעדיף לא" : "לא זמין";
                                   return (
                                     <button
@@ -493,13 +494,33 @@ const weekStart = getNextWeekStart();
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
-              <input
-                value={empFilter}
-                onChange={e => setEmpFilter(e.target.value)}
-                placeholder="חפש עובד..."
-                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 w-36 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white text-gray-700 placeholder-gray-400"
-                dir="rtl"
-              />
+              <div className="flex gap-1.5 flex-wrap justify-end">
+                <button
+                  onClick={() => setEmpFilter("")}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+                    empFilter === "" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  )}
+                >
+                  הכל
+                </button>
+                {employees.map((emp, i) => {
+                  const name = emp.name ?? emp.email;
+                  const selected = empFilter === name;
+                  return (
+                    <button
+                      key={emp.id}
+                      onClick={() => setEmpFilter(selected ? "" : name)}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+                        selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      )}
+                    >
+                      {name.split(" ")[0]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Overview table */}
@@ -529,7 +550,7 @@ const weekStart = getNextWeekStart();
                       {DAYS.map(day => (
                         <td key={day} className="py-1 px-1 align-top">
                           <div className="flex flex-col gap-0.5">
-                            {employees.filter(e => (e.name ?? e.email).toLowerCase().includes(empFilter.toLowerCase())).map(emp => {
+                            {employees.filter(e => !empFilter || (e.name ?? e.email) === empFilter).map(emp => {
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                               const chipStyle = av === "available"
                                 ? "bg-green-100 text-green-800 hover:bg-green-200"
