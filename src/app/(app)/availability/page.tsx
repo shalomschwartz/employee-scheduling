@@ -1,0 +1,164 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { format, addDays } from "date-fns";
+import {
+  AvailabilityGrid,
+  defaultConstraintData,
+  type ConstraintData,
+} from "@/components/availability/AvailabilityGrid";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { getNextWeekStart, DAYS } from "@/lib/utils";
+
+type SubmitStatus = "idle" | "loading" | "success" | "error";
+
+export default function AvailabilityPage() {
+  const { data: session } = useSession();
+  const [constraints, setConstraints] = useState<ConstraintData>(defaultConstraintData());
+  const [status, setStatus] = useState<SubmitStatus>("idle");
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+
+  const weekStart = getNextWeekStart();
+  const weekLabel = `${format(weekStart, "MMM d")} – ${format(addDays(weekStart, 6), "MMM d, yyyy")}`;
+
+  // Load existing constraints for next week
+  useEffect(() => {
+    async function load() {
+      const res = await fetch(
+        `/api/availability?weekStart=${weekStart.toISOString()}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.data) {
+          setConstraints(data.data as ConstraintData);
+          setAlreadySubmitted(true);
+          setLastSaved(new Date(data.updatedAt));
+        }
+      }
+    }
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleSubmit() {
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekStart: weekStart.toISOString(),
+          data: constraints,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save");
+
+      setStatus("success");
+      setAlreadySubmitted(true);
+      setLastSaved(new Date());
+
+      setTimeout(() => setStatus("idle"), 3000);
+    } catch {
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 4000);
+    }
+  }
+
+  // Count unavailable slots for summary
+  const unavailableCount = DAYS.reduce((acc, day) => {
+    return (
+      acc +
+      Object.values(constraints[day]).filter((v) => v === "unavailable").length
+    );
+  }, 0);
+
+  return (
+    <div className="space-y-4 max-w-2xl mx-auto">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">Submit Availability</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Week of {weekLabel}
+        </p>
+      </div>
+
+      {/* Status banner */}
+      {alreadySubmitted && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>
+            Availability submitted{lastSaved ? ` · Last saved ${format(lastSaved, "MMM d 'at' h:mm a")}` : ""}. You can update it any time before the schedule is generated.
+          </span>
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-gray-900 text-sm">
+                Hey, {session?.user.name?.split(" ")[0] ?? "there"}!
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Tap each cell to cycle: Available → Prefer not → Unavailable
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {unavailableCount > 0 && (
+                <Badge variant="warning">{unavailableCount} blocked</Badge>
+              )}
+              {alreadySubmitted && <Badge variant="success">Submitted</Badge>}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-4">
+          <AvailabilityGrid
+            value={constraints}
+            onChange={setConstraints}
+            disabled={status === "loading"}
+          />
+        </CardContent>
+
+        <CardFooter className="flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => setConstraints(defaultConstraintData())}
+            className="text-sm text-gray-400 hover:text-gray-600"
+            disabled={status === "loading"}
+          >
+            Reset all to available
+          </button>
+
+          <div className="flex items-center gap-3">
+            {status === "success" && (
+              <span className="text-sm text-green-600 font-medium">Saved!</span>
+            )}
+            {status === "error" && (
+              <span className="text-sm text-red-600">Failed to save. Try again.</span>
+            )}
+            <Button
+              onClick={handleSubmit}
+              loading={status === "loading"}
+              size="lg"
+              className="min-w-[120px]"
+            >
+              {alreadySubmitted ? "Update" : "Submit"}
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+
+      <p className="text-xs text-gray-400 text-center">
+        Your manager will generate the schedule once all team members have submitted.
+      </p>
+    </div>
+  );
+}

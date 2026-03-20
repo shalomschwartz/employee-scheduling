@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  MANAGER
+  EMPLOYEE
+}
+
+enum ShiftType {
+  MORNING
+  AFTERNOON
+  EVENING
+}
+
+enum ScheduleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// ─── Core Models ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  // settings: { minStaffPerShift: number, rolesRequired: string[], shiftLeadRoleLabel: string }
+  settings  Json     @default("{\"minStaffPerShift\":2,\"rolesRequired\":[\"SHIFT_LEAD\",\"STAFF\"],\"shiftLeadRoleLabel\":\"Shift Lead\"}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  schedules GeneratedSchedule[]
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  image          String?
+  role           Role      @default(EMPLOYEE)
+  isShiftLead    Boolean   @default(false)
+  organizationId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  accounts     Account[]
+  sessions     Session[]
+  constraints  WeeklyConstraints[]
+  shifts       Shift[]
+}
+
+// ─── NextAuth Models ─────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Scheduling Models ────────────────────────────────────────────────────────
+
+model WeeklyConstraints {
+  id        String   @id @default(cuid())
+  userId    String
+  weekStart DateTime // Monday 00:00:00 UTC of the target week
+
+  // { monday: { morning: 'available'|'prefer_not'|'unavailable', ... }, ... }
+  data      Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+}
+
+model GeneratedSchedule {
+  id             String         @id @default(cuid())
+  organizationId String
+  weekStart      DateTime
+
+  // Full schedule JSON produced by the OR-Tools solver
+  schedule       Json
+
+  status         ScheduleStatus @default(DRAFT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shifts       Shift[]
+
+  @@unique([organizationId, weekStart])
+}
+
+model Shift {
+  id         String    @id @default(cuid())
+  employeeId String
+  scheduleId String
+  day        String    // 'monday' | 'tuesday' | ... | 'sunday'
+  shiftType  ShiftType
+  startTime  String    // '07:00'
+  endTime    String    // '15:00'
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee User              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  schedule GeneratedSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+}
