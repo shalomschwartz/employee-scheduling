@@ -6,27 +6,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Returns the Monday of the current week (UTC midnight). */
+/** Returns the Sunday of the current week (UTC midnight). */
 export function getCurrentWeekStart(): Date {
   const now = new Date();
-  const monday = startOfWeek(now, { weekStartsOn: 1 });
-  monday.setUTCHours(0, 0, 0, 0);
-  return monday;
+  const sunday = startOfWeek(now, { weekStartsOn: 0 });
+  sunday.setUTCHours(0, 0, 0, 0);
+  return sunday;
 }
 
-/** Returns the Monday of the next week (UTC midnight). */
+/** Returns the Sunday of the next week (UTC midnight). */
 export function getNextWeekStart(): Date {
   return addWeeks(getCurrentWeekStart(), 1);
 }
 
 export const DAYS = [
+  "sunday",
   "monday",
   "tuesday",
   "wednesday",
   "thursday",
   "friday",
   "saturday",
-  "sunday",
 ] as const;
 
 export type Day = (typeof DAYS)[number];

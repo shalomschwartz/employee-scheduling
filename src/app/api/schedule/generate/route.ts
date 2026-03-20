@@ -28,7 +28,24 @@ export async function POST() {
     constraints: (emp.constraints[0]?.data as EmployeeForScheduling["constraints"]) ?? null,
   }));
 
-  const { schedule, warnings } = runScheduler(employeeData);
+  const nameMap = Object.fromEntries(employees.map((e) => [e.id, e.name ?? e.email]));
+  const leadIds = new Set(employees.filter((e) => e.isShiftLead).map((e) => e.id));
+
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData);
+
+  // Enrich each slot with display names and hasLead for the grid
+  const schedule: Record<string, Record<string, object>> = {};
+  for (const [day, dayData] of Object.entries(rawSchedule)) {
+    schedule[day] = {};
+    for (const [shift, slot] of Object.entries(dayData)) {
+      schedule[day][shift] = {
+        employeeIds: slot.employeeIds,
+        employeeNames: slot.employeeIds.map((id) => nameMap[id] ?? id),
+        hasLead: slot.employeeIds.some((id) => leadIds.has(id)),
+        understaffed: slot.understaffed,
+      };
+    }
+  }
 
   const saved = await prisma.generatedSchedule.upsert({
     where: {
@@ -42,7 +59,7 @@ export async function POST() {
   await prisma.shift.deleteMany({ where: { scheduleId: saved.id } });
 
   const shiftRows = [];
-  for (const [day, dayData] of Object.entries(schedule)) {
+  for (const [day, dayData] of Object.entries(rawSchedule)) {
     for (const [shiftType, slot] of Object.entries(dayData)) {
       for (const empId of slot.employeeIds) {
         shiftRows.push({
