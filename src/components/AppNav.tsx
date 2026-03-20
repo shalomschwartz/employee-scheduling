@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 const managerLinks = [
   { href: "/dashboard", label: "לוח בקרה" },
-  { href: "/schedule", label: "לוח משמרות" },
   { href: "/constraints", label: "זמינות עובדים" },
   { href: "/settings", label: "הגדרות" },
 ];

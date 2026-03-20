@@ -1,134 +1,285 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { getNextWeekStart } from "@/lib/utils";
-import { format, addDays } from "date-fns";
-import Link from "next/link";
+"use client";
 
-export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "MANAGER") redirect("/my-schedule");
+import { useEffect, useMemo, useState } from "react";
+import { format, addDays } from "date-fns";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { AvailabilityGrid, defaultConstraintData, type ConstraintData } from "@/components/availability/AvailabilityGrid";
+import { getNextWeekStart, SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day } from "@/lib/utils";
+
+type ShiftKey = "MORNING" | "AFTERNOON" | "EVENING";
+
+interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; }
+type ScheduleData = Record<string, Record<ShiftKey, ShiftSlot>>;
+interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; }
+interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; }
+
+const EMP_COLORS = [
+  "bg-blue-100 text-blue-800", "bg-violet-100 text-violet-800",
+  "bg-emerald-100 text-emerald-800", "bg-rose-100 text-rose-800",
+  "bg-amber-100 text-amber-800", "bg-cyan-100 text-cyan-800",
+];
+
+export default function DashboardPage() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [existing, setExisting] = useState<GeneratedSchedule | null>(null);
+  const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [minPerShift, setMinPerShift] = useState(2);
+  const [selectedEmp, setSelectedEmp] = useState<{ id: string; name: string } | null>(null);
+  const [empConstraints, setEmpConstraints] = useState<ConstraintData>(defaultConstraintData());
+  const [loadingConstraints, setLoadingConstraints] = useState(false);
+  const [savingConstraints, setSavingConstraints] = useState(false);
 
   const weekStart = getNextWeekStart();
-
-  const employees = session.user.organizationId
-    ? await prisma.user.findMany({
-        where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
-        include: { constraints: { where: { weekStart }, take: 1 } },
-        orderBy: { name: "asc" },
-      })
-    : [];
-
-  const submitted = employees.filter((e) => e.constraints.length > 0);
-  const pending = employees.filter((e) => e.constraints.length === 0);
-
-  const existingSchedule = session.user.organizationId
-    ? await prisma.generatedSchedule.findUnique({
-        where: {
-          organizationId_weekStart: {
-            organizationId: session.user.organizationId,
-            weekStart,
-          },
-        },
-      })
-    : null;
-
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
-  const statusLabel =
-    existingSchedule?.status === "PUBLISHED"
-      ? "פורסם"
-      : existingSchedule?.status === "DRAFT"
-      ? "טיוטה"
-      : "אין";
+  useEffect(() => {
+    Promise.all([
+      fetch(`/api/schedule?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
+      fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
+    ]).then(([sched, emps]) => {
+      if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
+      if (Array.isArray(emps)) setEmployees(emps);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const colorMap = useMemo(() => {
+    if (!scheduleData) return {} as Record<string, string>;
+    const names = new Set<string>();
+    for (const dayData of Object.values(scheduleData))
+      for (const slot of Object.values(dayData))
+        for (const n of slot.employeeNames ?? []) names.add(n);
+    const map: Record<string, string> = {};
+    [...names].forEach((name, i) => { map[name] = EMP_COLORS[i % EMP_COLORS.length]; });
+    return map;
+  }, [scheduleData]);
+
+  const nameToId = useMemo(() => {
+    if (!scheduleData) return {} as Record<string, string>;
+    const map: Record<string, string> = {};
+    for (const dayData of Object.values(scheduleData))
+      for (const slot of Object.values(dayData))
+        (slot.employeeIds ?? []).forEach((id, i) => { const n = (slot.employeeNames ?? [])[i]; if (n) map[n] = id; });
+    return map;
+  }, [scheduleData]);
+
+  async function handleNameClick(name: string) {
+    const id = nameToId[name];
+    if (!id) return;
+    if (selectedEmp?.id === id) { setSelectedEmp(null); return; }
+    setSelectedEmp({ id, name });
+    setLoadingConstraints(true);
+    const res = await fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`);
+    if (res.ok) {
+      const emps = await res.json();
+      const emp = emps.find((e: { id: string }) => e.id === id);
+      setEmpConstraints(emp?.constraints[0]?.data ?? defaultConstraintData());
+    }
+    setLoadingConstraints(false);
+  }
+
+  async function generate() {
+    setGenerating(true);
+    setWarnings([]);
+    const res = await fetch("/api/schedule/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ minPerShift, weekStart: weekStart.toISOString() }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setExisting(data.schedule);
+      setScheduleData(data.schedule.schedule as ScheduleData);
+      setWarnings(data.warnings ?? []);
+      setSelectedEmp(null);
+    }
+    setGenerating(false);
+  }
+
+  async function saveEmpConstraints() {
+    if (!selectedEmp) return;
+    setSavingConstraints(true);
+    await fetch("/api/admin/constraints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: selectedEmp.id, weekStart: weekStart.toISOString(), data: empConstraints }),
+    });
+    setSelectedEmp(null);
+    setSavingConstraints(false);
+    await generate();
+  }
+
+  async function publish() {
+    setPublishing(true);
+    const res = await fetch("/api/schedule/publish", { method: "POST" });
+    if (res.ok) setExisting(prev => prev ? { ...prev, status: "PUBLISHED" } : prev);
+    setPublishing(false);
+  }
+
+  const submitted = employees.filter(e => e.constraints.length > 0).length;
+  const shiftKeys: ShiftKey[] = ["MORNING", "AFTERNOON", "EVENING"];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-gray-900">לוח בקרה</h1>
           <p className="text-sm text-gray-500">שבוע {weekLabel}</p>
         </div>
-        {existingSchedule && (
-          <Link href="/schedule" className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700">
-            צפה בלוח
-            <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        )}
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: "סה\"כ עובדים", value: employees.length, color: "text-gray-900" },
-          { label: "הגישו זמינות", value: submitted.length, color: "text-green-600" },
-          { label: "ממתינים", value: pending.length, color: "text-amber-600" },
-          { label: "סטטוס לוח", value: statusLabel, color: existingSchedule?.status === "PUBLISHED" ? "text-green-600" : "text-gray-500" },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="py-4">
-              <p className="text-xs text-gray-500">{stat.label}</p>
-              <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Generate CTA */}
-      {!existingSchedule && (
-        <Card>
-          <CardContent className="py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <p className="font-semibold text-gray-900">מוכן לצור את לוח המשמרות?</p>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {pending.length > 0
-                  ? `${pending.length} עובד${pending.length > 1 ? "ים" : ""} טרם הגיש${pending.length > 1 ? "ו" : ""}.`
-                  : "כל העובדים הגישו את הזמינות שלהם."}
-              </p>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            {existing && (
+              <Badge variant={existing.status === "PUBLISHED" ? "success" : "warning"}>
+                {existing.status === "PUBLISHED" ? "פורסם" : "טיוטה"}
+              </Badge>
+            )}
+            <Button onClick={generate} loading={generating} variant="outline" size="md">
+              {scheduleData ? "צור מחדש" : "צור סידור"}
+            </Button>
+            {scheduleData && existing?.status !== "PUBLISHED" && (
+              <Button onClick={publish} loading={publishing} size="md">פרסם</Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">עובדים למשמרת:</span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setMinPerShift(n => Math.max(1, n - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">−</button>
+              <span className="w-6 text-center font-semibold text-gray-800 text-sm">{minPerShift}</span>
+              <button onClick={() => setMinPerShift(n => Math.min(10, n + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">+</button>
             </div>
-            <Link
-              href="/schedule"
-              className="flex-shrink-0 inline-flex items-center justify-center h-10 px-5 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
-            >
-              צור לוח משמרות
-            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats strip */}
+      {!loading && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "עובדים", value: employees.length },
+            { label: "הגישו זמינות", value: submitted, color: submitted === employees.length && employees.length > 0 ? "text-green-600" : "text-amber-600" },
+            { label: "סטטוס", value: existing?.status === "PUBLISHED" ? "פורסם" : existing ? "טיוטה" : "אין", color: existing?.status === "PUBLISHED" ? "text-green-600" : "text-gray-500" },
+          ].map(s => (
+            <Card key={s.label}>
+              <CardContent className="py-3">
+                <p className="text-xs text-gray-500">{s.label}</p>
+                <p className={cn("text-xl font-bold mt-0.5", s.color ?? "text-gray-900")}>{s.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Warnings */}
+      {warnings.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="py-3">
+            <p className="text-xs font-semibold text-yellow-800 mb-1">אזהרות:</p>
+            <ul className="space-y-0.5">{warnings.map((w, i) => <li key={i} className="text-xs text-yellow-700">• {w}</li>)}</ul>
           </CardContent>
         </Card>
       )}
 
-      {/* Employee list */}
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold text-gray-900 text-sm">הגשות זמינות</h2>
-        </CardHeader>
-        <CardContent className="p-0">
-          {employees.length === 0 ? (
-            <div className="text-center py-10 text-sm text-gray-400">
-              לא נמצאו עובדים.{" "}
-              <Link href="/onboarding" className="text-brand-600 hover:underline">הזמן את הצוות</Link>
-            </div>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {employees.map((emp) => (
-                <li key={emp.id} className="flex items-center justify-between px-6 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{emp.name ?? emp.email}</p>
-                    {emp.isShiftLead && <span className="text-xs text-brand-600">ראש משמרת</span>}
-                  </div>
-                  <Badge variant={emp.constraints.length > 0 ? "success" : "warning"}>
-                    {emp.constraints.length > 0 ? "הוגש" : "ממתין"}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
+      {/* Schedule grid */}
+      {loading ? (
+        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />)}</div>
+      ) : !scheduleData ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <p className="text-sm text-gray-400 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
+            <Button onClick={generate} loading={generating} size="md">צור סידור אוטומטי</Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-400">לחץ על שם עובד לעריכת זמינות</p>
+            {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-right py-3 ps-4 pe-3 text-xs font-semibold text-gray-500 w-28 whitespace-nowrap">משמרת</th>
+                  {DAYS.map(day => (
+                    <th key={day} className="py-3 px-3 text-center text-xs font-semibold text-gray-700 min-w-[90px]">
+                      {DAY_LABELS_HE[day as Day]}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {shiftKeys.map(shift => (
+                  <tr key={shift} className="border-b border-gray-100 last:border-0">
+                    <td className="py-3 ps-4 pe-3 align-middle">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0",
+                          shift === "MORNING" ? "bg-yellow-400" : shift === "AFTERNOON" ? "bg-orange-400" : "bg-indigo-400"
+                        )} />
+                        <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{SHIFTS[shift].label}</span>
+                        <span className="text-[10px] text-gray-400 whitespace-nowrap">{SHIFTS[shift].start}–{SHIFTS[shift].end}</span>
+                      </div>
+                    </td>
+                    {DAYS.map(day => {
+                      const slot = scheduleData[day]?.[shift];
+                      const names = slot?.employeeNames ?? [];
+                      return (
+                        <td key={day} className="py-2.5 px-2 align-top">
+                          {names.length === 0 ? (
+                            <span className="block text-center text-xs text-gray-300">—</span>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              {names.map(name => (
+                                <button key={name} onClick={() => handleNameClick(name)}
+                                  className={cn("text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full transition-all",
+                                    colorMap[name] ?? "bg-gray-100 text-gray-700",
+                                    selectedEmp?.name === name ? "ring-2 ring-offset-1 ring-gray-400 scale-105" : "hover:opacity-80"
+                                  )}>
+                                  {name.split(" ")[0]}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Inline constraint editor */}
+          {selectedEmp && (
+            <Card className="border-brand-200 bg-brand-50/30">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-semibold text-sm text-gray-900">זמינות: {selectedEmp.name}</p>
+                  <button onClick={() => setSelectedEmp(null)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100">סגור</button>
+                </div>
+                {loadingConstraints ? (
+                  <div className="h-40 rounded-lg bg-gray-100 animate-pulse" />
+                ) : (
+                  <AvailabilityGrid value={empConstraints} onChange={setEmpConstraints} disabled={savingConstraints} />
+                )}
+              </CardContent>
+              {!loadingConstraints && (
+                <CardFooter className="flex justify-end gap-2 pt-0">
+                  <Button variant="outline" size="md" onClick={() => setSelectedEmp(null)}>ביטול</Button>
+                  <Button size="md" loading={savingConstraints} onClick={saveEmpConstraints}>שמור ועדכן סידור</Button>
+                </CardFooter>
+              )}
+            </Card>
           )}
-        </CardContent>
-      </Card>
+        </>
+      )}
     </div>
   );
 }
