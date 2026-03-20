@@ -2,26 +2,38 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const hasError = searchParams.get("error") === "1";
-
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(hasError ? "Invalid email or password." : "");
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "Registration failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Auto sign-in after successful registration
     const result = await signIn("credentials", {
       email,
       password,
@@ -31,9 +43,9 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.error) {
-      setError("Invalid email or password.");
+      router.push("/login");
     } else {
-      router.push("/");
+      router.push("/onboarding");
       router.refresh();
     }
   }
@@ -54,8 +66,8 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">Sign in</h2>
-          <p className="text-sm text-gray-500 mb-6">Enter your email and password.</p>
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Create account</h2>
+          <p className="text-sm text-gray-500 mb-6">Set up your ShiftSync account.</p>
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
@@ -65,6 +77,17 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
+              id="name"
+              type="text"
+              label="Full name"
+              placeholder="Jane Smith"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+              autoComplete="name"
+            />
+            <Input
               id="email"
               type="email"
               label="Email"
@@ -72,28 +95,27 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              autoFocus
               autoComplete="email"
             />
             <Input
               id="password"
               type="password"
               label="Password"
-              placeholder="••••••••"
+              placeholder="Min. 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
             />
             <Button type="submit" className="w-full" size="lg" loading={loading}>
-              Sign in
+              Create account
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-brand-600 font-medium hover:underline">
-              Create one
+            Already have an account?{" "}
+            <Link href="/login" className="text-brand-600 font-medium hover:underline">
+              Sign in
             </Link>
           </p>
         </div>

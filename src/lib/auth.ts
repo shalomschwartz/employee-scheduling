@@ -1,56 +1,45 @@
 import { NextAuthOptions } from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import EmailProvider from "next-auth/providers/email";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   session: {
     strategy: "jwt",
   },
   pages: {
     signIn: "/login",
-    verifyRequest: "/login?verify=1",
     error: "/login?error=1",
   },
   providers: [
-    EmailProvider({
-      server: {
-        host: "smtp.resend.com",
-        port: 465,
-        auth: {
-          user: "resend",
-          pass: process.env.RESEND_API_KEY,
-        },
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
-      from: process.env.EMAIL_FROM ?? "ShiftSync <noreply@shiftsync.app>",
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials.password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email.toLowerCase() },
+        });
+
+        if (!user) return null;
+
+        const valid = await bcrypt.compare(credentials.password, user.password);
+        if (!valid) return null;
+
+        return { id: user.id, name: user.name, email: user.email };
+      },
     }),
-    // Dev-only credentials provider — remove in production
-    ...(process.env.NODE_ENV === "development"
-      ? [
-          CredentialsProvider({
-            name: "Dev Login",
-            credentials: {
-              email: { label: "Email", type: "email" },
-            },
-            async authorize(credentials) {
-              if (!credentials?.email) return null;
-              const user = await prisma.user.findUnique({
-                where: { email: credentials.email },
-              });
-              return user ?? null;
-            },
-          }),
-        ]
-      : []),
   ],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         const dbUser = await prisma.user.findUnique({
-          where: { email: user.email! },
+          where: { id: user.id },
           select: { id: true, role: true, organizationId: true, isShiftLead: true },
         });
         if (dbUser) {
