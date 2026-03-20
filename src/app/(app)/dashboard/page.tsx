@@ -192,7 +192,7 @@ const weekStart = getNextWeekStart();
     doAdd();
   }
 
-  function handleDownload() {
+  async function handleDownload() {
     if (!scheduleData) return;
     const downloadConflicts: string[] = [];
 
