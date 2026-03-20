@@ -107,6 +107,7 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
                       type="button"
                       onClick={() => handleToggle(day, shift)}
                       disabled={disabled}
+                      title={disabled ? "נא ללחוץ על עריכה" : undefined}
                       aria-label={`${DAY_LABELS_HE[day]} ${label}: ${styles.label}`}
                       className={cn(
                         "w-full h-10 rounded-lg border-2 text-xs font-semibold transition-all",
