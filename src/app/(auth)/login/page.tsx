@@ -12,11 +12,11 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const hasError = searchParams.get("error") === "1";
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(hasError ? "אימייל שגוי." : "");
+  const [error, setError] = useState(hasError ? "פרטים שגויים." : "");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,15 +24,16 @@ function LoginForm() {
     setError("");
 
     const result = await signIn("credentials", {
-      email,
+      username,
       password: isManager ? password : "",
+      isManager: isManager ? "true" : "false",
       redirect: false,
     });
 
     setLoading(false);
 
     if (result?.error) {
-      setError(isManager ? "אימייל או סיסמה שגויים." : "אימייל לא נמצא.");
+      setError(isManager ? "אימייל או סיסמה שגויים." : "שם לא נמצא. פנה למנהל.");
     } else {
       router.push("/");
       router.refresh();
@@ -43,7 +44,7 @@ function LoginForm() {
     <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
       <h2 className="text-lg font-semibold text-gray-900 mb-1">כניסה</h2>
       <p className="text-sm text-gray-500 mb-6">
-        {isManager ? "הזן אימייל וסיסמה." : "הזן את האימייל שלך."}
+        {isManager ? "הזן אימייל וסיסמה." : "הזן את שמך כפי שהוגדר על ידי המנהל."}
       </p>
 
       {error && (
@@ -54,15 +55,15 @@ function LoginForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          id="email"
-          type="email"
-          label="אימייל"
-          placeholder="you@company.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          id="username"
+          type={isManager ? "email" : "text"}
+          label={isManager ? "אימייל" : "שם"}
+          placeholder={isManager ? "you@company.com" : "ישראל ישראלי"}
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
           required
           autoFocus
-          autoComplete="email"
+          autoComplete={isManager ? "email" : "name"}
         />
         {isManager && (
           <Input
@@ -84,7 +85,7 @@ function LoginForm() {
       <p className="mt-4 text-center text-sm">
         <button
           type="button"
-          onClick={() => { setIsManager(v => !v); setError(""); setPassword(""); }}
+          onClick={() => { setIsManager(v => !v); setError(""); setUsername(""); setPassword(""); }}
           className="text-gray-400 hover:text-brand-600 transition-colors"
         >
           {isManager ? "כניסה כעובד" : "כניסת מנהל"}

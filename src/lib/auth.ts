@@ -16,26 +16,31 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
+        isManager: { label: "Is Manager", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email) return null;
+        if (!credentials?.username) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase() },
-        });
-
-        if (!user) return null;
-
-        // Managers require a password; employees log in with email only
-        if (user.role === "MANAGER") {
+        if (credentials.isManager === "true") {
+          // Manager: look up by email, verify password
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.username.toLowerCase() },
+          });
+          if (!user || user.role !== "MANAGER") return null;
           if (!credentials.password) return null;
           const valid = await bcrypt.compare(credentials.password, user.password);
           if (!valid) return null;
+          return { id: user.id, name: user.name, email: user.email };
+        } else {
+          // Employee: look up by name, no password needed
+          const user = await prisma.user.findFirst({
+            where: { name: { equals: credentials.username, mode: "insensitive" }, role: "EMPLOYEE" },
+          });
+          if (!user) return null;
+          return { id: user.id, name: user.name, email: user.email };
         }
-
-        return { id: user.id, name: user.name, email: user.email };
       },
     }),
   ],
