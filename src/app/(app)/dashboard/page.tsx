@@ -48,17 +48,25 @@ export default function DashboardPage() {
 const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
+  async function fetchEmployees() {
+    const res = await fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`);
+    const emps = await res.json();
+    if (Array.isArray(emps)) setEmployees(emps);
+  }
+
   useEffect(() => {
     Promise.all([
       fetch(`/api/schedule?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
     ]).then(([sched, emps]) => {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
-      if (Array.isArray(emps)) {
-        setEmployees(emps);
-      }
+      if (Array.isArray(emps)) setEmployees(emps);
       setLoading(false);
     }).catch(() => setLoading(false));
+
+    // Poll for employee constraint updates every 30 seconds
+    const interval = setInterval(fetchEmployees, 30_000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
