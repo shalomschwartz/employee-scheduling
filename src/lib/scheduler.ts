@@ -47,37 +47,25 @@ export function runScheduler(
       const pool = [...available, ...preferNot];
       const assigned: EmployeeForScheduling[] = [];
 
-      // Prioritize shift lead
-      const shiftLead = pool.find((e) => e.isShiftLead);
-      if (shiftLead) {
-        assigned.push(shiftLead);
-        shiftCounts[shiftLead.id]++;
-      }
-
-      // Fill remaining slots
+      // Fill slots, balanced by shift count
       for (const emp of pool) {
         if (assigned.length >= minPerShift) break;
-        if (assigned.some((a) => a.id === emp.id)) continue;
         assigned.push(emp);
         shiftCounts[emp.id]++;
       }
 
-      const hasShiftLead = assigned.some((e) => e.isShiftLead);
       const understaffed = assigned.length < minPerShift;
 
       if (assigned.length === 0) {
         warnings.push(`${day} ${SHIFTS[shift].label}: אין עובדים זמינים`);
-      } else {
-        if (understaffed)
-          warnings.push(`${day} ${SHIFTS[shift].label}: רק ${assigned.length}/${minPerShift} עובדים שובצו`);
-        if (!hasShiftLead)
-          warnings.push(`${day} ${SHIFTS[shift].label}: אין ראש משמרת`);
+      } else if (understaffed) {
+        warnings.push(`${day} ${SHIFTS[shift].label}: רק ${assigned.length}/${minPerShift} עובדים שובצו`);
       }
 
       schedule[day][shift] = {
         employeeIds: assigned.map((e) => e.id),
         understaffed,
-        noShiftLead: !hasShiftLead,
+        noShiftLead: false,
       };
     }
   }

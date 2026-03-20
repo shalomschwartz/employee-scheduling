@@ -5,15 +5,13 @@ import { format, addDays } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getNextWeekStart, SHIFTS, DAYS, DAY_LABELS_HE, type Day } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { getNextWeekStart, SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day } from "@/lib/utils";
 
 type ShiftKey = "MORNING" | "AFTERNOON" | "EVENING";
 
 interface ShiftSlot {
   employeeIds: string[];
   employeeNames: string[];
-  hasLead: boolean;
 }
 
 type ScheduleData = Record<string, Record<ShiftKey, ShiftSlot>>;
@@ -175,7 +173,6 @@ export default function SchedulePage() {
                   {DAYS.map((day) => {
                     const slot = scheduleData[day]?.[shift];
                     const names = slot?.employeeNames ?? [];
-                    const hasLead = slot?.hasLead ?? false;
                     return (
                       <td key={day} className="py-2 px-1.5 align-top text-center">
                         {names.length === 0 ? (
@@ -185,12 +182,7 @@ export default function SchedulePage() {
                             {names.map((name, i) => (
                               <span
                                 key={i}
-                                className={cn(
-                                  "text-xs px-1.5 py-0.5 rounded-md",
-                                  hasLead && i === 0
-                                    ? "bg-brand-100 text-brand-700 font-medium"
-                                    : "bg-gray-100 text-gray-700"
-                                )}
+                                className="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-700"
                               >
                                 {name}
                               </span>

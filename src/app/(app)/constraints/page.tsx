@@ -87,7 +87,6 @@ export default function ConstraintsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-sm text-gray-900">{emp.name ?? emp.email}</p>
-                      {emp.isShiftLead && <span className="text-xs text-brand-600">ראש משמרת</span>}
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={hasConstraints ? "success" : "warning"}>

@@ -29,11 +29,10 @@ export async function POST() {
   }));
 
   const nameMap = Object.fromEntries(employees.map((e) => [e.id, e.name ?? e.email]));
-  const leadIds = new Set(employees.filter((e) => e.isShiftLead).map((e) => e.id));
 
   const { schedule: rawSchedule, warnings } = runScheduler(employeeData);
 
-  // Enrich each slot with display names and hasLead for the grid
+  // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};
   for (const [day, dayData] of Object.entries(rawSchedule)) {
     schedule[day] = {};
@@ -41,7 +40,6 @@ export async function POST() {
       schedule[day][shift] = {
         employeeIds: slot.employeeIds,
         employeeNames: slot.employeeIds.map((id) => nameMap[id] ?? id),
-        hasLead: slot.employeeIds.some((id) => leadIds.has(id)),
         understaffed: slot.understaffed,
       };
     }
