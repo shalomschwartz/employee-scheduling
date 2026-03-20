@@ -9,12 +9,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-4 max-w-lg">
-      <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+      <h1 className="text-xl font-bold text-gray-900">הגדרות</h1>
       <Card>
         <CardContent className="py-16 text-center">
-          <p className="text-gray-400 text-sm">
-            Organization settings (roles, shift times, min staffing) coming soon.
-          </p>
+          <p className="text-gray-400 text-sm">הגדרות ארגון יגיעו בקרוב.</p>
         </CardContent>
       </Card>
     </div>

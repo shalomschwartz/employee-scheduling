@@ -15,7 +15,7 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(hasError ? "Invalid email or password." : "");
+  const [error, setError] = useState(hasError ? "אימייל או סיסמה שגויים." : "");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +31,7 @@ function LoginForm() {
     setLoading(false);
 
     if (result?.error) {
-      setError("Invalid email or password.");
+      setError("אימייל או סיסמה שגויים.");
     } else {
       router.push("/");
       router.refresh();
@@ -40,8 +40,8 @@ function LoginForm() {
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">Sign in</h2>
-      <p className="text-sm text-gray-500 mb-6">Enter your email and password.</p>
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">כניסה</h2>
+      <p className="text-sm text-gray-500 mb-6">הזן אימייל וסיסמה.</p>
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
@@ -53,7 +53,7 @@ function LoginForm() {
         <Input
           id="email"
           type="email"
-          label="Email"
+          label="אימייל"
           placeholder="you@company.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -64,7 +64,7 @@ function LoginForm() {
         <Input
           id="password"
           type="password"
-          label="Password"
+          label="סיסמה"
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -72,14 +72,14 @@ function LoginForm() {
           autoComplete="current-password"
         />
         <Button type="submit" className="w-full" size="lg" loading={loading}>
-          Sign in
+          כניסה
         </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-500">
-        Don&apos;t have an account?{" "}
+        אין לך חשבון?{" "}
         <Link href="/register" className="text-brand-600 font-medium hover:underline">
-          Create one
+          הירשם
         </Link>
       </p>
     </div>
@@ -98,7 +98,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">ShiftSync</h1>
-          <p className="text-sm text-gray-500 mt-1">Smart scheduling for your team</p>
+          <p className="text-sm text-gray-500 mt-1">ניהול משמרות חכם לצוות שלך</p>
         </div>
 
         <Suspense fallback={<div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 h-64 animate-pulse" />}>
@@ -106,7 +106,7 @@ export default function LoginPage() {
         </Suspense>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          By signing in you agree to our terms of service.
+          בכניסה אתה מסכים לתנאי השימוש.
         </p>
       </div>
     </div>

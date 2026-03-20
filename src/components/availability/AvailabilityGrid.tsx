@@ -1,24 +1,24 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { DAYS, SHIFTS, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
+import { DAYS, DAY_LABELS_HE, SHIFTS, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
 
 export type ConstraintData = Record<Day, Record<ShiftKey, AvailabilityOption>>;
 
 const OPTION_STYLES: Record<AvailabilityOption, { bg: string; label: string; icon: string }> = {
   available: {
     bg: "bg-green-100 border-green-400 text-green-800",
-    label: "Available",
+    label: "זמין",
     icon: "✓",
   },
   prefer_not: {
     bg: "bg-amber-100 border-amber-400 text-amber-800",
-    label: "Prefer not",
+    label: "מעדיף לא",
     icon: "~",
   },
   unavailable: {
     bg: "bg-red-100 border-red-400 text-red-800",
-    label: "Unavailable",
+    label: "לא זמין",
     icon: "✗",
   },
 };
@@ -68,13 +68,13 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
             </span>
           )
         )}
-        <span className="flex items-center text-gray-400 ml-1">Tap to cycle</span>
+        <span className="flex items-center text-gray-400 me-1">לחץ לשינוי</span>
       </div>
 
       <table className="w-full min-w-[340px] border-collapse">
         <thead>
           <tr>
-            <th className="text-left text-xs font-medium text-gray-400 pb-2 pr-2 w-24">Day</th>
+            <th className="text-right text-xs font-medium text-gray-400 pb-2 ps-2 w-16">יום</th>
             {(Object.entries(SHIFTS) as [ShiftKey, typeof SHIFTS[ShiftKey]][]).map(([key, { label, start, end }]) => (
               <th key={key} className="text-center pb-2 px-1">
                 <div className="text-xs font-semibold text-gray-700">{label}</div>
@@ -86,7 +86,9 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
         <tbody>
           {DAYS.map((day) => (
             <tr key={day} className="border-t border-gray-100">
-              <td className="py-1.5 pr-2 text-sm font-medium text-gray-700 capitalize w-24">{day}</td>
+              <td className="py-1.5 ps-2 text-sm font-medium text-gray-700 w-16">
+                {DAY_LABELS_HE[day]}
+              </td>
               {(Object.keys(SHIFTS) as ShiftKey[]).map((shift) => {
                 const option = value[day][shift];
                 const styles = OPTION_STYLES[option];
@@ -96,7 +98,7 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
                       type="button"
                       onClick={() => handleToggle(day, shift)}
                       disabled={disabled}
-                      aria-label={`${day} ${shift}: ${option}`}
+                      aria-label={`${DAY_LABELS_HE[day]} ${SHIFTS[shift].label}: ${styles.label}`}
                       className={cn(
                         "w-full min-w-[72px] h-10 rounded-lg border-2 text-xs font-semibold transition-all",
                         "active:scale-95 touch-manipulation select-none",
@@ -116,7 +118,7 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
         {/* Quick-set row */}
         <tfoot>
           <tr className="border-t border-gray-200">
-            <td className="pt-2 text-[10px] text-gray-400">Set all</td>
+            <td className="pt-2 text-[10px] text-gray-400 ps-2">הגדר הכל</td>
             {(Object.keys(SHIFTS) as ShiftKey[]).map((shift) => (
               <td key={shift} className="pt-2 px-1 text-center">
                 <div className="flex justify-center gap-0.5">
@@ -132,7 +134,7 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
                         OPTION_STYLES[opt].bg,
                         disabled && "opacity-50 cursor-not-allowed"
                       )}
-                      title={`Set all ${shift} to ${opt}`}
+                      title={`הגדר כל ${SHIFTS[shift].label} ל${OPTION_STYLES[opt].label}`}
                     >
                       {OPTION_STYLES[opt].icon}
                     </button>

@@ -24,10 +24,10 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orgName: orgName.trim() }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) throw new Error();
       router.push("/dashboard");
     } catch {
-      setError("Failed to create organization. Please try again.");
+      setError("שגיאה ביצירת הארגון. נסה שנית.");
     } finally {
       setLoading(false);
     }
@@ -36,33 +36,24 @@ export default function OnboardingPage() {
   return (
     <div className="max-w-md mx-auto mt-12">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome to ShiftSync</h1>
-        <p className="text-sm text-gray-500 mt-1">Set up your organization to get started.</p>
+        <h1 className="text-2xl font-bold text-gray-900">ברוך הבא ל-ShiftSync</h1>
+        <p className="text-sm text-gray-500 mt-1">הגדר את הארגון שלך להתחלה.</p>
       </div>
       <Card>
         <CardHeader>
-          <h2 className="font-semibold text-gray-900">Create your organization</h2>
+          <h2 className="font-semibold text-gray-900">צור ארגון</h2>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
-                {error}
-              </div>
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">{error}</div>
             )}
-            <Input
-              id="orgName"
-              label="Organization name"
-              placeholder="Acme Coffee Co."
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              required
-              autoFocus
-            />
+            <Input id="orgName" label="שם הארגון" placeholder="לדוגמה: קפה שלום"
+              value={orgName} onChange={(e) => setOrgName(e.target.value)} required autoFocus />
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" size="lg" loading={loading}>
-              Create organization
+              צור ארגון
             </Button>
           </CardFooter>
         </form>

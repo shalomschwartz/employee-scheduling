@@ -7,15 +7,15 @@ import { Session } from "next-auth";
 import { cn } from "@/lib/utils";
 
 const managerLinks = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/schedule", label: "Schedule" },
-  { href: "/constraints", label: "Constraints" },
-  { href: "/settings", label: "Settings" },
+  { href: "/dashboard", label: "לוח בקרה" },
+  { href: "/schedule", label: "לוח משמרות" },
+  { href: "/constraints", label: "זמינות עובדים" },
+  { href: "/settings", label: "הגדרות" },
 ];
 
 const employeeLinks = [
-  { href: "/my-schedule", label: "My Schedule" },
-  { href: "/availability", label: "Availability" },
+  { href: "/my-schedule", label: "המשמרות שלי" },
+  { href: "/availability", label: "זמינות שלי" },
 ];
 
 interface AppNavProps {
@@ -69,7 +69,7 @@ export function AppNav({ session }: AppNavProps) {
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
             >
-              Sign out
+              יציאה
             </button>
           </div>
         </div>

@@ -14,19 +14,10 @@ export default async function DashboardPage() {
 
   const weekStart = getNextWeekStart();
 
-  // Employees in this org
   const employees = session.user.organizationId
     ? await prisma.user.findMany({
-        where: {
-          organizationId: session.user.organizationId,
-          role: "EMPLOYEE",
-        },
-        include: {
-          constraints: {
-            where: { weekStart },
-            take: 1,
-          },
-        },
+        where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
+        include: { constraints: { where: { weekStart }, take: 1 } },
         orderBy: { name: "asc" },
       })
     : [];
@@ -34,7 +25,6 @@ export default async function DashboardPage() {
   const submitted = employees.filter((e) => e.constraints.length > 0);
   const pending = employees.filter((e) => e.constraints.length === 0);
 
-  // Check if schedule exists for next week
   const existingSchedule = session.user.organizationId
     ? await prisma.generatedSchedule.findUnique({
         where: {
@@ -46,22 +36,26 @@ export default async function DashboardPage() {
       })
     : null;
 
-  const weekLabel = `${format(weekStart, "MMM d")} – ${format(addDays(weekStart, 6), "MMM d, yyyy")}`;
+  const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
+
+  const statusLabel =
+    existingSchedule?.status === "PUBLISHED"
+      ? "פורסם"
+      : existingSchedule?.status === "DRAFT"
+      ? "טיוטה"
+      : "אין";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Manager Dashboard</h1>
-          <p className="text-sm text-gray-500">Week of {weekLabel}</p>
+          <h1 className="text-xl font-bold text-gray-900">לוח בקרה</h1>
+          <p className="text-sm text-gray-500">שבוע {weekLabel}</p>
         </div>
         {existingSchedule && (
-          <Link
-            href="/schedule"
-            className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700"
-          >
-            View schedule
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <Link href="/schedule" className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700">
+            צפה בלוח
+            <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </Link>
@@ -71,14 +65,10 @@ export default async function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Total employees", value: employees.length, color: "text-gray-900" },
-          { label: "Submitted", value: submitted.length, color: "text-green-600" },
-          { label: "Pending", value: pending.length, color: "text-amber-600" },
-          {
-            label: "Schedule status",
-            value: existingSchedule?.status ?? "None",
-            color: existingSchedule?.status === "PUBLISHED" ? "text-green-600" : "text-gray-500",
-          },
+          { label: "סה\"כ עובדים", value: employees.length, color: "text-gray-900" },
+          { label: "הגישו זמינות", value: submitted.length, color: "text-green-600" },
+          { label: "ממתינים", value: pending.length, color: "text-amber-600" },
+          { label: "סטטוס לוח", value: statusLabel, color: existingSchedule?.status === "PUBLISHED" ? "text-green-600" : "text-gray-500" },
         ].map((stat) => (
           <Card key={stat.label}>
             <CardContent className="py-4">
@@ -89,56 +79,52 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Generate button */}
+      {/* Generate CTA */}
       {!existingSchedule && (
         <Card>
           <CardContent className="py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-gray-900">Ready to generate the schedule?</p>
+              <p className="font-semibold text-gray-900">מוכן לצור את לוח המשמרות?</p>
               <p className="text-sm text-gray-500 mt-0.5">
                 {pending.length > 0
-                  ? `${pending.length} employee${pending.length > 1 ? "s haven't" : " hasn't"} submitted yet.`
-                  : "All employees have submitted their availability."}
+                  ? `${pending.length} עובד${pending.length > 1 ? "ים" : ""} טרם הגיש${pending.length > 1 ? "ו" : ""}.`
+                  : "כל העובדים הגישו את הזמינות שלהם."}
               </p>
             </div>
             <Link
               href="/schedule"
               className="flex-shrink-0 inline-flex items-center justify-center h-10 px-5 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors"
             >
-              Generate Schedule
+              צור לוח משמרות
             </Link>
           </CardContent>
         </Card>
       )}
 
-      {/* Constraint status table */}
+      {/* Employee list */}
       <Card>
         <CardHeader>
-          <h2 className="font-semibold text-gray-900 text-sm">Availability Submissions</h2>
+          <h2 className="font-semibold text-gray-900 text-sm">הגשות זמינות</h2>
         </CardHeader>
         <CardContent className="p-0">
           {employees.length === 0 ? (
             <div className="text-center py-10 text-sm text-gray-400">
-              No employees found. <Link href="/onboarding" className="text-brand-600 hover:underline">Invite your team</Link>
+              לא נמצאו עובדים.{" "}
+              <Link href="/onboarding" className="text-brand-600 hover:underline">הזמן את הצוות</Link>
             </div>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {employees.map((emp) => {
-                const hasSubmitted = emp.constraints.length > 0;
-                return (
-                  <li key={emp.id} className="flex items-center justify-between px-6 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{emp.name ?? emp.email}</p>
-                      {emp.isShiftLead && (
-                        <span className="text-xs text-brand-600">Shift Lead</span>
-                      )}
-                    </div>
-                    <Badge variant={hasSubmitted ? "success" : "warning"}>
-                      {hasSubmitted ? "Submitted" : "Pending"}
-                    </Badge>
-                  </li>
-                );
-              })}
+              {employees.map((emp) => (
+                <li key={emp.id} className="flex items-center justify-between px-6 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{emp.name ?? emp.email}</p>
+                    {emp.isShiftLead && <span className="text-xs text-brand-600">ראש משמרת</span>}
+                  </div>
+                  <Badge variant={emp.constraints.length > 0 ? "success" : "warning"}>
+                    {emp.constraints.length > 0 ? "הוגש" : "ממתין"}
+                  </Badge>
+                </li>
+              ))}
             </ul>
           )}
         </CardContent>

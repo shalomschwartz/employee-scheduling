@@ -1,17 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Heebo } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({ subsets: ["latin"] });
+const heebo = Heebo({ subsets: ["latin", "hebrew"] });
 
 export const metadata: Metadata = {
   title: {
     default: "ShiftSync",
     template: "%s | ShiftSync",
   },
-  description: "Automated shift scheduling for small and medium businesses",
-  manifest: "/manifest.json",
+  description: "ניהול משמרות אוטומטי לעסקים קטנים ובינוניים",
   icons: {
     icon: "/favicon.ico",
   },
@@ -30,8 +29,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} h-full`}>
+    <html lang="he" dir="rtl" className="h-full">
+      <body className={`${heebo.className} h-full`}>
         <Providers>{children}</Providers>
       </body>
     </html>

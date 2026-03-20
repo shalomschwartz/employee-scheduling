@@ -31,10 +31,20 @@ export const DAYS = [
 
 export type Day = (typeof DAYS)[number];
 
+export const DAY_LABELS_HE: Record<Day, string> = {
+  monday: "שני",
+  tuesday: "שלישי",
+  wednesday: "רביעי",
+  thursday: "חמישי",
+  friday: "שישי",
+  saturday: "שבת",
+  sunday: "ראשון",
+};
+
 export const SHIFTS = {
-  MORNING: { label: "Morning", start: "07:00", end: "15:00" },
-  AFTERNOON: { label: "Afternoon", start: "15:00", end: "23:00" },
-  EVENING: { label: "Evening", start: "23:00", end: "07:00" },
+  MORNING: { label: "בוקר", start: "07:00", end: "15:00" },
+  AFTERNOON: { label: "צהריים", start: "15:00", end: "23:00" },
+  EVENING: { label: "ערב", start: "23:00", end: "07:00" },
 } as const;
 
 export type ShiftKey = keyof typeof SHIFTS;
