@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -6,12 +6,15 @@ import { getNextWeekStart, SHIFTS } from "@/lib/utils";
 import { runScheduler, type EmployeeForScheduling } from "@/lib/scheduler";
 import type { ShiftType } from "@prisma/client";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "MANAGER")
     return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
   if (!session.user.organizationId)
     return NextResponse.json({ error: "אין ארגון" }, { status: 400 });
+
+  const body = await req.json().catch(() => ({}));
+  const minPerShift = typeof body.minPerShift === "number" ? Math.max(1, body.minPerShift) : 2;
 
   const weekStart = getNextWeekStart();
 
@@ -30,7 +33,7 @@ export async function POST() {
 
   const nameMap = Object.fromEntries(employees.map((e) => [e.id, e.name ?? e.email]));
 
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData);
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, minPerShift);
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};

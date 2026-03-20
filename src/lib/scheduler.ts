@@ -1,4 +1,4 @@
-import { DAYS, SHIFTS, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
+import { DAYS, SHIFTS, DAY_LABELS_HE, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
 
 export interface EmployeeForScheduling {
   id: string;
@@ -57,9 +57,9 @@ export function runScheduler(
       const understaffed = assigned.length < minPerShift;
 
       if (assigned.length === 0) {
-        warnings.push(`${day} ${SHIFTS[shift].label}: אין עובדים זמינים`);
+        warnings.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: אין עובדים זמינים`);
       } else if (understaffed) {
-        warnings.push(`${day} ${SHIFTS[shift].label}: רק ${assigned.length}/${minPerShift} עובדים שובצו`);
+        warnings.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: רק ${assigned.length}/${minPerShift} עובדים שובצו`);
       }
 
       schedule[day][shift] = {
