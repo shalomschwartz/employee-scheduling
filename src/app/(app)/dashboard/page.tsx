@@ -28,7 +28,6 @@ export default function DashboardPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [publishing, setPublishing] = useState(false);
   const [minPerShift, setMinPerShift] = useState(2);
 
   // Constraint editing
@@ -197,13 +196,6 @@ export default function DashboardPage() {
     await generate();
   }
 
-  async function publish() {
-    setPublishing(true);
-    const res = await fetch("/api/schedule/publish", { method: "POST" });
-    if (res.ok) setExisting(prev => prev ? { ...prev, status: "PUBLISHED" } : prev);
-    setPublishing(false);
-  }
-
   function selectCvEmp(emp: Employee) {
     setCvEmpId(emp.id);
     setCvData((emp.constraints[0]?.data as ConstraintData) ?? defaultConstraintData());
@@ -246,8 +238,13 @@ export default function DashboardPage() {
             <Button onClick={generate} loading={generating} variant="outline" size="md">
               {scheduleData ? "צור מחדש" : "צור סידור"}
             </Button>
-            {scheduleData && existing?.status !== "PUBLISHED" && (
-              <Button onClick={publish} loading={publishing} size="md">פרסם</Button>
+            {scheduleData && (
+              <Button
+                onClick={() => window.open(`/print?weekStart=${weekStart.toISOString()}`, "_blank")}
+                size="md"
+              >
+                הורדה
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-2">
