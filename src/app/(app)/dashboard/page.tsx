@@ -202,6 +202,11 @@ const weekStart = getNextWeekStart();
     setEditingCell(null);
     const slot = scheduleData[day][shift];
     if (slot.employeeIds.includes(emp.id)) return;
+    if (slot.employeeIds.length >= minPerShift) {
+      setErrorToast(`המשמרת מלאה (${minPerShift}/${minPerShift}) — הסר עובד קודם`);
+      setTimeout(() => setErrorToast(null), 3000);
+      return;
+    }
     const name = emp.name ?? emp.email;
 
     const doAdd = () => {
@@ -240,6 +245,12 @@ const weekStart = getNextWeekStart();
     const toSlot = scheduleData[toDay][toShift];
     if (toSlot.employeeIds.includes(dragging.empId)) {
       setErrorToast(`${dragging.name} כבר משובץ/ת במשמרת זו`);
+      setTimeout(() => setErrorToast(null), 3000);
+      setDragging(null);
+      return;
+    }
+    if (toSlot.employeeIds.length >= minPerShift) {
+      setErrorToast(`המשמרת מלאה (${minPerShift}/${minPerShift}) — הסר עובד קודם`);
       setTimeout(() => setErrorToast(null), 3000);
       setDragging(null);
       return;
