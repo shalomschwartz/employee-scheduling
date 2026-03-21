@@ -48,6 +48,7 @@ export default function DashboardPage() {
   // Drag and drop
   const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: ShiftKey } | null>(null);
   const [dragOver, setDragOver] = useState<{ day: string; shift: ShiftKey } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
 const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
@@ -236,7 +237,12 @@ const weekStart = getNextWeekStart();
 
     const emp = empMap[dragging.empId];
     const toSlot = scheduleData[toDay][toShift];
-    if (toSlot.employeeIds.includes(dragging.empId)) { setDragging(null); return; }
+    if (toSlot.employeeIds.includes(dragging.empId)) {
+      setToast(`${dragging.name} כבר משובץ/ת במשמרת זו`);
+      setTimeout(() => setToast(null), 3000);
+      setDragging(null);
+      return;
+    }
 
     const doMove = () => {
       const fromSlot = scheduleData[dragging.fromDay][dragging.fromShift];
@@ -488,10 +494,13 @@ const weekStart = getNextWeekStart();
                       const pinnedIds = slot?.pinnedIds ?? [];
 
                       const isDropTarget = dragOver?.day === day && dragOver?.shift === shift;
-                      const dropAv = isDropTarget && dragging
+                      const alreadyInSlot = isDropTarget && dragging && (slot?.employeeIds ?? []).includes(dragging.empId);
+                      const dropAv = isDropTarget && dragging && !alreadyInSlot
                         ? (empMap[dragging.empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available")
                         : null;
-                      const dropOutline = dropAv === "available"
+                      const dropOutline = alreadyInSlot
+                        ? "bg-gray-100 outline outline-2 outline-gray-400 rounded-lg"
+                        : dropAv === "available"
                         ? "bg-green-50 outline outline-2 outline-green-400 rounded-lg"
                         : dropAv === "prefer_not"
                         ? "bg-yellow-50 outline outline-2 outline-yellow-400 rounded-lg"
@@ -584,6 +593,13 @@ const weekStart = getNextWeekStart();
           </div>
 
         </>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+          {toast}
+        </div>
       )}
 
       {/* Conflict dialog */}
