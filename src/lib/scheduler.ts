@@ -79,7 +79,18 @@ export function runScheduler(
       available.sort(byHours);
       preferNot.sort(byHours);
 
-      for (const emp of [...available, ...preferNot]) {
+      // Compute current average hours across all employees
+      const totalHours = Object.values(hourCounts).reduce((s, h) => s + h, 0);
+      const avgHours = pool.length > 0 ? totalHours / pool.length : 0;
+      // Allow up to 1 shift (8h) above average before deprioritising
+      const softCap = avgHours + hours;
+
+      // First pass: prefer employees at or below the soft cap
+      const candidates = [...available, ...preferNot];
+      const belowCap = candidates.filter(e => hourCounts[e.id] <= softCap);
+      const aboveCap = candidates.filter(e => hourCounts[e.id] > softCap);
+
+      for (const emp of [...belowCap, ...aboveCap]) {
         if (assigned.length >= minPerShift) break;
         assigned.push(emp);
         hourCounts[emp.id] += hours;
