@@ -630,7 +630,7 @@ const weekStart = getNextWeekStart();
                                   );
                                 })}
                               </div>
-                            ) : (
+                            ) : (slot?.employeeIds ?? []).length < minPerShift && (
                               <button
                                 onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
                                 className="w-full text-center text-gray-300 hover:text-gray-500 text-sm py-0.5 rounded hover:bg-gray-50 transition-colors leading-none"
@@ -662,9 +662,12 @@ const weekStart = getNextWeekStart();
         </div>
       )}
 
-      {/* Error toast — bottom center, gray */}
+      {/* Error toast — top center, red */}
       {errorToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-red-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-xl">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
           {errorToast}
         </div>
       )}
