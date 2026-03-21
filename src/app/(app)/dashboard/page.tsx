@@ -45,6 +45,10 @@ export default function DashboardPage() {
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
 
+  // Drag and drop
+  const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: ShiftKey } | null>(null);
+  const [dragOver, setDragOver] = useState<{ day: string; shift: ShiftKey } | null>(null);
+
 const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
@@ -223,6 +227,52 @@ const weekStart = getNextWeekStart();
       return;
     }
     doAdd();
+  }
+
+  function handleDrop(toDay: string, toShift: ShiftKey) {
+    setDragOver(null);
+    if (!dragging || !scheduleData) return;
+    if (dragging.fromDay === toDay && dragging.fromShift === toShift) { setDragging(null); return; }
+
+    const emp = empMap[dragging.empId];
+    const toSlot = scheduleData[toDay][toShift];
+    if (toSlot.employeeIds.includes(dragging.empId)) { setDragging(null); return; }
+
+    const doMove = () => {
+      const fromSlot = scheduleData[dragging.fromDay][dragging.fromShift];
+      const idx = fromSlot.employeeIds.indexOf(dragging.empId);
+      const updated = {
+        ...scheduleData,
+        [dragging.fromDay]: {
+          ...scheduleData[dragging.fromDay],
+          [dragging.fromShift]: {
+            ...fromSlot,
+            employeeIds: fromSlot.employeeIds.filter((_, i) => i !== idx),
+            employeeNames: fromSlot.employeeNames.filter((_, i) => i !== idx),
+            pinnedIds: (fromSlot.pinnedIds ?? []).filter(id => id !== dragging.empId),
+          },
+        },
+        [toDay]: {
+          ...scheduleData[toDay],
+          [toShift]: {
+            ...toSlot,
+            employeeIds: [...toSlot.employeeIds, dragging.empId],
+            employeeNames: [...toSlot.employeeNames, dragging.name],
+            pinnedIds: [...(toSlot.pinnedIds ?? []), dragging.empId],
+          },
+        },
+      };
+      persistSchedule(updated);
+      setDragging(null);
+    };
+
+    const availability = emp?.constraints[0]?.data?.[toDay as Day]?.[toShift] ?? "available";
+    if (availability === "unavailable") {
+      setConflictDialog({ lines: [`${dragging.name} ציין/ה שאינו/ה זמין/ה למשמרת זו`], onIgnore: doMove });
+      setDragging(null);
+      return;
+    }
+    doMove();
   }
 
   async function handleDownload() {
@@ -437,8 +487,15 @@ const weekStart = getNextWeekStart();
                         });
                       const pinnedIds = slot?.pinnedIds ?? [];
 
+                      const isDropTarget = dragOver?.day === day && dragOver?.shift === shift;
                       return (
-                        <td key={day} className="py-2 px-2 align-top">
+                        <td
+                          key={day}
+                          className={cn("py-2 px-2 align-top transition-colors", isDropTarget && "bg-brand-50 outline outline-2 outline-brand-400 rounded-lg")}
+                          onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
+                          onDragLeave={() => setDragOver(null)}
+                          onDrop={() => handleDrop(day, shift)}
+                        >
                           <div className="flex flex-col gap-1">
                             {names.map((name, ni) => {
                               const empId = slot?.employeeIds?.[ni];
@@ -446,9 +503,15 @@ const weekStart = getNextWeekStart();
                               const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
                               const avBorder = av === "available" ? "border-2 border-green-500" : av === "prefer_not" ? "border-2 border-yellow-400" : "border-2 border-red-500";
                               return (
-                              <div key={name} className="group relative">
+                              <div
+                                key={name}
+                                className="group relative"
+                                draggable
+                                onDragStart={() => setDragging({ empId: empId!, name, fromDay: day, fromShift: shift })}
+                                onDragEnd={() => { setDragging(null); setDragOver(null); }}
+                              >
                                 <div className={cn(
-                                  "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full",
+                                  "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full cursor-grab active:cursor-grabbing",
                                   colorMap[name] ?? "bg-gray-100 text-gray-700",
                                   avBorder
                                 )}>
