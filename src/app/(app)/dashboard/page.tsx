@@ -572,7 +572,7 @@ const weekStart = getNextWeekStart();
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
                         >
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-col gap-2.5">
                             {names.map((name, ni) => {
                               const empId = slot?.employeeIds?.[ni];
                               const isPinned = !!empId && pinnedIds.includes(empId);
