@@ -17,13 +17,13 @@ interface Employee { id: string; name: string | null; email: string; constraints
 
 const EMP_COLORS = [
   "bg-[#273c75] text-white", "bg-[#6c5ce7] text-white",
-  "bg-[#00b894] text-white", "bg-[#d63031] text-white",
-  "bg-[#0984e3] text-white", "bg-[#e17055] text-white",
-  "bg-[#00cec9] text-white", "bg-[#2d3436] text-white",
+  "bg-[#e84393] text-white", "bg-[#0984e3] text-white",
+  "bg-[#e17055] text-white", "bg-[#00cec9] text-white",
+  "bg-[#a29bfe] text-white", "bg-[#2d3436] text-white",
 ];
 
 // Hex equivalents of EMP_COLORS for PDF rendering (html2canvas needs inline styles)
-const EMP_HEX = ["#273c75","#6c5ce7","#00b894","#d63031","#0984e3","#e17055","#00cec9","#2d3436"];
+const EMP_HEX = ["#273c75","#6c5ce7","#e84393","#0984e3","#e17055","#00cec9","#a29bfe","#2d3436"];
 
 export default function DashboardPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
