@@ -488,10 +488,20 @@ const weekStart = getNextWeekStart();
                       const pinnedIds = slot?.pinnedIds ?? [];
 
                       const isDropTarget = dragOver?.day === day && dragOver?.shift === shift;
+                      const dropAv = isDropTarget && dragging
+                        ? (empMap[dragging.empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available")
+                        : null;
+                      const dropOutline = dropAv === "available"
+                        ? "bg-green-50 outline outline-2 outline-green-400 rounded-lg"
+                        : dropAv === "prefer_not"
+                        ? "bg-yellow-50 outline outline-2 outline-yellow-400 rounded-lg"
+                        : dropAv === "unavailable"
+                        ? "bg-red-50 outline outline-2 outline-red-400 rounded-lg"
+                        : "";
                       return (
                         <td
                           key={day}
-                          className={cn("py-2 px-2 align-top transition-colors", isDropTarget && "bg-brand-50 outline outline-2 outline-brand-400 rounded-lg")}
+                          className={cn("py-2 px-2 align-top transition-colors", isDropTarget && dropOutline)}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
