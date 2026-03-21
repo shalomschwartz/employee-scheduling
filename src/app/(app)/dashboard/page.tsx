@@ -331,18 +331,21 @@ const weekStart = getNextWeekStart();
 
   function handleWhatsApp() {
     if (!scheduleData) return;
-    const waTab = window.open("", "_blank");
-    const openWa = () => {
-      if (waTab) waTab.location.href = "https://wa.me/972533306614?text=%D7%A9%D7%99%D7%91%D7%95%D7%A5%20%D7%94%D7%A9%D7%91%D7%95%D7%A2";
-    };
+    const WA_URL = "https://wa.me/972533306614?text=%D7%A9%D7%99%D7%91%D7%95%D7%A5%20%D7%94%D7%A9%D7%91%D7%95%D7%A2";
     const downloadConflicts = getDownloadConflicts();
     if (downloadConflicts.length > 0) {
+      // onIgnore runs inside a user click → window.open won't be blocked
       setConflictDialog({
         lines: downloadConflicts,
-        onIgnore: async () => { await executePdfDownload(); openWa(); },
+        onIgnore: async () => {
+          await executePdfDownload();
+          window.open(WA_URL, "_blank");
+        },
       });
     } else {
-      executePdfDownload().then(openWa);
+      // No dialog — open WhatsApp synchronously (user gesture), then download
+      window.open(WA_URL, "_blank");
+      executePdfDownload();
     }
   }
 
