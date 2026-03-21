@@ -426,14 +426,18 @@ const weekStart = getNextWeekStart();
           <CardContent className="py-3">
             <p className="text-xs font-semibold text-red-800 mb-2">התנגשויות זמינות:</p>
             <div className="space-y-2">
-              {Object.entries(conflicts).map(([name, slots]) => (
-                <div key={name}>
-                  <p className="text-xs font-semibold text-red-700">{name}</p>
-                  <ul className="mt-0.5 space-y-0.5 ps-3">
-                    {slots.map((s, i) => <li key={i} className="text-xs text-red-600">• {s}</li>)}
-                  </ul>
-                </div>
-              ))}
+              {Object.entries(conflicts).map(([name, slots]) => {
+                const empIndex = employees.findIndex(e => (e.name ?? e.email) === name);
+                const chipColor = empIndex >= 0 ? EMP_COLORS[empIndex % EMP_COLORS.length] : "bg-gray-200 text-gray-800";
+                return (
+                  <div key={name}>
+                    <span className={cn("inline-block text-xs font-semibold px-2 py-0.5 rounded-md", chipColor)}>{name}</span>
+                    <ul className="mt-0.5 space-y-0.5 ps-3">
+                      {slots.map((s, i) => <li key={i} className="text-xs text-red-600">• {s}</li>)}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
