@@ -364,8 +364,9 @@ const weekStart = getNextWeekStart();
             {scheduleData && (
               <Button
                 onClick={async () => {
+                  const waTab = window.open("", "_blank");
                   await handleDownload();
-                  window.open("https://wa.me/972533306614?text=%D7%A9%D7%99%D7%91%D7%95%D7%A5%20%D7%94%D7%A9%D7%91%D7%95%D7%A2", "_blank");
+                  if (waTab) waTab.location.href = "https://wa.me/972533306614?text=%D7%A9%D7%99%D7%91%D7%95%D7%A5%20%D7%94%D7%A9%D7%91%D7%95%D7%A2";
                 }}
                 size="md"
                 variant="secondary"
