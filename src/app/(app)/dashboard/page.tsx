@@ -281,10 +281,25 @@ const weekStart = getNextWeekStart();
     doMove();
   }
 
-  async function handleDownload() {
-    if (!scheduleData) return;
-    const downloadConflicts: string[] = [];
+  async function executePdfDownload() {
+    const { default: html2canvas } = await import("html2canvas");
+    const { default: jsPDF } = await import("jspdf");
+    if (!printRef.current) return;
+    const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+    const scale = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
+    const w = canvas.width * scale;
+    const h = canvas.height * scale;
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
+    pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}.pdf`);
+  }
 
+  function getDownloadConflicts(): string[] {
+    if (!scheduleData) return [];
+    const result: string[] = [];
     for (const day of DAYS) {
       const dayData = scheduleData[day];
       if (!dayData) continue;
@@ -296,33 +311,38 @@ const weekStart = getNextWeekStart();
           if (!emp) return;
           const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
           if (availability === "unavailable") {
-            const name = slot.employeeNames[i] ?? emp.name ?? emp.email;
-            downloadConflicts.push(`${name} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
+            result.push(`${slot.employeeNames[i] ?? emp.name ?? emp.email} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
           }
         });
       }
     }
+    return result;
+  }
 
-    const doDownload = async () => {
-      const { default: html2canvas } = await import("html2canvas");
-      const { default: jsPDF } = await import("jspdf");
-      if (!printRef.current) return;
-      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 8;
-      const scale = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
-      const w = canvas.width * scale;
-      const h = canvas.height * scale;
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
-      pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}.pdf`);
-    };
-
+  async function handleDownload() {
+    if (!scheduleData) return;
+    const downloadConflicts = getDownloadConflicts();
     if (downloadConflicts.length > 0) {
-      setConflictDialog({ lines: downloadConflicts, onIgnore: doDownload });
+      setConflictDialog({ lines: downloadConflicts, onIgnore: executePdfDownload });
     } else {
-      await doDownload();
+      await executePdfDownload();
+    }
+  }
+
+  function handleWhatsApp() {
+    if (!scheduleData) return;
+    const waTab = window.open("", "_blank");
+    const openWa = () => {
+      if (waTab) waTab.location.href = "https://wa.me/972533306614?text=%D7%A9%D7%99%D7%91%D7%95%D7%A5%20%D7%94%D7%A9%D7%91%D7%95%D7%A2";
+    };
+    const downloadConflicts = getDownloadConflicts();
+    if (downloadConflicts.length > 0) {
+      setConflictDialog({
+        lines: downloadConflicts,
+        onIgnore: async () => { await executePdfDownload(); openWa(); },
+      });
+    } else {
+      executePdfDownload().then(openWa);
     }
   }
 
@@ -363,11 +383,7 @@ const weekStart = getNextWeekStart();
             )}
             {scheduleData && (
               <Button
-                onClick={async () => {
-                  const waTab = window.open("", "_blank");
-                  await handleDownload();
-                  if (waTab) waTab.location.href = "https://wa.me/972533306614?text=%D7%A9%D7%99%D7%91%D7%95%D7%A5%20%D7%94%D7%A9%D7%91%D7%95%D7%A2";
-                }}
+                onClick={handleWhatsApp}
                 size="md"
                 variant="secondary"
               >
