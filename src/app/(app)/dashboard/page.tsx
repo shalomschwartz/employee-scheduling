@@ -105,8 +105,8 @@ const weekStart = getNextWeekStart();
   }, [scheduleData, minPerShift]);
 
   const conflicts = useMemo(() => {
-    if (!scheduleData) return [];
-    const result: string[] = [];
+    if (!scheduleData) return {} as Record<string, string[]>;
+    const result: Record<string, string[]> = {};
     for (const day of DAYS) {
       const dayData = scheduleData[day];
       if (!dayData) continue;
@@ -119,7 +119,8 @@ const weekStart = getNextWeekStart();
           const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
           if (availability === "unavailable") {
             const name = slot.employeeNames[i] ?? emp.name ?? emp.email;
-            result.push(`${name} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
+            if (!result[name]) result[name] = [];
+            result[name].push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
           }
         });
       }
@@ -364,11 +365,20 @@ const weekStart = getNextWeekStart();
       )}
 
       {/* Conflicts */}
-      {conflicts.length > 0 && (
+      {Object.keys(conflicts).length > 0 && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="py-3">
-            <p className="text-xs font-semibold text-red-800 mb-1">התנגשויות זמינות:</p>
-            <ul className="space-y-0.5">{conflicts.map((c, i) => <li key={i} className="text-xs text-red-700">• {c}</li>)}</ul>
+            <p className="text-xs font-semibold text-red-800 mb-2">התנגשויות זמינות:</p>
+            <div className="space-y-2">
+              {Object.entries(conflicts).map(([name, slots]) => (
+                <div key={name}>
+                  <p className="text-xs font-semibold text-red-700">{name}</p>
+                  <ul className="mt-0.5 space-y-0.5 ps-3">
+                    {slots.map((s, i) => <li key={i} className="text-xs text-red-600">• {s}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
