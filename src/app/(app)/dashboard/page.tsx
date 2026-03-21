@@ -44,6 +44,7 @@ export default function DashboardPage() {
 
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
+  const [confirmGenerate, setConfirmGenerate] = useState(false);
 
   // Drag and drop
   const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: ShiftKey } | null>(null);
@@ -378,7 +379,7 @@ const weekStart = getNextWeekStart();
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <Button onClick={generate} loading={generating} variant="outline" size="md">
+            <Button onClick={scheduleData ? () => setConfirmGenerate(true) : generate} loading={generating} variant="outline" size="md">
               {scheduleData ? "צור מחדש" : "צור סידור"}
             </Button>
             {scheduleData && (
@@ -638,6 +639,20 @@ const weekStart = getNextWeekStart();
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
           {toast}
+        </div>
+      )}
+
+      {/* Confirm regenerate dialog */}
+      {confirmGenerate && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" dir="rtl">
+            <h3 className="text-base font-bold text-gray-900 mb-2">צור סידור מחדש?</h3>
+            <p className="text-sm text-gray-500 mb-5">הסידור הנוכחי יוחלף. משמרות שנעוצו ידנית (📌) יישמרו.</p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="secondary" size="md" onClick={() => setConfirmGenerate(false)}>ביטול</Button>
+              <Button size="md" onClick={() => { setConfirmGenerate(false); generate(); }}>צור מחדש</Button>
+            </div>
+          </div>
         </div>
       )}
 
