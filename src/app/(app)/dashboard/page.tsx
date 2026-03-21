@@ -577,7 +577,7 @@ const weekStart = getNextWeekStart();
                               const empId = slot?.employeeIds?.[ni];
                               const isPinned = !!empId && pinnedIds.includes(empId);
                               const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
-                              const avBorder = av === "available" ? "border-2 border-green-500" : av === "prefer_not" ? "border-2 border-yellow-400" : "border-2 border-red-500";
+                              const avBorder = av === "available" ? "ring-2 ring-green-400 ring-offset-1" : av === "prefer_not" ? "ring-2 ring-yellow-400 ring-offset-1" : "ring-2 ring-red-500 ring-offset-1";
                               return (
                               <div
                                 key={name}
