@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: ShiftKey } | null>(null);
   const [dragOver, setDragOver] = useState<{ day: string; shift: ShiftKey } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
 const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
@@ -238,8 +239,8 @@ const weekStart = getNextWeekStart();
     const emp = empMap[dragging.empId];
     const toSlot = scheduleData[toDay][toShift];
     if (toSlot.employeeIds.includes(dragging.empId)) {
-      setToast(`${dragging.name} כבר משובץ/ת במשמרת זו`);
-      setTimeout(() => setToast(null), 3000);
+      setErrorToast(`${dragging.name} כבר משובץ/ת במשמרת זו`);
+      setTimeout(() => setErrorToast(null), 3000);
       setDragging(null);
       return;
     }
@@ -640,10 +641,20 @@ const weekStart = getNextWeekStart();
         </>
       )}
 
-      {/* Toast */}
+      {/* Success toast — top center, green */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-green-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-xl">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
           {toast}
+        </div>
+      )}
+
+      {/* Error toast — bottom center, gray */}
+      {errorToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg">
+          {errorToast}
         </div>
       )}
 
