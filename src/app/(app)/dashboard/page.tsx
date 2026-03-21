@@ -535,23 +535,27 @@ const weekStart = getNextWeekStart();
                       const pinnedIds = slot?.pinnedIds ?? [];
 
                       const isDropTarget = dragOver?.day === day && dragOver?.shift === shift;
-                      const alreadyInSlot = isDropTarget && dragging && (slot?.employeeIds ?? []).includes(dragging.empId);
-                      const dropAv = isDropTarget && dragging && !alreadyInSlot
+                      const alreadyInSlot = dragging && (slot?.employeeIds ?? []).includes(dragging.empId);
+                      const cellAv = dragging && !alreadyInSlot
                         ? (empMap[dragging.empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available")
                         : null;
-                      const dropOutline = alreadyInSlot
-                        ? "bg-gray-100 outline outline-2 outline-gray-400 rounded-lg"
-                        : dropAv === "available"
-                        ? "bg-green-50 outline outline-2 outline-green-400 rounded-lg"
-                        : dropAv === "prefer_not"
-                        ? "bg-yellow-50 outline outline-2 outline-yellow-400 rounded-lg"
-                        : dropAv === "unavailable"
-                        ? "bg-red-50 outline outline-2 outline-red-400 rounded-lg"
+                      // Ambient bg shown for all cells while dragging
+                      const dragBg = alreadyInSlot ? "bg-gray-100"
+                        : cellAv === "available" ? "bg-green-50"
+                        : cellAv === "prefer_not" ? "bg-yellow-50"
+                        : cellAv === "unavailable" ? "bg-red-50"
+                        : "";
+                      // Stronger outline only on the hovered cell
+                      const dropOutline = isDropTarget
+                        ? alreadyInSlot ? "outline outline-2 outline-gray-400 rounded-lg"
+                          : cellAv === "available" ? "outline outline-2 outline-green-500 rounded-lg"
+                          : cellAv === "prefer_not" ? "outline outline-2 outline-yellow-400 rounded-lg"
+                          : "outline outline-2 outline-red-400 rounded-lg"
                         : "";
                       return (
                         <td
                           key={day}
-                          className={cn("py-2 px-2 align-top transition-colors", isDropTarget && dropOutline)}
+                          className={cn("py-2 px-2 align-top transition-colors", dragging && dragBg, dropOutline)}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
