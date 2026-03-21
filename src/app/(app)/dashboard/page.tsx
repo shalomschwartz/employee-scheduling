@@ -766,17 +766,16 @@ const weekStart = getNextWeekStart();
                           <div className="flex flex-col gap-0.5">
                             {employees.filter(e => empFilter.length === 0 || empFilter.includes(e.name ?? e.email)).map(emp => {
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
-                              const chipStyle = av === "available"
-                                ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                : av === "prefer_not"
-                                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                                : "bg-red-100 text-red-800 hover:bg-red-200";
+                              const empIndex = employees.findIndex(e => e.id === emp.id);
+                              const empColor = EMP_COLORS[empIndex % EMP_COLORS.length];
+                              const avRing = av === "available" ? "ring-[2px] ring-green-400" : av === "prefer_not" ? "ring-[2px] ring-yellow-400" : "ring-[2px] ring-red-500";
                               return (
                                 <div
                                   key={emp.id}
                                   className={cn(
-                                    "text-[10px] px-1.5 py-0.5 rounded font-medium text-center w-full",
-                                    chipStyle
+                                    "text-[10px] px-1.5 py-0.5 rounded-md font-medium text-center w-full",
+                                    empColor,
+                                    avRing
                                   )}
                                 >
                                   {(emp.name ?? emp.email).split(" ")[0]}
