@@ -16,14 +16,14 @@ interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedul
 interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; }
 
 const EMP_COLORS = [
-  "bg-blue-300 text-blue-900", "bg-violet-300 text-violet-900",
-  "bg-pink-300 text-pink-900", "bg-indigo-300 text-indigo-900",
-  "bg-sky-300 text-sky-900", "bg-fuchsia-300 text-fuchsia-900",
-  "bg-purple-300 text-purple-900", "bg-slate-300 text-slate-900",
+  "bg-[#273c75] text-white", "bg-[#6c5ce7] text-white",
+  "bg-[#00b894] text-white", "bg-[#d63031] text-white",
+  "bg-[#0984e3] text-white", "bg-[#e17055] text-white",
+  "bg-[#00cec9] text-white", "bg-[#2d3436] text-white",
 ];
 
 // Hex equivalents of EMP_COLORS for PDF rendering (html2canvas needs inline styles)
-const EMP_HEX = ["#93c5fd","#c4b5fd","#f9a8d4","#a5b4fc","#7dd3fc","#f0abfc","#d8b4fe","#cbd5e1"];
+const EMP_HEX = ["#273c75","#6c5ce7","#00b894","#d63031","#0984e3","#e17055","#00cec9","#2d3436"];
 
 export default function DashboardPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
