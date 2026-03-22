@@ -130,19 +130,24 @@ export default function SettingsPage() {
                   className="flex-1 min-w-0 text-sm font-medium bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                   placeholder="שם המשמרת"
                 />
-                <input
-                  type="time"
-                  value={shift.start}
-                  onChange={e => updateShift(shift.id, "start", e.target.value)}
-                  className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-24"
-                />
-                <span className="text-gray-400 text-xs">—</span>
-                <input
-                  type="time"
-                  value={shift.end}
-                  onChange={e => updateShift(shift.id, "end", e.target.value)}
-                  className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-24"
-                />
+                {/* Time range — forced LTR so start always appears on the left */}
+                <div className="flex items-center gap-1 shrink-0" dir="ltr">
+                  <span className="text-[10px] text-gray-400">מ</span>
+                  <input
+                    type="time"
+                    value={shift.start}
+                    onChange={e => updateShift(shift.id, "start", e.target.value)}
+                    className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-[88px]"
+                  />
+                  <span className="text-gray-400 text-xs">—</span>
+                  <input
+                    type="time"
+                    value={shift.end}
+                    onChange={e => updateShift(shift.id, "end", e.target.value)}
+                    className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-[88px]"
+                  />
+                  <span className="text-[10px] text-gray-400">עד</span>
+                </div>
                 <button
                   onClick={() => removeShift(shift.id)}
                   disabled={shifts.length <= 1}
