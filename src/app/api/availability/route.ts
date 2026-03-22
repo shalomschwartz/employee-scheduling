@@ -9,7 +9,7 @@ const AvailabilitySchema = z.object({
   data: z.record(
     z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]),
     z.record(
-      z.enum(["MORNING", "AFTERNOON", "EVENING"]),
+      z.string(),
       z.enum(["available", "prefer_not", "unavailable"])
     )
   ),
