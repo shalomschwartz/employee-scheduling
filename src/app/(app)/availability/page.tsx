@@ -69,6 +69,12 @@ export default function AvailabilityPage() {
     }
   }
 
+  const availableCount = DAYS.reduce((acc, day) => {
+    return acc + Object.values(constraints[day]).filter((v) => v === "available").length;
+  }, 0);
+  const preferNotCount = DAYS.reduce((acc, day) => {
+    return acc + Object.values(constraints[day]).filter((v) => v === "prefer_not").length;
+  }, 0);
   const unavailableCount = DAYS.reduce((acc, day) => {
     return acc + Object.values(constraints[day]).filter((v) => v === "unavailable").length;
   }, 0);
@@ -102,11 +108,11 @@ export default function AvailabilityPage() {
                 לחץ על כל תא לשינוי: זמין ← מעדיף לא ← לא זמין
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {unavailableCount > 0 && (
-                <Badge variant="warning">{unavailableCount} חסום</Badge>
-              )}
-              {alreadySubmitted && <Badge variant="success">הוגש</Badge>}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {availableCount > 0 && <Badge variant="success">{availableCount} זמין</Badge>}
+              {preferNotCount > 0 && <Badge variant="warning">{preferNotCount} מעדיף לא</Badge>}
+              {unavailableCount > 0 && <Badge variant="danger">{unavailableCount} חסום</Badge>}
+              {alreadySubmitted && <Badge variant="default">הוגש</Badge>}
             </div>
           </div>
         </CardHeader>
