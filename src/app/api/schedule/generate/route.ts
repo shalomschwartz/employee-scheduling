@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getNextWeekStart, SHIFTS } from "@/lib/utils";
+import { getNextWeekStart, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
 import { runScheduler, type EmployeeForScheduling } from "@/lib/scheduler";
 import type { ShiftType } from "@prisma/client";
 
@@ -50,7 +50,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, minPerShift, pinnedSlots);
+  // Load org-specific shift config
+  const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
+  const orgSettings = (org?.settings ?? {}) as Record<string, unknown>;
+  const shifts: ShiftConfig[] = Array.isArray(orgSettings.shifts) ? (orgSettings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
+
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, minPerShift, pinnedSlots, shifts);
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};
@@ -81,13 +86,14 @@ export async function POST(req: NextRequest) {
   for (const [day, dayData] of Object.entries(rawSchedule)) {
     for (const [shiftType, slot] of Object.entries(dayData)) {
       for (const empId of slot.employeeIds) {
+        const shiftCfg = shifts.find(s => s.id === shiftType);
         shiftRows.push({
           employeeId: empId,
           scheduleId: saved.id,
           day,
           shiftType: shiftType as ShiftType,
-          startTime: SHIFTS[shiftType as keyof typeof SHIFTS].start,
-          endTime: SHIFTS[shiftType as keyof typeof SHIFTS].end,
+          startTime: shiftCfg?.start ?? "00:00",
+          endTime: shiftCfg?.end ?? "00:00",
         });
       }
     }

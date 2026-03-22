@@ -1,9 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { DAYS, DAY_LABELS_HE, SHIFTS, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
+import { DAYS, DAY_LABELS_HE, DEFAULT_SHIFTS, type Day, type AvailabilityOption, type ShiftConfig } from "@/lib/utils";
 
-export type ConstraintData = Record<Day, Record<ShiftKey, AvailabilityOption>>;
+export type ConstraintData = Record<Day, Record<string, AvailabilityOption>>;
 
 const OPTION_STYLES: Record<AvailabilityOption, { bg: string; label: string; icon: string }> = {
   available: { bg: "bg-green-100 border-green-400 text-green-800", label: "זמין", icon: "✓" },
@@ -11,11 +11,7 @@ const OPTION_STYLES: Record<AvailabilityOption, { bg: string; label: string; ico
   unavailable: { bg: "bg-red-100 border-red-400 text-red-800", label: "לא זמין", icon: "✗" },
 };
 
-const SHIFT_DOT: Record<ShiftKey, string> = {
-  MORNING: "bg-yellow-400",
-  AFTERNOON: "bg-orange-400",
-  EVENING: "bg-indigo-400",
-};
+const SHIFT_DOT_DEFAULTS = ["bg-yellow-400", "bg-orange-400", "bg-indigo-400", "bg-blue-400", "bg-pink-400"];
 
 const OPTION_CYCLE: AvailabilityOption[] = ["available", "prefer_not", "unavailable"];
 
@@ -27,15 +23,17 @@ interface AvailabilityGridProps {
   value: ConstraintData;
   onChange: (data: ConstraintData) => void;
   disabled?: boolean;
+  shifts?: ShiftConfig[];
 }
 
-export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGridProps) {
-  function handleToggle(day: Day, shift: ShiftKey) {
+export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_SHIFTS }: AvailabilityGridProps) {
+  function handleToggle(day: Day, shift: string) {
     if (disabled) return;
-    onChange({ ...value, [day]: { ...value[day], [shift]: nextOption(value[day][shift]) } });
+    const cur = value[day]?.[shift] ?? "available";
+    onChange({ ...value, [day]: { ...value[day], [shift]: nextOption(cur as AvailabilityOption) } });
   }
 
-  function handleSetAll(shift: ShiftKey, option: AvailabilityOption) {
+  function handleSetAll(shift: string, option: AvailabilityOption) {
     const updated = { ...value };
     for (const day of DAYS) updated[day] = { ...updated[day], [shift]: option };
     onChange(updated);
@@ -58,7 +56,6 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
       <table className="w-full min-w-[520px] border-collapse">
         <thead>
           <tr>
-            {/* Shift label column header */}
             <th className="text-right text-xs font-medium text-gray-400 pb-2 ps-2 w-28">משמרת</th>
             {DAYS.map(day => (
               <th key={day} className="text-center pb-2 px-1 min-w-[58px]">
@@ -68,28 +65,27 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
           </tr>
         </thead>
         <tbody>
-          {(Object.entries(SHIFTS) as [ShiftKey, typeof SHIFTS[ShiftKey]][]).map(([shift, { label, start, end }]) => (
-            <tr key={shift} className="border-t border-gray-100">
-              {/* Shift label + quick-set */}
+          {shifts.map((shiftCfg, si) => (
+            <tr key={shiftCfg.id} className="border-t border-gray-100">
               <td className="py-2 ps-2 pe-3 align-middle">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className={cn("w-2 h-2 rounded-full flex-shrink-0", SHIFT_DOT[shift])} />
-                  <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{label}</span>
+                  <span className={cn("w-2 h-2 rounded-full flex-shrink-0", SHIFT_DOT_DEFAULTS[si % SHIFT_DOT_DEFAULTS.length])} />
+                  <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg.label}</span>
                 </div>
-                <div className="text-[10px] text-gray-400 mb-1.5 ps-3.5">{start}–{end}</div>
+                <div className="text-[10px] text-gray-400 mb-1.5 ps-3.5">{shiftCfg.start}–{shiftCfg.end}</div>
                 <div className="flex gap-0.5 ps-3.5">
                   {OPTION_CYCLE.map(opt => (
                     <button
                       key={opt}
                       type="button"
                       disabled={disabled}
-                      onClick={() => handleSetAll(shift, opt)}
+                      onClick={() => handleSetAll(shiftCfg.id, opt)}
                       className={cn(
                         "w-5 h-5 rounded text-[9px] font-bold border transition-all active:scale-95 touch-manipulation",
                         OPTION_STYLES[opt].bg,
                         disabled && "opacity-50 cursor-not-allowed"
                       )}
-                      title={`הגדר כל ${label} ל${OPTION_STYLES[opt].label}`}
+                      title={`הגדר כל ${shiftCfg.label} ל${OPTION_STYLES[opt].label}`}
                     >
                       {OPTION_STYLES[opt].icon}
                     </button>
@@ -97,18 +93,17 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
                 </div>
               </td>
 
-              {/* Day cells */}
               {DAYS.map(day => {
-                const option = value[day][shift];
+                const option = (value[day]?.[shiftCfg.id] ?? "available") as AvailabilityOption;
                 const styles = OPTION_STYLES[option];
                 return (
                   <td key={day} className="py-1.5 px-1 text-center">
                     <button
                       type="button"
-                      onClick={() => handleToggle(day, shift)}
+                      onClick={() => handleToggle(day, shiftCfg.id)}
                       disabled={disabled}
                       title={disabled ? "נא ללחוץ על עריכה" : undefined}
-                      aria-label={`${DAY_LABELS_HE[day]} ${label}: ${styles.label}`}
+                      aria-label={`${DAY_LABELS_HE[day]} ${shiftCfg.label}: ${styles.label}`}
                       className={cn(
                         "w-full h-10 rounded-lg border-2 text-xs font-semibold transition-all",
                         "active:scale-95 touch-manipulation select-none",
@@ -131,8 +126,8 @@ export function AvailabilityGrid({ value, onChange, disabled }: AvailabilityGrid
 }
 
 /** Returns a blank constraint grid with all slots set to 'available' */
-export function defaultConstraintData(): ConstraintData {
+export function defaultConstraintData(shifts: ShiftConfig[] = DEFAULT_SHIFTS): ConstraintData {
   return Object.fromEntries(
-    DAYS.map(day => [day, Object.fromEntries((Object.keys(SHIFTS) as ShiftKey[]).map(shift => [shift, "available"]))])
+    DAYS.map(day => [day, Object.fromEntries(shifts.map(s => [s.id, "available"]))])
   ) as ConstraintData;
 }

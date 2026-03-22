@@ -11,12 +11,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getNextWeekStart, DAYS } from "@/lib/utils";
+import { getNextWeekStart, DAYS, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
 
 type SubmitStatus = "idle" | "loading" | "success" | "error";
 
 export default function AvailabilityPage() {
   const { data: session } = useSession();
+  const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [constraints, setConstraints] = useState<ConstraintData>(defaultConstraintData());
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -27,9 +28,16 @@ export default function AvailabilityPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(`/api/availability?weekStart=${weekStart.toISOString()}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [shiftsRes, availRes] = await Promise.all([
+        fetch("/api/shifts"),
+        fetch(`/api/availability?weekStart=${weekStart.toISOString()}`),
+      ]);
+      if (shiftsRes.ok) {
+        const s = await shiftsRes.json();
+        if (Array.isArray(s)) { setShifts(s); setConstraints(defaultConstraintData(s)); }
+      }
+      if (availRes.ok) {
+        const data = await availRes.json();
         if (data?.data) {
           setConstraints(data.data as ConstraintData);
           setAlreadySubmitted(true);
@@ -103,13 +111,13 @@ export default function AvailabilityPage() {
         </CardHeader>
 
         <CardContent className="pt-4">
-          <AvailabilityGrid value={constraints} onChange={setConstraints} disabled={status === "loading"} />
+          <AvailabilityGrid value={constraints} onChange={setConstraints} disabled={status === "loading"} shifts={shifts} />
         </CardContent>
 
         <CardFooter className="flex items-center justify-between gap-4">
           <button
             type="button"
-            onClick={() => setConstraints(defaultConstraintData())}
+            onClick={() => setConstraints(defaultConstraintData(shifts))}
             className="text-sm text-gray-400 hover:text-gray-600"
             disabled={status === "loading"}
           >

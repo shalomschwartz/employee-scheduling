@@ -6,12 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type ConstraintData } from "@/components/availability/AvailabilityGrid";
-import { getNextWeekStart, SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day } from "@/lib/utils";
-
-type ShiftKey = "MORNING" | "AFTERNOON" | "EVENING";
+import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day, type ShiftConfig } from "@/lib/utils";
 
 interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; pinnedIds?: string[]; }
-type ScheduleData = Record<string, Record<ShiftKey, ShiftSlot>>;
+type ScheduleData = Record<string, Record<string, ShiftSlot>>;
 interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; }
 interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; }
 
@@ -33,21 +31,22 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [minPerShift, setMinPerShift] = useState(2);
 
+  const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [empFilter, setEmpFilter] = useState<string[]>([]);
 
   // Hidden print-calendar ref for PDF capture
   const printRef = useRef<HTMLDivElement>(null);
 
   // Manual slot editing
-  const [editingCell, setEditingCell] = useState<{ day: string; shift: ShiftKey } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ day: string; shift: string } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
 
   // Drag and drop
-  const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: ShiftKey } | null>(null);
-  const [dragOver, setDragOver] = useState<{ day: string; shift: ShiftKey } | null>(null);
+  const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: string } | null>(null);
+  const [dragOver, setDragOver] = useState<{ day: string; shift: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
@@ -64,9 +63,11 @@ const weekStart = getNextWeekStart();
     Promise.all([
       fetch(`/api/schedule?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
-    ]).then(([sched, emps]) => {
+      fetch("/api/shifts").then(r => r.json()),
+    ]).then(([sched, emps, shiftsCfg]) => {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
       if (Array.isArray(emps)) setEmployees(emps);
+      if (Array.isArray(shiftsCfg)) setShifts(shiftsCfg);
       setLoading(false);
     }).catch(() => setLoading(false));
 
@@ -96,19 +97,19 @@ const weekStart = getNextWeekStart();
     for (const day of DAYS) {
       const dayData = scheduleData[day];
       if (!dayData) continue;
-      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
-        const slot = dayData[shift];
+      for (const shiftCfg of shifts) {
+        const slot = dayData[shiftCfg.id];
         if (!slot) continue;
         const count = slot.employeeIds.length;
         if (count === 0) {
-          result.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: אין עובדים משובצים`);
+          result.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים משובצים`);
         } else if (count < minPerShift) {
-          result.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: רק ${count}/${minPerShift} עובדים`);
+          result.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${count}/${minPerShift} עובדים`);
         }
       }
     }
     return result;
-  }, [scheduleData, minPerShift]);
+  }, [scheduleData, minPerShift, shifts]);
 
   const conflicts = useMemo(() => {
     if (!scheduleData) return {} as Record<string, string[]>;
@@ -116,23 +117,23 @@ const weekStart = getNextWeekStart();
     for (const day of DAYS) {
       const dayData = scheduleData[day];
       if (!dayData) continue;
-      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
-        const slot = dayData[shift];
+      for (const shiftCfg of shifts) {
+        const slot = dayData[shiftCfg.id];
         if (!slot) continue;
         slot.employeeIds.forEach((empId, i) => {
           const emp = empMap[empId];
           if (!emp) return;
-          const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+          const availability = emp.constraints[0]?.data?.[day as Day]?.[shiftCfg.id] ?? "available";
           if (availability === "unavailable") {
             const name = slot.employeeNames[i] ?? emp.name ?? emp.email;
             if (!result[name]) result[name] = [];
-            result[name].push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
+            result[name].push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}`);
           }
         });
       }
     }
     return result;
-  }, [scheduleData, employees]);
+  }, [scheduleData, employees, shifts]);
 
   const colorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -145,8 +146,7 @@ const weekStart = getNextWeekStart();
   const hoursMap = useMemo(() => {
     const map: Record<string, number> = {};
     if (!scheduleData) return map;
-    function shiftHours(shift: ShiftKey) {
-      const { start, end } = SHIFTS[shift];
+    function shiftHours(start: string, end: string) {
       const [sh, sm] = start.split(":").map(Number);
       const [eh, em] = end.split(":").map(Number);
       const startMins = sh * 60 + sm;
@@ -154,17 +154,17 @@ const weekStart = getNextWeekStart();
       return (endMins > startMins ? endMins - startMins : 1440 - startMins + endMins) / 60;
     }
     for (const day of DAYS) {
-      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
-        const slot = scheduleData[day]?.[shift];
+      for (const shiftCfg of shifts) {
+        const slot = scheduleData[day]?.[shiftCfg.id];
         if (!slot) continue;
-        const h = shiftHours(shift);
+        const h = shiftHours(shiftCfg.start, shiftCfg.end);
         slot.employeeIds.forEach(id => {
           map[id] = (map[id] ?? 0) + h;
         });
       }
     }
     return map;
-  }, [scheduleData]);
+  }, [scheduleData, shifts]);
 
 
   async function persistSchedule(updated: ScheduleData) {
@@ -176,7 +176,7 @@ const weekStart = getNextWeekStart();
     });
   }
 
-  function removeFromSlot(name: string, day: string, shift: ShiftKey) {
+  function removeFromSlot(name: string, day: string, shift: string) {
     if (!scheduleData) return;
     const slot = scheduleData[day][shift];
     const idx = slot.employeeNames.indexOf(name);
@@ -197,7 +197,7 @@ const weekStart = getNextWeekStart();
     persistSchedule(updated);
   }
 
-  function addToSlot(emp: Employee, day: string, shift: ShiftKey) {
+  function addToSlot(emp: Employee, day: string, shift: string) {
     if (!scheduleData) return;
     setEditingCell(null);
     const slot = scheduleData[day][shift];
@@ -236,7 +236,7 @@ const weekStart = getNextWeekStart();
     doAdd();
   }
 
-  function handleDrop(toDay: string, toShift: ShiftKey) {
+  function handleDrop(toDay: string, toShift: string) {
     setDragOver(null);
     if (!dragging || !scheduleData) return;
     if (dragging.fromDay === toDay && dragging.fromShift === toShift) { setDragging(null); return; }
@@ -315,15 +315,15 @@ const weekStart = getNextWeekStart();
     for (const day of DAYS) {
       const dayData = scheduleData[day];
       if (!dayData) continue;
-      for (const shift of (["MORNING", "AFTERNOON", "EVENING"] as ShiftKey[])) {
-        const slot = dayData[shift];
+      for (const shiftCfg of shifts) {
+        const slot = dayData[shiftCfg.id];
         if (!slot) continue;
         slot.employeeIds.forEach((empId, i) => {
           const emp = empMap[empId];
           if (!emp) return;
-          const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+          const availability = emp.constraints[0]?.data?.[day as Day]?.[shiftCfg.id] ?? "available";
           if (availability === "unavailable") {
-            result.push(`${slot.employeeNames[i] ?? emp.name ?? emp.email} — ${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}`);
+            result.push(`${slot.employeeNames[i] ?? emp.name ?? emp.email} — ${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}`);
           }
         });
       }
@@ -380,7 +380,7 @@ const weekStart = getNextWeekStart();
 
 
   const submitted = employees.filter(e => e.constraints.length > 0).length;
-  const shiftKeys: ShiftKey[] = ["MORNING", "AFTERNOON", "EVENING"];
+  const shiftKeys = shifts.map(s => s.id);
 
   return (
     <div className="space-y-4">
@@ -521,15 +521,16 @@ const weekStart = getNextWeekStart();
                 </tr>
               </thead>
               <tbody>
-                {shiftKeys.map(shift => (
+                {shiftKeys.map((shift, si) => {
+                  const shiftCfg = shifts.find(s => s.id === shift);
+                  const dotColors = ["bg-yellow-400","bg-orange-400","bg-indigo-400","bg-blue-400","bg-pink-400"];
+                  return (
                   <tr key={shift} className="border-b border-gray-100 last:border-0">
                     <td className="py-3 ps-4 pe-3 align-middle">
                       <div className="flex items-center gap-2">
-                        <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0",
-                          shift === "MORNING" ? "bg-yellow-400" : shift === "AFTERNOON" ? "bg-orange-400" : "bg-indigo-400"
-                        )} />
-                        <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{SHIFTS[shift].label}</span>
-                        <span className="text-[10px] text-gray-400 whitespace-nowrap">{SHIFTS[shift].start}–{SHIFTS[shift].end}</span>
+                        <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
+                        <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
+                        <span className="text-[10px] text-gray-400 whitespace-nowrap">{shiftCfg?.start}–{shiftCfg?.end}</span>
                       </div>
                     </td>
                     {DAYS.map(day => {
@@ -644,7 +645,8 @@ const weekStart = getNextWeekStart();
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -751,14 +753,15 @@ const weekStart = getNextWeekStart();
                   </tr>
                 </thead>
                 <tbody>
-                  {shiftKeys.map(shift => (
+                  {shiftKeys.map((shift, si) => {
+                    const shiftCfg = shifts.find(s => s.id === shift);
+                    const dotColors = ["bg-yellow-400","bg-orange-400","bg-indigo-400","bg-blue-400","bg-pink-400"];
+                    return (
                     <tr key={shift} className="border-b border-gray-100 last:border-0">
                       <td className="py-2 ps-3 pe-2 align-middle">
                         <div className="flex items-center gap-1.5">
-                          <span className={cn("w-2 h-2 rounded-full flex-shrink-0",
-                            shift === "MORNING" ? "bg-yellow-400" : shift === "AFTERNOON" ? "bg-orange-400" : "bg-indigo-400"
-                          )} />
-                          <span className="font-semibold text-gray-700">{SHIFTS[shift].label}</span>
+                          <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
+                          <span className="font-semibold text-gray-700">{shiftCfg?.label ?? shift}</span>
                         </div>
                       </td>
                       {DAYS.map(day => (
@@ -787,7 +790,8 @@ const weekStart = getNextWeekStart();
                         </td>
                       ))}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -818,14 +822,15 @@ const weekStart = getNextWeekStart();
                 <th style={{ padding: "12px", textAlign: "center", backgroundColor: "#f0f0f0", borderBottom: "1px solid #ddd", fontWeight: "700", fontSize: "14px", width: "110px" }}>
                   יום
                 </th>
-                {shiftKeys.map(shift => {
-                  const color = shift === "MORNING" ? "#15803d" : shift === "AFTERNOON" ? "#ca8a04" : "#3730a3";
+                {shiftKeys.map((shift, si) => {
+                  const shiftCfg = shifts.find(s => s.id === shift);
+                  const pdfColors = ["#15803d","#ca8a04","#3730a3","#0369a1","#9d174d","#92400e"];
                   return (
                     <th key={shift} style={{ padding: "12px", textAlign: "center", backgroundColor: "#f0f0f0", borderBottom: "1px solid #ddd", fontWeight: "700" }}>
-                      <span style={{ color, fontSize: "15px" }}>{SHIFTS[shift].label}</span>
+                      <span style={{ color: pdfColors[si % pdfColors.length], fontSize: "15px" }}>{shiftCfg?.label ?? shift}</span>
                       <br />
                       <span style={{ fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>
-                        {SHIFTS[shift].start} – {SHIFTS[shift].end}
+                        {shiftCfg?.start} – {shiftCfg?.end}
                       </span>
                     </th>
                   );

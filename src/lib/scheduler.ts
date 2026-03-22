@@ -1,4 +1,4 @@
-import { DAYS, SHIFTS, DAY_LABELS_HE, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
+import { DAYS, DEFAULT_SHIFTS, DAY_LABELS_HE, type Day, type ShiftKey, type AvailabilityOption, type ShiftConfig } from "@/lib/utils";
 
 export interface EmployeeForScheduling {
   id: string;
@@ -16,8 +16,7 @@ export interface ShiftSlot {
 
 export type ScheduleData = Record<Day, Record<ShiftKey, ShiftSlot>>;
 
-function shiftHours(shift: ShiftKey): number {
-  const { start, end } = SHIFTS[shift];
+function shiftHours(start: string, end: string): number {
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
   const startMins = sh * 60 + sm;
@@ -38,7 +37,8 @@ function shuffle<T>(arr: T[]): T[] {
 export function runScheduler(
   employees: EmployeeForScheduling[],
   minPerShift = 2,
-  pinnedSlots: Record<string, Record<string, string[]>> = {}
+  pinnedSlots: Record<string, Record<string, string[]>> = {},
+  shifts: ShiftConfig[] = DEFAULT_SHIFTS
 ): { schedule: ScheduleData; warnings: string[] } {
   // Shuffle once so ties are broken randomly, not by DB order
   const pool = shuffle(employees);
@@ -52,8 +52,9 @@ export function runScheduler(
   for (const day of DAYS) {
     schedule[day] = {} as Record<ShiftKey, ShiftSlot>;
 
-    for (const shift of Object.keys(SHIFTS) as ShiftKey[]) {
-      const hours = shiftHours(shift);
+    for (const shiftCfg of shifts) {
+      const shift = shiftCfg.id as ShiftKey;
+      const hours = shiftHours(shiftCfg.start, shiftCfg.end);
       const pinnedIds = pinnedSlots[day]?.[shift] ?? [];
 
       // Always include pinned employees first (manager overrides)
@@ -99,9 +100,9 @@ export function runScheduler(
       const understaffed = assigned.length < minPerShift;
 
       if (assigned.length === 0) {
-        warnings.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: אין עובדים זמינים`);
+        warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים זמינים`);
       } else if (understaffed) {
-        warnings.push(`${DAY_LABELS_HE[day as Day]} ${SHIFTS[shift].label}: רק ${assigned.length}/${minPerShift} עובדים שובצו`);
+        warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${assigned.length}/${minPerShift} עובדים שובצו`);
       }
 
       schedule[day][shift] = {
