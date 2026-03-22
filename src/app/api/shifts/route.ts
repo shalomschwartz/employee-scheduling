@@ -23,8 +23,11 @@ export async function GET(): Promise<NextResponse> {
 
   const org = await prisma.organization.findUnique({ where: { id: orgId } });
   const settings = (org?.settings ?? {}) as Record<string, unknown>;
-  const shifts = Array.isArray(settings.shifts) ? (settings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
+  const rawShifts = Array.isArray(settings.shifts) ? (settings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
   const minPerShift = typeof settings.minPerShift === "number" ? settings.minPerShift : 2;
+
+  const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const shifts = [...rawShifts].sort((a, b) => toMins(a.start) - toMins(b.start));
 
   return NextResponse.json({ shifts, minPerShift });
 }
