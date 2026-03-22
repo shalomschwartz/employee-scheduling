@@ -382,17 +382,25 @@ const weekStart = getNextWeekStart();
 
   async function generate() {
     setGenerating(true);
-    const res = await fetch("/api/schedule/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ minPerShift, weekStart: weekStart.toISOString() }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setExisting(data.schedule);
-      setScheduleData(data.schedule.schedule as ScheduleData);
-      setToast("הסידור נוצר בהצלחה!");
-      setTimeout(() => setToast(null), 3000);
+    try {
+      const res = await fetch("/api/schedule/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minPerShift, weekStart: weekStart.toISOString() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExisting(data.schedule);
+        setScheduleData(data.schedule.schedule as ScheduleData);
+        setToast("הסידור נוצר בהצלחה!");
+        setTimeout(() => setToast(null), 3000);
+      } else {
+        setErrorToast("שגיאה ביצירת הסידור — נסה שנית");
+        setTimeout(() => setErrorToast(null), 4000);
+      }
+    } catch {
+      setErrorToast("שגיאת רשת — בדוק חיבור ונסה שנית");
+      setTimeout(() => setErrorToast(null), 4000);
     }
     setGenerating(false);
   }

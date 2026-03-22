@@ -79,28 +79,30 @@ export async function POST(req: NextRequest) {
     update: { schedule, status: "DRAFT", updatedAt: new Date() },
   });
 
-  // Recreate shifts
-  await prisma.shift.deleteMany({ where: { scheduleId: saved.id } });
-
-  const shiftRows = [];
-  for (const [day, dayData] of Object.entries(rawSchedule)) {
-    for (const [shiftType, slot] of Object.entries(dayData)) {
-      for (const empId of slot.employeeIds) {
-        const shiftCfg = shifts.find(s => s.id === shiftType);
-        shiftRows.push({
-          employeeId: empId,
-          scheduleId: saved.id,
-          day,
-          shiftType: shiftType as ShiftType,
-          startTime: shiftCfg?.start ?? "00:00",
-          endTime: shiftCfg?.end ?? "00:00",
-        });
+  // Recreate Shift rows (best-effort tracking — skip custom shift IDs not in the DB enum)
+  try {
+    const VALID_SHIFT_TYPES = new Set<string>(["MORNING", "AFTERNOON", "EVENING"]);
+    await prisma.shift.deleteMany({ where: { scheduleId: saved.id } });
+    const shiftRows = [];
+    for (const [day, dayData] of Object.entries(rawSchedule)) {
+      for (const [shiftType, slot] of Object.entries(dayData)) {
+        if (!VALID_SHIFT_TYPES.has(shiftType)) continue;
+        for (const empId of slot.employeeIds) {
+          const shiftCfg = shifts.find(s => s.id === shiftType);
+          shiftRows.push({
+            employeeId: empId,
+            scheduleId: saved.id,
+            day,
+            shiftType: shiftType as ShiftType,
+            startTime: shiftCfg?.start ?? "00:00",
+            endTime: shiftCfg?.end ?? "00:00",
+          });
+        }
       }
     }
-  }
-
-  if (shiftRows.length > 0) {
-    await prisma.shift.createMany({ data: shiftRows });
+    if (shiftRows.length > 0) await prisma.shift.createMany({ data: shiftRows });
+  } catch {
+    // Non-critical — schedule JSON is already saved above
   }
 
   return NextResponse.json({ scheduleId: saved.id, schedule: saved, warnings });
