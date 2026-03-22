@@ -51,8 +51,10 @@ export function runScheduler(
 
   for (const day of DAYS) {
     schedule[day] = {} as Record<ShiftKey, ShiftSlot>;
+    // Track which shift indices each employee is assigned to this day
+    const dayEmpShiftIdx: Record<string, Set<number>> = {};
 
-    for (const shiftCfg of shifts) {
+    for (const [si, shiftCfg] of shifts.entries()) {
       const shift = shiftCfg.id as ShiftKey;
       const hours = shiftHours(shiftCfg.start, shiftCfg.end);
       const pinnedIds = pinnedSlots[day]?.[shift] ?? [];
@@ -62,13 +64,19 @@ export function runScheduler(
         .map(id => pool.find(e => e.id === id))
         .filter(Boolean) as EmployeeForScheduling[];
       const assigned: EmployeeForScheduling[] = [...pinned];
-      for (const emp of pinned) hourCounts[emp.id] += hours;
+      for (const emp of pinned) {
+        hourCounts[emp.id] += hours;
+        (dayEmpShiftIdx[emp.id] ??= new Set()).add(si);
+      }
 
       const available: EmployeeForScheduling[] = [];
       const preferNot: EmployeeForScheduling[] = [];
 
       for (const emp of pool) {
         if (pinnedIds.includes(emp.id)) continue;
+        // Skip if employee already works an adjacent shift on this day
+        const empShifts = dayEmpShiftIdx[emp.id];
+        if (empShifts?.has(si - 1) || empShifts?.has(si + 1)) continue;
         const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
         if (val === "available") available.push(emp);
         else if (val === "prefer_not") preferNot.push(emp);
@@ -95,6 +103,7 @@ export function runScheduler(
         if (assigned.length >= minPerShift) break;
         assigned.push(emp);
         hourCounts[emp.id] += hours;
+        (dayEmpShiftIdx[emp.id] ??= new Set()).add(si);
       }
 
       const understaffed = assigned.length < minPerShift;

@@ -197,6 +197,14 @@ const weekStart = getNextWeekStart();
     persistSchedule(updated);
   }
 
+  function hasConsecutiveConflict(empId: string, day: string, shift: string): boolean {
+    if (!scheduleData) return false;
+    const si = shifts.findIndex(s => s.id === shift);
+    if (si < 0) return false;
+    const adjacent = [shifts[si - 1]?.id, shifts[si + 1]?.id].filter(Boolean) as string[];
+    return adjacent.some(adjId => scheduleData[day]?.[adjId]?.employeeIds.includes(empId));
+  }
+
   function addToSlot(emp: Employee, day: string, shift: string) {
     if (!scheduleData) return;
     setEditingCell(null);
@@ -204,6 +212,11 @@ const weekStart = getNextWeekStart();
     if (slot.employeeIds.includes(emp.id)) return;
     if (slot.employeeIds.length >= minPerShift) {
       setErrorToast(`המשמרת מלאה (${minPerShift}/${minPerShift}) — הסר עובד קודם`);
+      setTimeout(() => setErrorToast(null), 3000);
+      return;
+    }
+    if (hasConsecutiveConflict(emp.id, day, shift)) {
+      setErrorToast(`${emp.name ?? emp.email} כבר משובץ/ת במשמרת צמודה באותו יום`);
       setTimeout(() => setErrorToast(null), 3000);
       return;
     }
@@ -251,6 +264,12 @@ const weekStart = getNextWeekStart();
     }
     if (toSlot.employeeIds.length >= minPerShift) {
       setErrorToast(`המשמרת מלאה (${minPerShift}/${minPerShift}) — הסר עובד קודם`);
+      setTimeout(() => setErrorToast(null), 3000);
+      setDragging(null);
+      return;
+    }
+    if (hasConsecutiveConflict(dragging.empId, toDay, toShift)) {
+      setErrorToast(`${dragging.name} כבר משובץ/ת במשמרת צמודה באותו יום`);
       setTimeout(() => setErrorToast(null), 3000);
       setDragging(null);
       return;
