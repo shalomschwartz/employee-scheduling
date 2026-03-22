@@ -34,7 +34,8 @@ export default function AvailabilityPage() {
       ]);
       if (shiftsRes.ok) {
         const s = await shiftsRes.json();
-        if (Array.isArray(s)) { setShifts(s); setConstraints(defaultConstraintData(s)); }
+        const arr = Array.isArray(s) ? s : s?.shifts;
+        if (Array.isArray(arr)) { setShifts(arr); setConstraints(defaultConstraintData(arr)); }
       }
       if (availRes.ok) {
         const data = await availRes.json();

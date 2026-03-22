@@ -53,6 +53,7 @@ export default function SettingsPage() {
 
   // ── Shifts ─────────────────────────────────────────────────────────────────
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
+  const [minPerShift, setMinPerShift] = useState(2);
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftSaved, setShiftSaved] = useState(false);
   const [shiftError, setShiftError] = useState("");
@@ -60,7 +61,11 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch("/api/shifts")
       .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setShifts(data); });
+      .then(data => {
+        const arr = Array.isArray(data) ? data : data?.shifts;
+        if (Array.isArray(arr)) setShifts(arr);
+        if (typeof data?.minPerShift === "number") setMinPerShift(data.minPerShift);
+      });
   }, []);
 
   function updateShift(id: string, field: keyof ShiftConfig, value: string) {
@@ -86,7 +91,7 @@ export default function SettingsPage() {
     const res = await fetch("/api/shifts", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(shifts),
+      body: JSON.stringify({ shifts, minPerShift }),
     });
     setShiftSaving(false);
     if (!res.ok) { setShiftError("שגיאה בשמירה"); return; }
@@ -153,11 +158,20 @@ export default function SettingsPage() {
             ))}
           </div>
 
+          <div className="flex items-center gap-3 pt-1">
+            <span className="text-sm font-medium text-gray-700">עובדים למשמרת:</span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setMinPerShift(n => Math.max(1, n - 1))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">−</button>
+              <span className="w-7 text-center font-semibold text-gray-800">{minPerShift}</span>
+              <button onClick={() => setMinPerShift(n => Math.min(10, n + 1))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">+</button>
+            </div>
+          </div>
+
           {shiftError && <p className="text-sm text-red-600">{shiftError}</p>}
 
           <div className="flex items-center gap-3">
             <Button onClick={saveShifts} loading={shiftSaving} size="md">
-              שמור משמרות
+              שמור הגדרות
             </Button>
             {shiftSaved && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
           </div>

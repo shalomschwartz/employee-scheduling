@@ -67,7 +67,10 @@ const weekStart = getNextWeekStart();
     ]).then(([sched, emps, shiftsCfg]) => {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
       if (Array.isArray(emps)) setEmployees(emps);
-      if (Array.isArray(shiftsCfg)) setShifts(shiftsCfg);
+      if (shiftsCfg?.shifts) {
+        setShifts(shiftsCfg.shifts);
+        setMinPerShift(shiftsCfg.minPerShift ?? 2);
+      }
       setLoading(false);
     }).catch(() => setLoading(false));
 
@@ -382,6 +385,12 @@ const weekStart = getNextWeekStart();
 
   async function generate() {
     setGenerating(true);
+    // Persist minPerShift so it survives page reloads
+    fetch("/api/shifts", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shifts, minPerShift }),
+    }).catch(() => {});
     try {
       const res = await fetch("/api/schedule/generate", {
         method: "POST",
