@@ -112,7 +112,6 @@ export default function AvailabilityPage() {
               {availableCount > 0 && <Badge variant="success">{availableCount} זמין</Badge>}
               {preferNotCount > 0 && <Badge variant="warning">{preferNotCount} מעדיף לא</Badge>}
               {unavailableCount > 0 && <Badge variant="danger">{unavailableCount} חסום</Badge>}
-              {alreadySubmitted && <Badge variant="default">הוגש</Badge>}
             </div>
           </div>
         </CardHeader>
