@@ -32,6 +32,10 @@ export const authOptions: NextAuthOptions = {
           if (!credentials.password) return null;
           const valid = await bcrypt.compare(credentials.password, user.password);
           if (!valid) return null;
+          if (user.organizationId) {
+            const org = await prisma.organization.findUnique({ where: { id: user.organizationId } });
+            if ((org?.settings as Record<string, unknown>)?.blocked === true) return null;
+          }
           return { id: user.id, name: user.name, email: user.email };
         } else {
           // Employee: look up by name, no password needed
@@ -39,6 +43,10 @@ export const authOptions: NextAuthOptions = {
             where: { name: { equals: credentials.username, mode: "insensitive" }, role: "EMPLOYEE" },
           });
           if (!user) return null;
+          if (user.organizationId) {
+            const org = await prisma.organization.findUnique({ where: { id: user.organizationId } });
+            if ((org?.settings as Record<string, unknown>)?.blocked === true) return null;
+          }
           return { id: user.id, name: user.name, email: user.email };
         }
       },
