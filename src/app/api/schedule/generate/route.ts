@@ -49,10 +49,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Load org-specific shift config
+  // Load org-specific shift config — apply same normalization as GET /api/shifts
   const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
   const orgSettings = (org?.settings ?? {}) as Record<string, unknown>;
-  const shifts: ShiftConfig[] = Array.isArray(orgSettings.shifts) ? (orgSettings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
+  const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const legacyMin = typeof orgSettings.minPerShift === "number" ? orgSettings.minPerShift : 2;
+  const rawShifts: ShiftConfig[] = Array.isArray(orgSettings.shifts) ? (orgSettings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
+  const shifts = [...rawShifts]
+    .map(s => ({ ...s, minWorkers: s.minWorkers ?? legacyMin }))
+    .sort((a, b) => toMins(a.start) - toMins(b.start));
 
   const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts);
 
