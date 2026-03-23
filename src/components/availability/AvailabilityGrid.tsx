@@ -41,24 +41,12 @@ export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_S
 
   return (
     <div className="w-full overflow-x-auto -mx-4 px-4">
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 mb-4 text-xs">
-        {(Object.entries(OPTION_STYLES) as [AvailabilityOption, typeof OPTION_STYLES[AvailabilityOption]][]).map(
-          ([key, { bg, label, icon }]) => (
-            <span key={key} className={cn("flex items-center gap-1 px-2 py-1 rounded border font-medium", bg)}>
-              {icon} {label}
-            </span>
-          )
-        )}
-        <span className="flex items-center text-gray-400">לחץ לשינוי</span>
-      </div>
-
-      <table className="w-full min-w-[520px] border-collapse">
+      <table className="w-full min-w-[480px] border-collapse">
         <thead>
           <tr>
-            <th className="text-right text-xs font-medium text-gray-400 pb-2 ps-2 w-28">משמרת</th>
+            <th className="text-right text-xs font-medium text-gray-400 pb-2 ps-2 w-24">משמרת</th>
             {DAYS.map(day => (
-              <th key={day} className="text-center pb-2 px-1 min-w-[58px]">
+              <th key={day} className="text-center pb-2 px-0.5 min-w-[48px]">
                 <div className="text-xs font-semibold text-gray-700">{DAY_LABELS_HE[day]}</div>
               </th>
             ))}
@@ -67,13 +55,13 @@ export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_S
         <tbody>
           {shifts.map((shiftCfg, si) => (
             <tr key={shiftCfg.id} className="border-t border-gray-100">
-              <td className="py-2 ps-2 pe-3 align-middle">
-                <div className="flex items-center gap-1.5 mb-0.5">
+              <td className="py-2 ps-2 pe-2 align-middle">
+                <div className="flex items-center gap-1 mb-0.5">
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", SHIFT_DOT_DEFAULTS[si % SHIFT_DOT_DEFAULTS.length])} />
-                  <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg.label}</span>
+                  <span className="text-xs font-semibold text-gray-700 truncate">{shiftCfg.label}</span>
                 </div>
-                <div className="text-[10px] text-gray-400 mb-1.5 ps-3.5">{shiftCfg.start}–{shiftCfg.end}</div>
-                <div className="flex gap-0.5 ps-3.5">
+                <div className="text-[10px] text-gray-400 mb-1 ps-3">{shiftCfg.start}–{shiftCfg.end}</div>
+                <div className="flex gap-0.5 ps-3">
                   {OPTION_CYCLE.map(opt => (
                     <button
                       key={opt}
@@ -97,22 +85,20 @@ export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_S
                 const option = (value[day]?.[shiftCfg.id] ?? "available") as AvailabilityOption;
                 const styles = OPTION_STYLES[option];
                 return (
-                  <td key={day} className="py-1.5 px-1 text-center">
+                  <td key={day} className="py-1 px-0.5 text-center">
                     <button
                       type="button"
                       onClick={() => handleToggle(day, shiftCfg.id)}
                       disabled={disabled}
-                      title={disabled ? "נא ללחוץ על עריכה" : undefined}
                       aria-label={`${DAY_LABELS_HE[day]} ${shiftCfg.label}: ${styles.label}`}
                       className={cn(
-                        "w-full h-10 rounded-lg border-2 text-xs font-semibold transition-all",
+                        "w-full h-14 rounded-xl border-2 text-xl font-bold transition-all",
                         "active:scale-95 touch-manipulation select-none",
                         styles.bg,
                         disabled && "opacity-50 cursor-not-allowed"
                       )}
                     >
-                      <span className="block text-base leading-none">{styles.icon}</span>
-                      <span className="block text-[9px] leading-tight mt-0.5 opacity-75">{styles.label}</span>
+                      {styles.icon}
                     </button>
                   </td>
                 );

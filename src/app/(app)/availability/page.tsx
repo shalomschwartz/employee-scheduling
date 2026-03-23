@@ -99,20 +99,12 @@ export default function AvailabilityPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-gray-900 text-sm">
-                שלום, {session?.user.name?.split(" ")[0] ?? ""}!
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                לחץ על כל תא לשינוי: זמין ← מעדיף לא ← לא זמין
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              {availableCount > 0 && <Badge variant="success">{availableCount} זמין</Badge>}
-              {preferNotCount > 0 && <Badge variant="warning">{preferNotCount} מעדיף לא</Badge>}
-              {unavailableCount > 0 && <Badge variant="danger">{unavailableCount} חסום</Badge>}
-            </div>
+          <p className="font-semibold text-gray-900">שלום, {session?.user.name?.split(" ")[0] ?? ""}!</p>
+          <p className="text-xs text-gray-500 mt-0.5">לחץ על כל תא: זמין ← מעדיף לא ← לא זמין</p>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {availableCount > 0 && <Badge variant="success">{availableCount} זמין</Badge>}
+            {preferNotCount > 0 && <Badge variant="warning">{preferNotCount} מעדיף לא</Badge>}
+            {unavailableCount > 0 && <Badge variant="danger">{unavailableCount} חסום</Badge>}
           </div>
         </CardHeader>
 
