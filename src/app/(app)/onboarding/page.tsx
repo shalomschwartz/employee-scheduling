@@ -26,6 +26,7 @@ export default function OnboardingPage() {
       });
       if (!res.ok) throw new Error();
       router.push("/dashboard");
+      router.refresh();
     } catch {
       setError("שגיאה ביצירת הארגון. נסה שנית.");
     } finally {

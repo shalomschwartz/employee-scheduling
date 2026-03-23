@@ -65,6 +65,17 @@ export const authOptions: NextAuthOptions = {
           token.organizationId = dbUser.organizationId;
           token.isShiftLead = dbUser.isShiftLead;
         }
+      } else if (token.id && !token.organizationId) {
+        // Re-check DB after onboarding — org may have been created since login
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, organizationId: true, isShiftLead: true },
+        });
+        if (dbUser?.organizationId) {
+          token.role = dbUser.role;
+          token.organizationId = dbUser.organizationId;
+          token.isShiftLead = dbUser.isShiftLead;
+        }
       }
       return token;
     },
