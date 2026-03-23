@@ -1,0 +1,14 @@
+{
+  "name": "ShiftSync",
+  "short_name": "ShiftSync",
+  "description": "ניהול משמרות אוטומטי",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#4f46e5",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "any", "type": "image/x-icon" }
+  ]
+}

@@ -11,8 +11,15 @@ export const metadata: Metadata = {
     template: "%s | ShiftSync",
   },
   description: "ניהול משמרות אוטומטי לעסקים קטנים ובינוניים",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ShiftSync",
+  },
   icons: {
     icon: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { cn } from "@/lib/utils";
+import { InstallPWA } from "@/components/InstallPWA";
 
 const managerLinks = [
   { href: "/dashboard", label: "לוח בקרה" },
@@ -59,6 +60,7 @@ export function AppNav({ session }: AppNavProps) {
 
           {/* User menu */}
           <div className="flex items-center gap-3">
+            <InstallPWA />
             <span className="hidden sm:block text-xs text-gray-500 max-w-[120px] truncate">
               {session.user.name ?? session.user.email}
             </span>
