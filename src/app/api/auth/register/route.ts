@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       name,
       email: email.toLowerCase(),
       password: hashed,
+      role: "MANAGER",
     },
   });
 
