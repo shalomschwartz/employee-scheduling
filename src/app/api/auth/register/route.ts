@@ -7,6 +7,7 @@ const Schema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
+  inviteCode: z.string().min(1),
 });
 
 export async function POST(req: NextRequest) {
@@ -18,7 +19,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, inviteCode } = parsed.data;
+
+  const expected = process.env.INVITE_CODE;
+  if (expected && inviteCode !== expected) {
+    return NextResponse.json({ error: "קוד גישה שגוי" }, { status: 403 });
+  }
 
   const existing = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },

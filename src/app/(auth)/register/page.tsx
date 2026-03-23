@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,7 +24,7 @@ export default function RegisterPage() {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, inviteCode }),
     });
 
     if (!res.ok) {
@@ -80,6 +81,8 @@ export default function RegisterPage() {
               value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
             <Input id="password" type="password" label="סיסמה" placeholder="לפחות 8 תווים"
               value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" />
+            <Input id="inviteCode" type="text" label="קוד גישה" placeholder="הזן את קוד הגישה"
+              value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} required />
             <Button type="submit" className="w-full" size="lg" loading={loading}>
               צור חשבון
             </Button>
