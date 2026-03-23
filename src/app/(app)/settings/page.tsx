@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
+import { DEFAULT_SHIFTS, type ShiftConfig, type SchedulingRule } from "@/lib/utils";
 
 interface Employee {
   id: string;
@@ -95,6 +95,41 @@ export default function SettingsPage() {
     if (!res.ok) { setShiftError("שגיאה בשמירה"); return; }
     setShiftSaved(true);
     setTimeout(() => setShiftSaved(false), 3000);
+  }
+
+  // ── Rules ──────────────────────────────────────────────────────────────────
+  const [rules, setRules] = useState<SchedulingRule[]>([]);
+  const [ruleSaving, setRuleSaving] = useState(false);
+  const [ruleSaved, setRuleSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/rules")
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.rules)) setRules(d.rules); });
+  }, []);
+
+  function addRule() {
+    setRules(prev => [...prev, { id: `rule_${Date.now()}`, type: "same_shift", enabled: true, employeeAId: "", employeeBId: "" }]);
+  }
+
+  function updateRule(id: string, field: keyof SchedulingRule, value: unknown) {
+    setRules(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+  }
+
+  function removeRule(id: string) {
+    setRules(prev => prev.filter(r => r.id !== id));
+  }
+
+  async function saveRules() {
+    setRuleSaving(true);
+    await fetch("/api/rules", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules }),
+    });
+    setRuleSaving(false);
+    setRuleSaved(true);
+    setTimeout(() => setRuleSaved(false), 3000);
   }
 
   // Live overlap detection — computed every render
@@ -247,6 +282,83 @@ export default function SettingsPage() {
               ))}
             </ul>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Rules ── */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">כללי שיבוץ</h2>
+              <p className="text-xs text-gray-500 mt-0.5">הגדר כללים שחלים על שיבוץ אוטומטי.</p>
+            </div>
+            <button
+              onClick={addRule}
+              className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+            >
+              + הוסף כלל
+            </button>
+          </div>
+
+          {rules.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">אין כללים.</p>
+          ) : (
+            <div className="space-y-2">
+              {rules.map(rule => (
+                <div key={rule.id} className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={rule.enabled}
+                    onChange={e => updateRule(rule.id, "enabled", e.target.checked)}
+                    className="accent-blue-600 w-4 h-4 shrink-0"
+                    title="הפעל/כבה כלל"
+                  />
+                  <select
+                    value={rule.type}
+                    onChange={e => updateRule(rule.id, "type", e.target.value)}
+                    className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  >
+                    <option value="same_shift">אותה משמרת</option>
+                    <option value="next_shift">המשמרת הבאה</option>
+                  </select>
+                  <select
+                    value={rule.employeeAId}
+                    onChange={e => updateRule(rule.id, "employeeAId", e.target.value)}
+                    className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 flex-1 min-w-[100px]"
+                  >
+                    <option value="">עובד א׳</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  </select>
+                  <span className="text-xs text-gray-500 shrink-0">
+                    {rule.type === "same_shift" ? "יחד עם" : "ואחריו"}
+                  </span>
+                  <select
+                    value={rule.employeeBId}
+                    onChange={e => updateRule(rule.id, "employeeBId", e.target.value)}
+                    className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 flex-1 min-w-[100px]"
+                  >
+                    <option value="">עובד ב׳</option>
+                    {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  </select>
+                  <button
+                    onClick={() => removeRule(rule.id)}
+                    className="text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded px-1.5 py-0.5 text-base font-bold leading-none shrink-0"
+                    title="מחק כלל"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Button onClick={saveRules} loading={ruleSaving} size="md">
+              שמור כללים
+            </Button>
+            {ruleSaved && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
+          </div>
         </CardContent>
       </Card>
     </div>

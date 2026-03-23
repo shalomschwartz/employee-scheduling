@@ -1,4 +1,4 @@
-import { DAYS, DEFAULT_SHIFTS, DAY_LABELS_HE, type Day, type ShiftKey, type AvailabilityOption, type ShiftConfig } from "@/lib/utils";
+import { DAYS, DEFAULT_SHIFTS, DAY_LABELS_HE, type Day, type ShiftKey, type AvailabilityOption, type ShiftConfig, type SchedulingRule } from "@/lib/utils";
 
 export interface EmployeeForScheduling {
   id: string;
@@ -37,7 +37,8 @@ function shuffle<T>(arr: T[]): T[] {
 export function runScheduler(
   employees: EmployeeForScheduling[],
   pinnedSlots: Record<string, Record<string, string[]>> = {},
-  shifts: ShiftConfig[] = DEFAULT_SHIFTS
+  shifts: ShiftConfig[] = DEFAULT_SHIFTS,
+  rules: SchedulingRule[] = []
 ): { schedule: ScheduleData; warnings: string[] } {
   // Shuffle once so ties are broken randomly, not by DB order
   const pool = shuffle(employees);
@@ -119,6 +120,46 @@ export function runScheduler(
         understaffed,
         noShiftLead: false,
       };
+    }
+  }
+
+  // Apply scheduling rules as post-processing
+  for (const rule of rules) {
+    if (!rule.enabled || !rule.employeeAId || !rule.employeeBId) continue;
+    if (!pool.find(e => e.id === rule.employeeBId)) {
+      warnings.push(`כלל שיבוץ: עובד לא נמצא`);
+      continue;
+    }
+
+    if (rule.type === "same_shift") {
+      for (const day of DAYS) {
+        for (const shiftCfg of shifts) {
+          const shift = shiftCfg.id as ShiftKey;
+          const slot = schedule[day]?.[shift];
+          if (!slot) continue;
+          if (slot.employeeIds.includes(rule.employeeAId) && !slot.employeeIds.includes(rule.employeeBId)) {
+            slot.employeeIds.push(rule.employeeBId);
+            hourCounts[rule.employeeBId] = (hourCounts[rule.employeeBId] ?? 0) + shiftHours(shiftCfg.start, shiftCfg.end);
+          }
+        }
+      }
+    }
+
+    if (rule.type === "next_shift") {
+      for (const day of DAYS) {
+        for (let si = 0; si < shifts.length - 1; si++) {
+          const shift = shifts[si].id as ShiftKey;
+          const nextShiftCfg = shifts[si + 1];
+          const nextShift = nextShiftCfg.id as ShiftKey;
+          const slot = schedule[day]?.[shift];
+          const nextSlot = schedule[day]?.[nextShift];
+          if (!slot || !nextSlot) continue;
+          if (slot.employeeIds.includes(rule.employeeAId) && !nextSlot.employeeIds.includes(rule.employeeBId)) {
+            nextSlot.employeeIds.push(rule.employeeBId);
+            hourCounts[rule.employeeBId] = (hourCounts[rule.employeeBId] ?? 0) + shiftHours(nextShiftCfg.start, nextShiftCfg.end);
+          }
+        }
+      }
     }
   }
 

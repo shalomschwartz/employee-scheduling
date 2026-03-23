@@ -65,3 +65,11 @@ export const DEFAULT_SHIFTS: ShiftConfig[] = [
 
 export const AVAILABILITY_OPTIONS = ["available", "prefer_not", "unavailable"] as const;
 export type AvailabilityOption = (typeof AVAILABILITY_OPTIONS)[number];
+
+export interface SchedulingRule {
+  id: string;
+  type: "same_shift" | "next_shift";
+  enabled: boolean;
+  employeeAId: string;
+  employeeBId: string;
+}

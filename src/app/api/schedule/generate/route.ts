@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getNextWeekStart, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
+import { getNextWeekStart, DEFAULT_SHIFTS, type ShiftConfig, type SchedulingRule } from "@/lib/utils";
 import { runScheduler, type EmployeeForScheduling } from "@/lib/scheduler";
 import type { ShiftType } from "@prisma/client";
 
@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
   const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
   const orgSettings = (org?.settings ?? {}) as Record<string, unknown>;
   const shifts: ShiftConfig[] = Array.isArray(orgSettings.shifts) ? (orgSettings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
+  const rules: SchedulingRule[] = Array.isArray(orgSettings.rules) ? (orgSettings.rules as SchedulingRule[]) : [];
 
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts);
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts, rules);
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};
