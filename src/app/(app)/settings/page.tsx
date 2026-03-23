@@ -133,7 +133,7 @@ export default function SettingsPage() {
             {shifts.map((shift, i) => (
               <div key={shift.id} className={cn(
                 "flex flex-col gap-2 p-3 rounded-lg border bg-gray-50 transition-all",
-                overlappingIds.has(shift.id) ? "border-amber-400 ring-2 ring-amber-200" : "border-gray-200"
+                overlappingIds.has(shift.id) ? "border-red-400 ring-2 ring-red-200" : "border-gray-200"
               )}>
                 {/* Row 1: number + name */}
                 <div className="flex items-center gap-2">
@@ -175,7 +175,7 @@ export default function SettingsPage() {
                     onClick={() => removeShift(shift.id)}
                     disabled={shifts.length <= 1}
                     className={cn(
-                      "text-gray-300 hover:text-red-500 transition-colors text-lg leading-none w-6 flex items-center justify-center",
+                      "text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded px-1.5 py-0.5 text-base font-bold leading-none",
                       shifts.length <= 1 && "opacity-30 cursor-not-allowed"
                     )}
                     title="מחק משמרת"
@@ -187,6 +187,11 @@ export default function SettingsPage() {
             ))}
           </div>
 
+          {overlappingIds.size > 0 && (
+            <p className="text-sm text-red-600 font-medium">
+              ⚠ משמרות חופפות: {shifts.filter(s => overlappingIds.has(s.id)).map(s => s.label).join(", ")}
+            </p>
+          )}
           {shiftError && <p className="text-sm text-red-600">{shiftError}</p>}
 
           <div className="flex items-center gap-3">
