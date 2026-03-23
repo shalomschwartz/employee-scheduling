@@ -35,8 +35,9 @@ export default function RegisterPage() {
     }
 
     const result = await signIn("credentials", {
-      email,
+      username: email,
       password,
+      isManager: "true",
       redirect: false,
     });
 
