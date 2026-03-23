@@ -14,7 +14,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "אין ארגון" }, { status: 400 });
 
   const body = await req.json().catch(() => ({}));
-  const minPerShift = typeof body.minPerShift === "number" ? Math.max(1, body.minPerShift) : 2;
 
   // Use weekStart from client to ensure it matches the saved constraints
   const weekStart = body.weekStart ? new Date(body.weekStart) : getNextWeekStart();
@@ -55,7 +54,7 @@ export async function POST(req: NextRequest) {
   const orgSettings = (org?.settings ?? {}) as Record<string, unknown>;
   const shifts: ShiftConfig[] = Array.isArray(orgSettings.shifts) ? (orgSettings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
 
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, minPerShift, pinnedSlots, shifts);
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts);
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};

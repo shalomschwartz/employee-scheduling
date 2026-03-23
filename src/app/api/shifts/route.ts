@@ -24,12 +24,15 @@ export async function GET(): Promise<NextResponse> {
   const org = await prisma.organization.findUnique({ where: { id: orgId } });
   const settings = (org?.settings ?? {}) as Record<string, unknown>;
   const rawShifts = Array.isArray(settings.shifts) ? (settings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
-  const minPerShift = typeof settings.minPerShift === "number" ? settings.minPerShift : 2;
+  const legacyMin = typeof settings.minPerShift === "number" ? settings.minPerShift : 2;
 
   const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-  const shifts = [...rawShifts].sort((a, b) => toMins(a.start) - toMins(b.start));
+  // Backfill minWorkers for shifts saved before per-shift counts were introduced
+  const shifts = [...rawShifts]
+    .map(s => ({ ...s, minWorkers: s.minWorkers ?? legacyMin }))
+    .sort((a, b) => toMins(a.start) - toMins(b.start));
 
-  return NextResponse.json({ shifts, minPerShift });
+  return NextResponse.json({ shifts });
 }
 
 export async function PUT(req: NextRequest) {
@@ -42,7 +45,6 @@ export async function PUT(req: NextRequest) {
 
   const body = await req.json();
   const shifts: ShiftConfig[] = Array.isArray(body.shifts) ? body.shifts : body;
-  const minPerShift: number = typeof body.minPerShift === "number" ? Math.max(1, body.minPerShift) : 2;
 
   if (!Array.isArray(shifts) || shifts.length === 0)
     return NextResponse.json({ error: "נדרשת לפחות משמרת אחת" }, { status: 400 });
@@ -52,8 +54,8 @@ export async function PUT(req: NextRequest) {
 
   await prisma.organization.update({
     where: { id: orgId },
-    data: { settings: { ...current, shifts, minPerShift } },
+    data: { settings: { ...current, shifts } },
   });
 
-  return NextResponse.json({ shifts, minPerShift });
+  return NextResponse.json({ shifts });
 }

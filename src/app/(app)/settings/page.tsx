@@ -53,7 +53,6 @@ export default function SettingsPage() {
 
   // ── Shifts ─────────────────────────────────────────────────────────────────
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
-  const [minPerShift, setMinPerShift] = useState(2);
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftSaved, setShiftSaved] = useState(false);
   const [shiftError, setShiftError] = useState("");
@@ -64,18 +63,17 @@ export default function SettingsPage() {
       .then(data => {
         const arr = Array.isArray(data) ? data : data?.shifts;
         if (Array.isArray(arr)) setShifts(arr);
-        if (typeof data?.minPerShift === "number") setMinPerShift(data.minPerShift);
       });
   }, []);
 
-  function updateShift(id: string, field: keyof ShiftConfig, value: string) {
+  function updateShift(id: string, field: keyof ShiftConfig, value: string | number) {
     setShifts(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
     setShiftSaved(false);
   }
 
   function addShift() {
     const newId = `SHIFT_${Date.now()}`;
-    setShifts(prev => [...prev, { id: newId, label: "משמרת חדשה", start: "08:00", end: "16:00" }]);
+    setShifts(prev => [...prev, { id: newId, label: "משמרת חדשה", start: "08:00", end: "16:00", minWorkers: 2 }]);
     setShiftSaved(false);
   }
 
@@ -88,15 +86,26 @@ export default function SettingsPage() {
   async function saveShifts() {
     setShiftSaving(true);
     setShiftError("");
+
+    // Warn if any two shifts overlap
+    function toMins(t: string) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
+    function shiftsOverlap(a: ShiftConfig, b: ShiftConfig) {
+      const ae = toMins(a.end) <= toMins(a.start) ? toMins(a.end) + 1440 : toMins(a.end);
+      const be = toMins(b.end) <= toMins(b.start) ? toMins(b.end) + 1440 : toMins(b.end);
+      return toMins(a.start) < be && toMins(b.start) < ae;
+    }
+    const hasOverlap = shifts.some((a, i) => shifts.slice(i + 1).some(b => shiftsOverlap(a, b)));
+
     const res = await fetch("/api/shifts", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shifts, minPerShift }),
+      body: JSON.stringify({ shifts }),
     });
     setShiftSaving(false);
     if (!res.ok) { setShiftError("שגיאה בשמירה"); return; }
     setShiftSaved(true);
-    setTimeout(() => setShiftSaved(false), 3000);
+    if (hasOverlap) setShiftError("אזהרה: קיימות משמרות חופפות בזמן.");
+    setTimeout(() => { setShiftSaved(false); setShiftError(""); }, 4000);
   }
 
   return (
@@ -121,7 +130,7 @@ export default function SettingsPage() {
 
           <div className="space-y-2">
             {shifts.map((shift, i) => (
-              <div key={shift.id} className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50">
+              <div key={shift.id} className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50 flex-wrap">
                 <span className="text-xs text-gray-400 w-4 text-center font-bold">{i + 1}</span>
                 <input
                   type="text"
@@ -148,6 +157,13 @@ export default function SettingsPage() {
                   />
                   <span className="text-[10px] text-gray-400">עד</span>
                 </div>
+                {/* Per-shift worker count */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] text-gray-400">עובדים:</span>
+                  <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">−</button>
+                  <span className="w-5 text-center text-xs font-semibold text-gray-800">{shift.minWorkers ?? 2}</span>
+                  <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
+                </div>
                 <button
                   onClick={() => removeShift(shift.id)}
                   disabled={shifts.length <= 1}
@@ -163,16 +179,7 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3 pt-1">
-            <span className="text-sm font-medium text-gray-700">עובדים למשמרת:</span>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setMinPerShift(n => Math.max(1, n - 1))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">−</button>
-              <span className="w-7 text-center font-semibold text-gray-800">{minPerShift}</span>
-              <button onClick={() => setMinPerShift(n => Math.min(10, n + 1))} className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">+</button>
-            </div>
-          </div>
-
-          {shiftError && <p className="text-sm text-red-600">{shiftError}</p>}
+          {shiftError && <p className="text-sm text-amber-600">{shiftError}</p>}
 
           <div className="flex items-center gap-3">
             <Button onClick={saveShifts} loading={shiftSaving} size="md">
@@ -197,7 +204,8 @@ export default function SettingsPage() {
               type="text"
               placeholder="שם העובד"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => setName(e.target.value.replace(/[^א-תa-zA-Z\s]/g, ""))}
+              maxLength={50}
               required
             />
             <Button type="submit" loading={empLoading} size="md">

@@ -54,12 +54,13 @@ export interface ShiftConfig {
   label: string;
   start: string;
   end: string;
+  minWorkers: number;
 }
 
 export const DEFAULT_SHIFTS: ShiftConfig[] = [
-  { id: "MORNING",   label: "בוקר",    start: "07:00", end: "15:00" },
-  { id: "AFTERNOON", label: "צהריים",  start: "15:00", end: "23:00" },
-  { id: "EVENING",   label: "ערב",     start: "23:00", end: "07:00" },
+  { id: "MORNING",   label: "בוקר",    start: "07:00", end: "15:00", minWorkers: 2 },
+  { id: "AFTERNOON", label: "צהריים",  start: "15:00", end: "23:00", minWorkers: 2 },
+  { id: "EVENING",   label: "ערב",     start: "23:00", end: "07:00", minWorkers: 2 },
 ];
 
 export const AVAILABILITY_OPTIONS = ["available", "prefer_not", "unavailable"] as const;

@@ -29,7 +29,6 @@ export default function DashboardPage() {
   const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [minPerShift, setMinPerShift] = useState(2);
 
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [empFilter, setEmpFilter] = useState<string[]>([]);
@@ -69,7 +68,6 @@ const weekStart = getNextWeekStart();
       if (Array.isArray(emps)) setEmployees(emps);
       if (shiftsCfg?.shifts) {
         setShifts(shiftsCfg.shifts);
-        setMinPerShift(shiftsCfg.minPerShift ?? 2);
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -104,15 +102,16 @@ const weekStart = getNextWeekStart();
         const slot = dayData[shiftCfg.id];
         if (!slot) continue;
         const count = slot.employeeIds.length;
+        const min = shiftCfg.minWorkers ?? 2;
         if (count === 0) {
           result.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים משובצים`);
-        } else if (count < minPerShift) {
-          result.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${count}/${minPerShift} עובדים`);
+        } else if (count < min) {
+          result.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${count}/${min} עובדים`);
         }
       }
     }
     return result;
-  }, [scheduleData, minPerShift, shifts]);
+  }, [scheduleData, shifts]);
 
   const conflicts = useMemo(() => {
     if (!scheduleData) return {} as Record<string, string[]>;
@@ -213,8 +212,9 @@ const weekStart = getNextWeekStart();
     setEditingCell(null);
     const slot = scheduleData[day][shift];
     if (slot.employeeIds.includes(emp.id)) return;
-    if (slot.employeeIds.length >= minPerShift) {
-      setErrorToast(`המשמרת מלאה (${minPerShift}/${minPerShift}) — הסר עובד קודם`);
+    const minW = shifts.find(s => s.id === shift)?.minWorkers ?? 2;
+    if (slot.employeeIds.length >= minW) {
+      setErrorToast(`המשמרת מלאה (${minW}/${minW}) — הסר עובד קודם`);
       setTimeout(() => setErrorToast(null), 3000);
       return;
     }
@@ -265,8 +265,9 @@ const weekStart = getNextWeekStart();
       setDragging(null);
       return;
     }
-    if (toSlot.employeeIds.length >= minPerShift) {
-      setErrorToast(`המשמרת מלאה (${minPerShift}/${minPerShift}) — הסר עובד קודם`);
+    const toMinW = shifts.find(s => s.id === toShift)?.minWorkers ?? 2;
+    if (toSlot.employeeIds.length >= toMinW) {
+      setErrorToast(`המשמרת מלאה (${toMinW}/${toMinW}) — הסר עובד קודם`);
       setTimeout(() => setErrorToast(null), 3000);
       setDragging(null);
       return;
@@ -385,17 +386,11 @@ const weekStart = getNextWeekStart();
 
   async function generate() {
     setGenerating(true);
-    // Persist minPerShift so it survives page reloads
-    fetch("/api/shifts", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shifts, minPerShift }),
-    }).catch(() => {});
     try {
       const res = await fetch("/api/schedule/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minPerShift, weekStart: weekStart.toISOString() }),
+        body: JSON.stringify({ weekStart: weekStart.toISOString() }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -446,14 +441,6 @@ const weekStart = getNextWeekStart();
                 שלח לווצאפ
               </Button>
             )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">עובדים למשמרת:</span>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setMinPerShift(n => Math.max(1, n - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">−</button>
-              <span className="w-6 text-center font-semibold text-gray-800 text-sm">{minPerShift}</span>
-              <button onClick={() => setMinPerShift(n => Math.min(10, n + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-base leading-none">+</button>
-            </div>
           </div>
         </div>
       </div>
@@ -667,7 +654,7 @@ const weekStart = getNextWeekStart();
                                   );
                                 })}
                               </div>
-                            ) : (slot?.employeeIds ?? []).length < minPerShift && (
+                            ) : (slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2) && (
                               <button
                                 onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
                                 className="w-full text-center text-gray-300 hover:text-gray-500 text-sm py-0.5 rounded hover:bg-gray-50 transition-colors leading-none"

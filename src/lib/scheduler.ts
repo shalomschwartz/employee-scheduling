@@ -36,7 +36,6 @@ function shuffle<T>(arr: T[]): T[] {
 
 export function runScheduler(
   employees: EmployeeForScheduling[],
-  minPerShift = 2,
   pinnedSlots: Record<string, Record<string, string[]>> = {},
   shifts: ShiftConfig[] = DEFAULT_SHIFTS
 ): { schedule: ScheduleData; warnings: string[] } {
@@ -99,19 +98,20 @@ export function runScheduler(
       const belowCap = candidates.filter(e => hourCounts[e.id] <= softCap);
       const aboveCap = candidates.filter(e => hourCounts[e.id] > softCap);
 
+      const minWorkers = shiftCfg.minWorkers ?? 2;
       for (const emp of [...belowCap, ...aboveCap]) {
-        if (assigned.length >= minPerShift) break;
+        if (assigned.length >= minWorkers) break;
         assigned.push(emp);
         hourCounts[emp.id] += hours;
         (dayEmpShiftIdx[emp.id] ??= new Set()).add(si);
       }
 
-      const understaffed = assigned.length < minPerShift;
+      const understaffed = assigned.length < minWorkers;
 
       if (assigned.length === 0) {
         warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים זמינים`);
       } else if (understaffed) {
-        warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${assigned.length}/${minPerShift} עובדים שובצו`);
+        warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${assigned.length}/${minWorkers} עובדים שובצו`);
       }
 
       schedule[day][shift] = {
