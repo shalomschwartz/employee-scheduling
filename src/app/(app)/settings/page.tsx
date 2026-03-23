@@ -86,16 +86,6 @@ export default function SettingsPage() {
   async function saveShifts() {
     setShiftSaving(true);
     setShiftError("");
-
-    // Warn if any two shifts overlap
-    function toMins(t: string) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
-    function shiftsOverlap(a: ShiftConfig, b: ShiftConfig) {
-      const ae = toMins(a.end) <= toMins(a.start) ? toMins(a.end) + 1440 : toMins(a.end);
-      const be = toMins(b.end) <= toMins(b.start) ? toMins(b.end) + 1440 : toMins(b.end);
-      return toMins(a.start) < be && toMins(b.start) < ae;
-    }
-    const hasOverlap = shifts.some((a, i) => shifts.slice(i + 1).some(b => shiftsOverlap(a, b)));
-
     const res = await fetch("/api/shifts", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -104,9 +94,20 @@ export default function SettingsPage() {
     setShiftSaving(false);
     if (!res.ok) { setShiftError("שגיאה בשמירה"); return; }
     setShiftSaved(true);
-    if (hasOverlap) setShiftError("אזהרה: קיימות משמרות חופפות בזמן.");
-    setTimeout(() => { setShiftSaved(false); setShiftError(""); }, 4000);
+    setTimeout(() => setShiftSaved(false), 3000);
   }
+
+  // Live overlap detection — computed every render
+  const toM = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const overlappingIds = new Set<string>();
+  shifts.forEach((a, i) => shifts.slice(i + 1).forEach(b => {
+    const ae = toM(a.end) <= toM(a.start) ? toM(a.end) + 1440 : toM(a.end);
+    const be = toM(b.end) <= toM(b.start) ? toM(b.end) + 1440 : toM(b.end);
+    if (toM(a.start) < be && toM(b.start) < ae) {
+      overlappingIds.add(a.id);
+      overlappingIds.add(b.id);
+    }
+  }));
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -130,56 +131,63 @@ export default function SettingsPage() {
 
           <div className="space-y-2">
             {shifts.map((shift, i) => (
-              <div key={shift.id} className="flex items-center gap-2 p-3 rounded-lg border border-gray-200 bg-gray-50 flex-wrap">
-                <span className="text-xs text-gray-400 w-4 text-center font-bold">{i + 1}</span>
-                <input
-                  type="text"
-                  value={shift.label}
-                  onChange={e => updateShift(shift.id, "label", e.target.value)}
-                  className="flex-1 min-w-0 text-sm font-medium bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  placeholder="שם המשמרת"
-                />
-                {/* Time range — forced LTR so start always appears on the left */}
-                <div className="flex items-center gap-1 shrink-0" dir="ltr">
-                  <span className="text-[10px] text-gray-400">מ</span>
+              <div key={shift.id} className={cn(
+                "flex flex-col gap-2 p-3 rounded-lg border bg-gray-50 transition-all",
+                overlappingIds.has(shift.id) ? "border-amber-400 ring-2 ring-amber-200" : "border-gray-200"
+              )}>
+                {/* Row 1: number + name */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-4 text-center font-bold shrink-0">{i + 1}</span>
                   <input
-                    type="time"
-                    value={shift.start}
-                    onChange={e => updateShift(shift.id, "start", e.target.value)}
-                    className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-[88px]"
+                    type="text"
+                    value={shift.label}
+                    onChange={e => updateShift(shift.id, "label", e.target.value)}
+                    className="flex-1 text-sm font-medium bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    placeholder="שם המשמרת"
                   />
-                  <span className="text-gray-400 text-xs">—</span>
-                  <input
-                    type="time"
-                    value={shift.end}
-                    onChange={e => updateShift(shift.id, "end", e.target.value)}
-                    className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-[88px]"
-                  />
-                  <span className="text-[10px] text-gray-400">עד</span>
                 </div>
-                {/* Per-shift worker count */}
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[10px] text-gray-400">עובדים:</span>
-                  <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">−</button>
-                  <span className="w-5 text-center text-xs font-semibold text-gray-800">{shift.minWorkers ?? 2}</span>
-                  <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
+                {/* Row 2: time range + workers + delete */}
+                <div className="flex items-center gap-2 ps-6 flex-wrap">
+                  <div className="flex items-center gap-1 shrink-0" dir="ltr">
+                    <span className="text-[10px] text-gray-400">מ</span>
+                    <input
+                      type="time"
+                      value={shift.start}
+                      onChange={e => updateShift(shift.id, "start", e.target.value)}
+                      className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-[88px]"
+                    />
+                    <span className="text-gray-400 text-xs">—</span>
+                    <input
+                      type="time"
+                      value={shift.end}
+                      onChange={e => updateShift(shift.id, "end", e.target.value)}
+                      className="text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300 w-[88px]"
+                    />
+                    <span className="text-[10px] text-gray-400">עד</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-gray-400">עובדים:</span>
+                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">−</button>
+                    <span className="w-5 text-center text-xs font-semibold text-gray-800">{shift.minWorkers ?? 2}</span>
+                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
+                  </div>
+                  <button
+                    onClick={() => removeShift(shift.id)}
+                    disabled={shifts.length <= 1}
+                    className={cn(
+                      "text-gray-300 hover:text-red-500 transition-colors text-lg leading-none w-6 flex items-center justify-center",
+                      shifts.length <= 1 && "opacity-30 cursor-not-allowed"
+                    )}
+                    title="מחק משמרת"
+                  >
+                    ×
+                  </button>
                 </div>
-                <button
-                  onClick={() => removeShift(shift.id)}
-                  disabled={shifts.length <= 1}
-                  className={cn(
-                    "text-gray-300 hover:text-red-500 transition-colors text-lg leading-none w-6 flex items-center justify-center",
-                    shifts.length <= 1 && "opacity-30 cursor-not-allowed"
-                  )}
-                  title="מחק משמרת"
-                >
-                  ×
-                </button>
               </div>
             ))}
           </div>
 
-          {shiftError && <p className="text-sm text-amber-600">{shiftError}</p>}
+          {shiftError && <p className="text-sm text-red-600">{shiftError}</p>}
 
           <div className="flex items-center gap-3">
             <Button onClick={saveShifts} loading={shiftSaving} size="md">
