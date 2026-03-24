@@ -7,7 +7,7 @@ export type ConstraintData = Record<Day, Record<string, AvailabilityOption>>;
 
 const OPTION_STYLES: Record<AvailabilityOption, { bg: string; label: string; shortLabel: string; icon: string }> = {
   available: { bg: "bg-green-100 border-green-400 text-green-800", label: "זמין", shortLabel: "זמין", icon: "✓" },
-  prefer_not: { bg: "bg-amber-100 border-amber-400 text-amber-800", label: "מעדיף לא", shortLabel: "מעדיף", icon: "~" },
+  prefer_not: { bg: "bg-amber-100 border-amber-400 text-amber-800", label: "מעדיף לא", shortLabel: "לא מעדיף", icon: "~" },
   unavailable: { bg: "bg-red-100 border-red-400 text-red-800", label: "לא זמין", shortLabel: "חסום", icon: "✗" },
 };
 
