@@ -271,7 +271,7 @@ export default function SettingsPage() {
             </Button>
             {minWorkersChanged && (
               <Button onClick={handleRegenerate} loading={regenerating} size="md"
-                className="bg-indigo-600 hover:bg-indigo-700">
+                className="bg-green-500 hover:bg-green-600">
                 צור מחדש
               </Button>
             )}
