@@ -186,7 +186,7 @@ export default function AvailabilityPage() {
           </div>
         </CardHeader>
 
-        <CardContent className="pt-4">
+        <CardContent className="px-2 sm:px-6 pt-4">
           <AvailabilityGrid value={constraints} onChange={setConstraints} disabled={status === "loading"} shifts={shifts} />
         </CardContent>
 

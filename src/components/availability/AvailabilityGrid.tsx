@@ -45,7 +45,7 @@ export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_S
   }
 
   return (
-    <div className="w-full -mx-4 px-4">
+    <div className="w-full">
       <table className="w-full border-collapse">
         <thead>
           <tr>
