@@ -839,51 +839,47 @@ const weekStart = getNextWeekStart();
           </h2>
           <p style={{ textAlign: "center", color: "#6b7280", fontSize: "13px", marginBottom: "20px" }}>{weekLabel}</p>
 
-          {/* Table — days as rows, shifts as columns */}
+          {/* Table — shifts as rows, days as columns */}
           <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "white" }}>
             <thead>
               <tr>
                 <th style={{ padding: "12px", textAlign: "center", backgroundColor: "#f0f0f0", borderBottom: "1px solid #ddd", fontWeight: "700", fontSize: "14px", width: "110px" }}>
-                  יום
+                  משמרת
                 </th>
-                {shiftKeys.map((shift, si) => {
-                  const shiftCfg = shifts.find(s => s.id === shift);
-                  const pdfColors = ["#15803d","#ca8a04","#3730a3","#0369a1","#9d174d","#92400e"];
+                {DAYS.map((day, di) => {
+                  const date = format(addDays(weekStart, di), "d/M");
                   return (
-                    <th key={shift} style={{ padding: "12px", textAlign: "center", backgroundColor: "#f0f0f0", borderBottom: "1px solid #ddd", fontWeight: "700" }}>
-                      <span style={{ color: pdfColors[si % pdfColors.length], fontSize: "15px" }}>{shiftCfg?.label ?? shift}</span>
+                    <th key={day} style={{ padding: "12px", textAlign: "center", backgroundColor: "#f0f0f0", borderBottom: "1px solid #ddd", fontWeight: "700" }}>
+                      <span style={{ fontSize: "14px", color: "#111827" }}>{DAY_LABELS_HE[day as Day]}</span>
                       <br />
-                      <span style={{ fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>
-                        {shiftCfg?.start} – {shiftCfg?.end}
-                      </span>
+                      <span style={{ fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>{date}</span>
                     </th>
                   );
                 })}
               </tr>
             </thead>
             <tbody>
-              {DAYS.map((day, di) => {
-                const date = format(addDays(weekStart, di), "d/M");
+              {shiftKeys.map((shift, si) => {
+                const shiftCfg = shifts.find(s => s.id === shift);
+                const pdfColors = ["#15803d","#ca8a04","#3730a3","#0369a1","#9d174d","#92400e"];
                 return (
-                  <tr key={day} style={{ borderBottom: "1px solid #ddd" }}>
-                    <td style={{ padding: "12px", textAlign: "center", backgroundColor: "#f9fafb", fontWeight: "700", fontSize: "14px", color: "#111827" }}>
-                      {DAY_LABELS_HE[day as Day]}
+                  <tr key={shift} style={{ borderBottom: "1px solid #ddd" }}>
+                    <td style={{ padding: "12px", textAlign: "center", backgroundColor: "#f9fafb" }}>
+                      <span style={{ color: pdfColors[si % pdfColors.length], fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
                       <br />
-                      <span style={{ fontWeight: "normal", fontSize: "12px", color: "#9ca3af" }}>{date}</span>
+                      <span style={{ fontSize: "12px", color: "#9ca3af" }}>{shiftCfg?.start} – {shiftCfg?.end}</span>
                     </td>
-                    {shiftKeys.map(shift => {
+                    {DAYS.map(day => {
                       const names = scheduleData[day]?.[shift]?.employeeNames ?? [];
                       return (
-                        <td key={shift} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle" }}>
+                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle" }}>
                           {names.length === 0
                             ? <span style={{ color: "#d1d5db", fontSize: "13px" }}>—</span>
-                            : names.map((name, ni) => {
-                                return (
-                                  <div key={ni} style={{ display: "inline-block", margin: "2px 3px", padding: "3px 10px", fontSize: "13px", fontWeight: "700", color: "#111827" }}>
-                                    {name.split(" ")[0]}
-                                  </div>
-                                );
-                              })}
+                            : names.map((name, ni) => (
+                                <div key={ni} style={{ display: "inline-block", margin: "2px 3px", padding: "3px 10px", fontSize: "13px", fontWeight: "700", color: "#111827" }}>
+                                  {name.split(" ")[0]}
+                                </div>
+                              ))}
                         </td>
                       );
                     })}
