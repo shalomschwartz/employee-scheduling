@@ -554,7 +554,7 @@ const weekStart = getNextWeekStart();
                       <div className="flex items-center gap-2">
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
                         <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
-                        <span className="text-[10px] text-gray-400 whitespace-nowrap">{shiftCfg?.start}–{shiftCfg?.end}</span>
+                        <span className="text-[10px] text-gray-400 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
                       </div>
                     </td>
                     {DAYS.map(day => {
@@ -867,7 +867,7 @@ const weekStart = getNextWeekStart();
                     <td style={{ padding: "12px", textAlign: "center", backgroundColor: "#f9fafb" }}>
                       <span style={{ color: pdfColors[si % pdfColors.length], fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
                       <br />
-                      <span style={{ fontSize: "12px", color: "#9ca3af" }}>{shiftCfg?.start} – {shiftCfg?.end}</span>
+                      <span style={{ fontSize: "12px", color: "#9ca3af" }} dir="ltr">{shiftCfg?.start} – {shiftCfg?.end}</span>
                     </td>
                     {DAYS.map(day => {
                       const names = scheduleData[day]?.[shift]?.employeeNames ?? [];

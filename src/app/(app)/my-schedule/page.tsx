@@ -41,7 +41,7 @@ export default async function MySchedulePage() {
       <div className="flex items-center justify-between py-3 px-4 rounded-lg border border-gray-100 bg-gray-50">
         <div>
           <p className="text-sm font-semibold text-gray-900 capitalize">{shift.day}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{shift.startTime} – {shift.endTime}</p>
+          <p className="text-xs text-gray-500 mt-0.5" dir="ltr">{shift.startTime} – {shift.endTime}</p>
         </div>
         <Badge variant={badgeVariant}>{typeInfo?.label ?? shift.shiftType}</Badge>
       </div>

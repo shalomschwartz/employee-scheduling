@@ -60,7 +60,7 @@ export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_S
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", SHIFT_DOT_DEFAULTS[si % SHIFT_DOT_DEFAULTS.length])} />
                   <span className="text-xs font-semibold text-gray-700 truncate">{shiftCfg.label}</span>
                 </div>
-                <div className="text-[10px] text-gray-400 mb-1 ps-3">{shiftCfg.start}–{shiftCfg.end}</div>
+                <div className="text-[10px] text-gray-400 mb-1 ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
                 <div className="flex gap-0.5 ps-3">
                   {OPTION_CYCLE.map(opt => (
                     <button
