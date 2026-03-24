@@ -162,11 +162,13 @@ export default function SettingsPage() {
     setTimeout(() => setShiftSaved(false), 3000);
   }
 
-  // Show regenerate button only when minWorkers differs from last saved/loaded
-  const minWorkersChanged = shifts.some(s => {
-    const orig = savedShifts.current.find(o => o.id === s.id);
-    return orig?.minWorkers !== s.minWorkers;
-  });
+  // Show regenerate button when any schedule-affecting shift setting changed
+  const shiftsChanged =
+    shifts.length !== savedShifts.current.length ||
+    shifts.some(s => {
+      const orig = savedShifts.current.find(o => o.id === s.id);
+      return !orig || orig.minWorkers !== s.minWorkers || orig.start !== s.start || orig.end !== s.end;
+    });
 
   // Live overlap detection — computed every render
   const toM = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
@@ -269,7 +271,7 @@ export default function SettingsPage() {
             <Button onClick={saveShifts} loading={shiftSaving} size="md">
               שמור הגדרות
             </Button>
-            {minWorkersChanged && (
+            {shiftsChanged && (
               <Button onClick={handleRegenerate} loading={regenerating} size="md"
                 className="bg-green-500 hover:bg-green-600">
                 צור מחדש
