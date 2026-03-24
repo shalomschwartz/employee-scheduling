@@ -31,7 +31,7 @@ export function AppNav({ session }: AppNavProps) {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 font-bold text-brand-600">
-            <img src="/logo.png" alt="ShiftSync" className="h-11" />
+            <img src="/logo.png" alt="ShiftSync" className="h-20 -my-3" />
           </Link>
 
           {/* Nav links */}
