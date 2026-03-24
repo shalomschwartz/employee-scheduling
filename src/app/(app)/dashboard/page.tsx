@@ -732,7 +732,7 @@ const weekStart = getNextWeekStart();
       {!loading && employees.length > 0 && (
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
               <div className="flex gap-1.5 flex-wrap justify-end">
                 <button
@@ -761,6 +761,13 @@ const weekStart = getNextWeekStart();
                   );
                 })}
               </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex gap-3 mb-3 text-xs text-gray-600">
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-green-500" />זמין</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-400" />מעדיף לא</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-red-500" />לא זמין</span>
             </div>
 
             {/* Overview table */}
