@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,7 +98,7 @@ export default function SettingsPage() {
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftSaved, setShiftSaved] = useState(false);
   const [shiftError, setShiftError] = useState("");
-  const [minWorkersChanged, setMinWorkersChanged] = useState(false);
+  const savedShifts = useRef<ShiftConfig[]>([]);
   const [regenerating, setRegenerating] = useState(false);
   const [regenerated, setRegenerated] = useState(false);
 
@@ -107,14 +107,13 @@ export default function SettingsPage() {
       .then(r => r.json())
       .then(data => {
         const arr = Array.isArray(data) ? data : data?.shifts;
-        if (Array.isArray(arr)) setShifts(arr);
+        if (Array.isArray(arr)) { setShifts(arr); savedShifts.current = arr; }
       });
   }, []);
 
   function updateShift(id: string, field: keyof ShiftConfig, value: string | number) {
     setShifts(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
     setShiftSaved(false);
-    if (field === "minWorkers") setMinWorkersChanged(true);
   }
 
   async function handleRegenerate() {
@@ -130,8 +129,8 @@ export default function SettingsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ weekStart: getNextWeekStart().toISOString() }),
     });
+    savedShifts.current = shifts;
     setRegenerating(false);
-    setMinWorkersChanged(false);
     setRegenerated(true);
     setTimeout(() => setRegenerated(false), 3000);
   }
@@ -158,9 +157,16 @@ export default function SettingsPage() {
     });
     setShiftSaving(false);
     if (!res.ok) { setShiftError("שגיאה בשמירה"); return; }
+    savedShifts.current = shifts;
     setShiftSaved(true);
     setTimeout(() => setShiftSaved(false), 3000);
   }
+
+  // Show regenerate button only when minWorkers differs from last saved/loaded
+  const minWorkersChanged = shifts.some(s => {
+    const orig = savedShifts.current.find(o => o.id === s.id);
+    return orig?.minWorkers !== s.minWorkers;
+  });
 
   // Live overlap detection — computed every render
   const toM = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
