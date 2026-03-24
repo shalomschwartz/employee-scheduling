@@ -148,15 +148,12 @@ export default function AvailabilityPage() {
     }
   }
 
-  const availableCount = DAYS.reduce((acc, day) => {
-    return acc + Object.values(constraints[day]).filter((v) => v === "available").length;
-  }, 0);
-  const preferNotCount = DAYS.reduce((acc, day) => {
-    return acc + Object.values(constraints[day]).filter((v) => v === "prefer_not").length;
-  }, 0);
-  const unavailableCount = DAYS.reduce((acc, day) => {
-    return acc + Object.values(constraints[day]).filter((v) => v === "unavailable").length;
-  }, 0);
+  const availableCount = DAYS.reduce((acc, day) =>
+    acc + shifts.filter(s => (constraints[day]?.[s.id] ?? "available") === "available").length, 0);
+  const preferNotCount = DAYS.reduce((acc, day) =>
+    acc + shifts.filter(s => (constraints[day]?.[s.id] ?? "available") === "prefer_not").length, 0);
+  const unavailableCount = DAYS.reduce((acc, day) =>
+    acc + shifts.filter(s => (constraints[day]?.[s.id] ?? "available") === "unavailable").length, 0);
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto" style={{ fontFamily: "Arial, sans-serif" }}>
