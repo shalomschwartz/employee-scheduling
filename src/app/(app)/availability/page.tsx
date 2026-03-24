@@ -100,6 +100,16 @@ export default function AvailabilityPage() {
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [deadline] = useState<Date>(() => getDeadline());
+  const [isPastDeadline, setIsPastDeadline] = useState(() => Date.now() >= deadline.getTime());
+
+  useEffect(() => {
+    if (isPastDeadline) return;
+    const id = setInterval(() => {
+      if (Date.now() >= deadline.getTime()) { setIsPastDeadline(true); clearInterval(id); }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [deadline, isPastDeadline]);
 
   const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
@@ -205,8 +215,14 @@ export default function AvailabilityPage() {
           <div className="flex items-center gap-3">
             {status === "success" && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
             {status === "error" && <span className="text-sm text-red-600">שגיאה בשמירה. נסה שנית.</span>}
-            <Button onClick={handleSubmit} loading={status === "loading"} size="lg" className="min-w-[100px]">
-              {alreadySubmitted ? "עדכן" : "שלח"}
+            <Button
+              onClick={handleSubmit}
+              loading={status === "loading"}
+              disabled={isPastDeadline}
+              size="lg"
+              className={cn("min-w-[100px]", isPastDeadline && "bg-red-500 hover:bg-red-500 cursor-not-allowed opacity-100")}
+            >
+              {isPastDeadline ? "מועד ההגשה עבר" : alreadySubmitted ? "עדכן" : "שלח"}
             </Button>
           </div>
         </CardFooter>
