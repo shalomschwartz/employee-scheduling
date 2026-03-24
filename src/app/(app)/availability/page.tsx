@@ -11,7 +11,79 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getNextWeekStart, DAYS, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
+import { cn, getNextWeekStart, DAYS, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
+
+function getDeadline(): Date {
+  const now = new Date();
+  for (let d = 0; d <= 7; d++) {
+    const candidate = new Date(Date.UTC(
+      now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + d, 12, 0, 0
+    ));
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jerusalem", weekday: "long",
+    }).format(candidate);
+    if (weekday !== "Wednesday") continue;
+
+    const datePart = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jerusalem",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(candidate);
+
+    const naiveUTC = new Date(`${datePart}T21:00:00Z`);
+    const jHour = parseInt(new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jerusalem", hour: "numeric", hour12: false,
+    }).format(naiveUTC));
+    const offsetH = ((jHour % 24) - 21 + 24) % 24;
+    const deadline = new Date(naiveUTC.getTime() - offsetH * 3_600_000);
+
+    if (deadline > now) return deadline;
+  }
+  return new Date(now.getTime() + 7 * 86_400_000);
+}
+
+function DeadlineBanner() {
+  const [deadline] = useState<Date>(() => getDeadline());
+  const [timeLeft, setTimeLeft] = useState<number>(deadline.getTime() - Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setTimeLeft(deadline.getTime() - Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [deadline]);
+
+  const deadlineDateStr = new Intl.DateTimeFormat("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    weekday: "long", day: "numeric", month: "numeric",
+  }).format(deadline);
+
+  if (timeLeft <= 0) {
+    return (
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+        <span className="font-medium">⏰ מועד ההגשה עבר.</span>
+      </div>
+    );
+  }
+
+  const totalSec = Math.floor(timeLeft / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const urgent = timeLeft < 24 * 3600 * 1000;
+
+  return (
+    <div className={cn(
+      "p-3 rounded-lg border text-sm",
+      urgent ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-700"
+    )}>
+      <p className="font-medium">⏰ יש להגיש זמינות עד {deadlineDateStr} בשעה 21:00</p>
+      <p className="mt-1 font-mono text-base tracking-wide">
+        {days > 0 && <span>{days} ימים </span>}
+        {pad(hours)}:{pad(mins)}:{pad(secs)}
+      </p>
+    </div>
+  );
+}
 
 type SubmitStatus = "idle" | "loading" | "success" | "error";
 
@@ -85,6 +157,8 @@ export default function AvailabilityPage() {
         <h1 className="text-xl font-bold text-gray-900">הגשת זמינות</h1>
         <p className="text-sm text-gray-500 mt-0.5">שבוע {weekLabel}</p>
       </div>
+
+      <DeadlineBanner />
 
       {alreadySubmitted && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">
