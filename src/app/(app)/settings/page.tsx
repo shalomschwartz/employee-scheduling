@@ -21,6 +21,45 @@ export default function SettingsPage() {
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
 
+  // ── Deadline ────────────────────────────────────────────────────────────────
+  const [deadlineInput, setDeadlineInput] = useState("");
+  const [deadlineSaving, setDeadlineSaving] = useState(false);
+  const [deadlineSaved, setDeadlineSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/deadline")
+      .then(r => r.json())
+      .then(d => {
+        if (d.deadline) setDeadlineInput(toDatetimeLocal(d.deadline));
+      });
+  }, []);
+
+  function toDatetimeLocal(iso: string): string {
+    const d = new Date(iso);
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jerusalem",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(d);
+    const p = (type: string) => parts.find(x => x.type === type)?.value ?? "00";
+    return `${p("year")}-${p("month")}-${p("day")}T${p("hour")}:${p("minute")}`;
+  }
+
+  async function saveDeadline() {
+    if (!deadlineInput) return;
+    setDeadlineSaving(true);
+    // datetime-local value treated as Jerusalem local time → convert to UTC
+    const utcIso = new Date(deadlineInput).toISOString();
+    await fetch("/api/deadline", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deadline: utcIso }),
+    });
+    setDeadlineSaving(false);
+    setDeadlineSaved(true);
+    setTimeout(() => setDeadlineSaved(false), 3000);
+  }
+
   useEffect(() => {
     fetch("/api/employees")
       .then(r => r.json())
@@ -202,6 +241,30 @@ export default function SettingsPage() {
               שמור הגדרות
             </Button>
             {shiftSaved && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Deadline ── */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900">מועד הגשת זמינות</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              הגדר עד מתי העובדים יכולים לשלוח זמינות. ניתן לשנות בכל עת — אם תרצה לתת הארכה, פשוט הזז את התאריך קדימה.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              type="datetime-local"
+              value={deadlineInput}
+              onChange={e => setDeadlineInput(e.target.value)}
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+            <Button onClick={saveDeadline} loading={deadlineSaving} size="md">
+              שמור
+            </Button>
+            {deadlineSaved && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
           </div>
         </CardContent>
       </Card>

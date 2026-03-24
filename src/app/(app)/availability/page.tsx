@@ -13,46 +13,28 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import { cn, getNextWeekStart, DAYS, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
 
-function getDeadline(): Date {
-  const now = new Date();
-  for (let d = 0; d <= 7; d++) {
-    const candidate = new Date(Date.UTC(
-      now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + d, 12, 0, 0
-    ));
-    const weekday = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Jerusalem", weekday: "long",
-    }).format(candidate);
-    if (weekday !== "Wednesday") continue;
-
-    const datePart = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Jerusalem",
-      year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(candidate);
-
-    const naiveUTC = new Date(`${datePart}T21:00:00Z`);
-    const jHour = parseInt(new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Jerusalem", hour: "numeric", hour12: false,
-    }).format(naiveUTC));
-    const offsetH = ((jHour % 24) - 21 + 24) % 24;
-    const deadline = new Date(naiveUTC.getTime() - offsetH * 3_600_000);
-
-    if (deadline > now) return deadline;
-  }
-  return new Date(now.getTime() + 7 * 86_400_000);
-}
-
-function DeadlineBanner() {
-  const [deadline] = useState<Date>(() => getDeadline());
-  const [timeLeft, setTimeLeft] = useState<number>(deadline.getTime() - Date.now());
+function DeadlineBanner({ deadline }: { deadline: Date | null }) {
+  const [timeLeft, setTimeLeft] = useState<number>(
+    deadline ? deadline.getTime() - Date.now() : Infinity
+  );
 
   useEffect(() => {
+    if (!deadline) return;
+    setTimeLeft(deadline.getTime() - Date.now());
     const id = setInterval(() => setTimeLeft(deadline.getTime() - Date.now()), 1000);
     return () => clearInterval(id);
   }, [deadline]);
 
+  if (!deadline) return null;
+
   const deadlineDateStr = new Intl.DateTimeFormat("he-IL", {
     timeZone: "Asia/Jerusalem",
     weekday: "long", day: "numeric", month: "numeric",
+  }).format(deadline);
+
+  const deadlineTimeStr = new Intl.DateTimeFormat("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    hour: "2-digit", minute: "2-digit", hour12: false,
   }).format(deadline);
 
   if (timeLeft <= 0) {
@@ -76,7 +58,7 @@ function DeadlineBanner() {
       "p-3 rounded-lg border text-sm",
       urgent ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-700"
     )}>
-      <p className="font-medium">⏰ יש להגיש זמינות עד {deadlineDateStr} בשעה 21:00</p>
+      <p className="font-medium">⏰ יש להגיש זמינות עד {deadlineDateStr} בשעה {deadlineTimeStr}</p>
       <div className="mt-1 flex items-baseline gap-2">
         {days > 0 && (
           <span className="text-base" style={{ fontFamily: "Arial, sans-serif" }}>
@@ -100,11 +82,11 @@ export default function AvailabilityPage() {
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const [deadline] = useState<Date>(() => getDeadline());
-  const [isPastDeadline, setIsPastDeadline] = useState(() => Date.now() >= deadline.getTime());
+  const [deadline, setDeadline] = useState<Date | null>(null);
+  const [isPastDeadline, setIsPastDeadline] = useState(false);
 
   useEffect(() => {
-    if (isPastDeadline) return;
+    if (!deadline || isPastDeadline) return;
     const id = setInterval(() => {
       if (Date.now() >= deadline.getTime()) { setIsPastDeadline(true); clearInterval(id); }
     }, 1000);
@@ -116,9 +98,10 @@ export default function AvailabilityPage() {
 
   useEffect(() => {
     async function load() {
-      const [shiftsRes, availRes] = await Promise.all([
+      const [shiftsRes, availRes, deadlineRes] = await Promise.all([
         fetch("/api/shifts"),
         fetch(`/api/availability?weekStart=${weekStart.toISOString()}`),
+        fetch("/api/deadline"),
       ]);
       if (shiftsRes.ok) {
         const s = await shiftsRes.json();
@@ -131,6 +114,14 @@ export default function AvailabilityPage() {
           setConstraints(data.data as ConstraintData);
           setAlreadySubmitted(true);
           setLastSaved(new Date(data.updatedAt));
+        }
+      }
+      if (deadlineRes.ok) {
+        const d = await deadlineRes.json();
+        if (d.deadline) {
+          const dl = new Date(d.deadline);
+          setDeadline(dl);
+          setIsPastDeadline(Date.now() >= dl.getTime());
         }
       }
     }
@@ -174,7 +165,7 @@ export default function AvailabilityPage() {
         <p className="text-sm text-gray-500 mt-0.5">שבוע {weekLabel}</p>
       </div>
 
-      <DeadlineBanner />
+      <DeadlineBanner deadline={deadline} />
 
       {alreadySubmitted && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">
