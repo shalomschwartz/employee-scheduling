@@ -833,11 +833,12 @@ const weekStart = getNextWeekStart();
             padding: "30px 36px", fontFamily: "'Heebo', Arial, sans-serif", direction: "rtl",
           }}
         >
-          {/* Title */}
-          <h2 style={{ textAlign: "center", marginBottom: "6px", fontSize: "22px", fontWeight: "800", color: "#111827" }}>
-            סידור עבודה שבועי
-          </h2>
-          <p style={{ textAlign: "center", color: "#6b7280", fontSize: "13px", marginBottom: "20px" }}>{weekLabel}</p>
+          {/* Logo + Title */}
+          <div style={{ textAlign: "center", marginBottom: "16px" }}>
+            <img src="/logo.png" alt="ShiftSync" style={{ height: "56px", margin: "0 auto 8px" }} />
+            <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "800", color: "#111827" }}>סידור עבודה שבועי</h2>
+            <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>{weekLabel}</p>
+          </div>
 
           {/* Table — shifts as rows, days as columns */}
           <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "white" }}>
