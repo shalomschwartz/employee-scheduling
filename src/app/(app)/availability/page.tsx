@@ -83,7 +83,7 @@ function DeadlineBanner() {
             {days} ימים
           </span>
         )}
-        <span className="font-mono text-base tracking-wide">
+        <span className="text-base tracking-wide">
           {pad(hours)}:{pad(mins)}:{pad(secs)}
         </span>
       </div>
@@ -158,7 +158,7 @@ export default function AvailabilityPage() {
   }, 0);
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
+    <div className="space-y-4 max-w-2xl mx-auto" style={{ fontFamily: "Arial, sans-serif" }}>
       <div>
         <h1 className="text-xl font-bold text-gray-900">הגשת זמינות</h1>
         <p className="text-sm text-gray-500 mt-0.5">שבוע {weekLabel}</p>
