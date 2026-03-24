@@ -5,10 +5,10 @@ import { DAYS, DAY_LABELS_HE, DEFAULT_SHIFTS, type Day, type AvailabilityOption,
 
 export type ConstraintData = Record<Day, Record<string, AvailabilityOption>>;
 
-const OPTION_STYLES: Record<AvailabilityOption, { bg: string; label: string; icon: string }> = {
-  available: { bg: "bg-green-100 border-green-400 text-green-800", label: "זמין", icon: "✓" },
-  prefer_not: { bg: "bg-amber-100 border-amber-400 text-amber-800", label: "מעדיף לא", icon: "~" },
-  unavailable: { bg: "bg-red-100 border-red-400 text-red-800", label: "לא זמין", icon: "✗" },
+const OPTION_STYLES: Record<AvailabilityOption, { bg: string; label: string; shortLabel: string; icon: string }> = {
+  available: { bg: "bg-green-100 border-green-400 text-green-800", label: "זמין", shortLabel: "זמין", icon: "✓" },
+  prefer_not: { bg: "bg-amber-100 border-amber-400 text-amber-800", label: "מעדיף לא", shortLabel: "מעדיף", icon: "~" },
+  unavailable: { bg: "bg-red-100 border-red-400 text-red-800", label: "לא זמין", shortLabel: "חסום", icon: "✗" },
 };
 
 const SHIFT_DOT_DEFAULTS = ["bg-yellow-400", "bg-orange-400", "bg-indigo-400", "bg-blue-400", "bg-pink-400"];
@@ -100,13 +100,15 @@ export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_S
                       disabled={disabled}
                       aria-label={`${DAY_LABELS_HE[day]} ${shiftCfg.label}: ${styles.label}`}
                       className={cn(
-                        "w-full h-10 sm:h-14 rounded-lg sm:rounded-xl border-2 text-base sm:text-xl font-bold transition-all",
-                        "active:scale-95 touch-manipulation select-none",
+                        "w-full h-12 sm:h-14 rounded-lg sm:rounded-xl border-2 transition-all cursor-pointer",
+                        "active:scale-95 hover:brightness-95 touch-manipulation select-none",
+                        "flex flex-col items-center justify-center gap-0.5",
                         styles.bg,
                         disabled && "opacity-50 cursor-not-allowed"
                       )}
                     >
-                      {styles.icon}
+                      <span className="text-base sm:text-xl font-bold leading-none">{styles.icon}</span>
+                      <span className="text-[9px] sm:text-[10px] font-semibold leading-none opacity-80">{styles.shortLabel}</span>
                     </button>
                   </td>
                 );

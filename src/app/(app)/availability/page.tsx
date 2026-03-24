@@ -181,7 +181,7 @@ export default function AvailabilityPage() {
       <Card>
         <CardHeader>
           <p className="font-semibold text-gray-900">שלום, {session?.user.name?.split(" ")[0] ?? ""}!</p>
-          <p className="text-xs text-gray-500 mt-0.5">לחץ על כל תא: זמין ← מעדיף לא ← לא זמין</p>
+          <p className="text-xs text-gray-500 mt-0.5">לחץ על כל משבצת כדי לשנות את הסטטוס שלה 👆</p>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {availableCount > 0 && <Badge variant="success">{availableCount} זמין</Badge>}
             {preferNotCount > 0 && <Badge variant="warning">{preferNotCount} מעדיף לא</Badge>}
