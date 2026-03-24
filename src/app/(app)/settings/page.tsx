@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
+import { DEFAULT_SHIFTS, getNextWeekStart, type ShiftConfig } from "@/lib/utils";
 
 interface Employee {
   id: string;
@@ -98,6 +98,9 @@ export default function SettingsPage() {
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftSaved, setShiftSaved] = useState(false);
   const [shiftError, setShiftError] = useState("");
+  const [minWorkersChanged, setMinWorkersChanged] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenerated, setRegenerated] = useState(false);
 
   useEffect(() => {
     fetch("/api/shifts")
@@ -111,6 +114,26 @@ export default function SettingsPage() {
   function updateShift(id: string, field: keyof ShiftConfig, value: string | number) {
     setShifts(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
     setShiftSaved(false);
+    if (field === "minWorkers") setMinWorkersChanged(true);
+  }
+
+  async function handleRegenerate() {
+    setRegenerating(true);
+    // Save shifts first so the generator reads the updated minWorkers
+    await fetch("/api/shifts", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shifts }),
+    });
+    await fetch("/api/schedule/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ weekStart: getNextWeekStart().toISOString() }),
+    });
+    setRegenerating(false);
+    setMinWorkersChanged(false);
+    setRegenerated(true);
+    setTimeout(() => setRegenerated(false), 3000);
   }
 
   function addShift() {
@@ -236,11 +259,18 @@ export default function SettingsPage() {
           )}
           {shiftError && <p className="text-sm text-red-600">{shiftError}</p>}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button onClick={saveShifts} loading={shiftSaving} size="md">
               שמור הגדרות
             </Button>
+            {minWorkersChanged && (
+              <Button onClick={handleRegenerate} loading={regenerating} size="md"
+                className="bg-indigo-600 hover:bg-indigo-700">
+                צור מחדש
+              </Button>
+            )}
             {shiftSaved && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
+            {regenerated && <span className="text-sm text-green-600 font-medium">לוח נוצר מחדש!</span>}
           </div>
         </CardContent>
       </Card>
