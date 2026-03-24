@@ -19,6 +19,7 @@ export const authOptions: NextAuthOptions = {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
         isManager: { label: "Is Manager", type: "text" },
+        phone: { label: "Phone", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.username) return null;
@@ -38,9 +39,14 @@ export const authOptions: NextAuthOptions = {
           }
           return { id: user.id, name: user.name, email: user.email };
         } else {
-          // Employee: look up by name, no password needed
+          // Employee: look up by name + phone
+          if (!credentials.phone) return null;
           const user = await prisma.user.findFirst({
-            where: { name: { equals: credentials.username, mode: "insensitive" }, role: "EMPLOYEE" },
+            where: {
+              name: { equals: credentials.username, mode: "insensitive" },
+              phone: credentials.phone,
+              role: "EMPLOYEE",
+            },
           });
           if (!user) return null;
           if (user.organizationId) {

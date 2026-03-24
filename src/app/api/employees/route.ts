@@ -10,7 +10,7 @@ export async function GET() {
 
   const employees = await prisma.user.findMany({
     where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, phone: true },
     orderBy: { createdAt: "asc" },
   });
 
@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
   if (!session || session.user.role !== "MANAGER" || !session.user.organizationId)
     return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
 
-  const { name } = await req.json();
+  const { name, phone } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "שם נדרש" }, { status: 400 });
+  if (!phone?.trim()) return NextResponse.json({ error: "מספר טלפון נדרש" }, { status: 400 });
 
   const trimmed = name.trim();
 
@@ -40,12 +41,13 @@ export async function POST(req: NextRequest) {
   const employee = await prisma.user.create({
     data: {
       name: trimmed,
+      phone: phone.trim(),
       email,
       password: "",
       role: "EMPLOYEE",
       organizationId: session.user.organizationId,
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, phone: true },
   });
 
   return NextResponse.json(employee, { status: 201 });

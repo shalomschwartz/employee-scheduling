@@ -10,12 +10,14 @@ import { DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
 interface Employee {
   id: string;
   name: string;
+  phone?: string | null;
 }
 
 export default function SettingsPage() {
   // ── Employees ──────────────────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
 
@@ -33,13 +35,14 @@ export default function SettingsPage() {
     const res = await fetch("/api/employees", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
+      body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
     });
     const data = await res.json();
     setEmpLoading(false);
     if (!res.ok) { setEmpError(data.error ?? "שגיאה בהוספה"); return; }
     setEmployees(prev => [...prev, data]);
     setName("");
+    setPhone("");
   }
 
   async function handleDeleteEmployee(id: string) {
@@ -208,21 +211,32 @@ export default function SettingsPage() {
         <CardContent className="pt-5 space-y-4">
           <h2 className="font-semibold text-gray-900">עובדים</h2>
           <p className="text-xs text-gray-500">
-            הוסף עובדים לפי שם. כל עובד יכנס עם שמו בלבד — ללא סיסמה.
+            הוסף עובדים לפי שם וטלפון. העובד יכנס עם שמו ומספר הטלפון שלו.
           </p>
 
-          <form onSubmit={handleAddEmployee} className="flex gap-2">
-            <Input
-              id="empName"
-              type="text"
-              placeholder="שם העובד"
-              value={name}
-              onChange={e => setName(e.target.value.replace(/[^א-תa-zA-Z\s]/g, ""))}
-              maxLength={50}
-              required
-            />
-            <Button type="submit" loading={empLoading} size="md">
-              הוסף
+          <form onSubmit={handleAddEmployee} className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                id="empName"
+                type="text"
+                placeholder="שם העובד"
+                value={name}
+                onChange={e => setName(e.target.value.replace(/[^א-תa-zA-Z\s]/g, ""))}
+                maxLength={50}
+                required
+              />
+              <Input
+                id="empPhone"
+                type="tel"
+                placeholder="טלפון"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                maxLength={20}
+                required
+              />
+            </div>
+            <Button type="submit" loading={empLoading} size="md" className="w-full">
+              הוסף עובד
             </Button>
           </form>
 
@@ -234,7 +248,10 @@ export default function SettingsPage() {
             <ul className="divide-y divide-gray-100">
               {employees.map(emp => (
                 <li key={emp.id} className="flex items-center justify-between py-2.5">
-                  <span className="text-sm font-medium text-gray-800">{emp.name}</span>
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{emp.name}</span>
+                    {emp.phone && <span className="block text-xs text-gray-400">{emp.phone}</span>}
+                  </div>
                   <button
                     onClick={() => handleDeleteEmployee(emp.id)}
                     className={cn(

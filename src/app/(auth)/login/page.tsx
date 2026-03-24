@@ -14,6 +14,7 @@ function LoginForm() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(hasError ? "פרטים שגויים." : "");
@@ -27,13 +28,14 @@ function LoginForm() {
       username,
       password: isManager ? password : "",
       isManager: isManager ? "true" : "false",
+      phone: isManager ? "" : phone,
       redirect: false,
     });
 
     setLoading(false);
 
     if (result?.error) {
-      setError(isManager ? "אימייל או סיסמה שגויים." : "שם לא נמצא. פנה למנהל.");
+      setError(isManager ? "אימייל או סיסמה שגויים." : "שם או טלפון שגויים. פנה למנהל.");
     } else {
       router.push("/");
       router.refresh();
@@ -44,7 +46,7 @@ function LoginForm() {
     <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
       <h2 className="text-lg font-semibold text-gray-900 mb-1">כניסה</h2>
       <p className="text-sm text-gray-500 mb-6">
-        {isManager ? "הזן אימייל וסיסמה." : "הזן את שמך כפי שהוגדר על ידי המנהל."}
+        {isManager ? "הזן אימייל וסיסמה." : "הזן את שמך ומספר הטלפון שלך."}
       </p>
 
       {error && (
@@ -65,6 +67,18 @@ function LoginForm() {
           autoFocus
           autoComplete={isManager ? "email" : "name"}
         />
+        {!isManager && (
+          <Input
+            id="phone"
+            type="tel"
+            label="טלפון"
+            placeholder="050-0000000"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            autoComplete="tel"
+          />
+        )}
         {isManager && (
           <Input
             id="password"
@@ -85,7 +99,7 @@ function LoginForm() {
       <p className="mt-4 text-center text-sm">
         <button
           type="button"
-          onClick={() => { setIsManager(v => !v); setError(""); setUsername(""); setPassword(""); }}
+          onClick={() => { setIsManager(v => !v); setError(""); setUsername(""); setPassword(""); setPhone(""); }}
           className="text-gray-400 hover:text-brand-600 transition-colors"
         >
           {isManager ? "כניסה כעובד" : "כניסת מנהל"}
