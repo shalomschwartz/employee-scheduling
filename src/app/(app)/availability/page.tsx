@@ -77,10 +77,16 @@ function DeadlineBanner() {
       urgent ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-700"
     )}>
       <p className="font-medium">⏰ יש להגיש זמינות עד {deadlineDateStr} בשעה 21:00</p>
-      <p className="mt-1 font-mono text-base tracking-wide">
-        {days > 0 && <span>{days} ימים </span>}
-        {pad(hours)}:{pad(mins)}:{pad(secs)}
-      </p>
+      <div className="mt-1 flex items-baseline gap-2">
+        {days > 0 && (
+          <span className="text-base" style={{ fontFamily: "Arial, sans-serif" }}>
+            {days} ימים
+          </span>
+        )}
+        <span className="font-mono text-base tracking-wide">
+          {pad(hours)}:{pad(mins)}:{pad(secs)}
+        </span>
+      </div>
     </div>
   );
 }
