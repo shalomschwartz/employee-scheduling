@@ -44,7 +44,7 @@ function LoginForm() {
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">כניסה</h2>
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">כניסה – {isManager ? "מנהל" : "עובד"}</h2>
       <p className="text-sm text-gray-500 mb-6">
         {isManager ? "הזן אימייל וסיסמה." : "הזן את שמך ומספר הטלפון שלך."}
       </p>
