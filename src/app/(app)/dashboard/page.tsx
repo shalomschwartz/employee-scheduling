@@ -53,8 +53,8 @@ export default function DashboardPage() {
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!sessionStorage.getItem("welcomed")) {
-      sessionStorage.setItem("welcomed", "1");
+    if (sessionStorage.getItem("justLoggedIn")) {
+      sessionStorage.removeItem("justLoggedIn");
       setShowWelcome(true);
       setTimeout(() => setShowWelcome(false), 2000);
     }
