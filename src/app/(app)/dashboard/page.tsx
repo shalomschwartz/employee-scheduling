@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { format, addDays } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ const EMP_COLORS = [
 const EMP_HEX = ["#273c75","#6c5ce7","#e84393","#0984e3","#e17055","#00cec9","#a29bfe","#2d3436"];
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const [showWelcome, setShowWelcome] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [existing, setExisting] = useState<GeneratedSchedule | null>(null);
   const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
@@ -48,6 +51,14 @@ export default function DashboardPage() {
   const [dragOver, setDragOver] = useState<{ day: string; shift: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sessionStorage.getItem("welcomed")) {
+      sessionStorage.setItem("welcomed", "1");
+      setShowWelcome(true);
+      setTimeout(() => setShowWelcome(false), 2000);
+    }
+  }, []);
 
 const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
@@ -415,6 +426,15 @@ const weekStart = getNextWeekStart();
 
   return (
     <div className="space-y-4">
+      {showWelcome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 pointer-events-none">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
+            <p className="text-3xl">👋</p>
+            <p className="text-2xl font-bold text-gray-900">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
