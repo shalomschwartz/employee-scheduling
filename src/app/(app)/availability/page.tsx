@@ -84,6 +84,15 @@ export default function AvailabilityPage() {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [deadline, setDeadline] = useState<Date | null>(null);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (!sessionStorage.getItem("welcomed")) {
+      sessionStorage.setItem("welcomed", "1");
+      setShowWelcome(true);
+      setTimeout(() => setShowWelcome(false), 2000);
+    }
+  }, []);
 
   useEffect(() => {
     if (!deadline || isPastDeadline) return;
@@ -218,6 +227,15 @@ export default function AvailabilityPage() {
       <p className="text-xs text-gray-400 text-center">
         המנהל יצור את לוח המשמרות לאחר שכולם ישלחו.
       </p>
+
+      {showWelcome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 pointer-events-none">
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
+            <p className="text-3xl">👋</p>
+            <p className="text-2xl font-bold text-gray-900">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
+          </div>
+        </div>
+      )}
 
       {status === "success" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setStatus("idle")}>
