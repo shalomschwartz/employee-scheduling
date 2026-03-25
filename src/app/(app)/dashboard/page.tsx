@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ const EMP_HEX = ["#273c75","#6c5ce7","#e84393","#0984e3","#e17055","#00cec9","#a
 
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [showWelcome, setShowWelcome] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [existing, setExisting] = useState<GeneratedSchedule | null>(null);
@@ -53,12 +56,12 @@ export default function DashboardPage() {
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (sessionStorage.getItem("justLoggedIn")) {
-      sessionStorage.removeItem("justLoggedIn");
+    if (searchParams.get("welcome") === "1") {
       setShowWelcome(true);
       setTimeout(() => setShowWelcome(false), 2000);
+      router.replace("/dashboard");
     }
-  }, []);
+  }, [searchParams, router]);
 
 const weekStart = getNextWeekStart();
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;

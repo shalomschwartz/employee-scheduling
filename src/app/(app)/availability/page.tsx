@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
 import {
   AvailabilityGrid,
@@ -77,6 +78,8 @@ type SubmitStatus = "idle" | "loading" | "success" | "error";
 
 export default function AvailabilityPage() {
   const { data: session } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [constraints, setConstraints] = useState<ConstraintData>(defaultConstraintData());
   const [status, setStatus] = useState<SubmitStatus>("idle");
@@ -87,12 +90,12 @@ export default function AvailabilityPage() {
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
-    if (sessionStorage.getItem("justLoggedIn")) {
-      sessionStorage.removeItem("justLoggedIn");
+    if (searchParams.get("welcome") === "1") {
       setShowWelcome(true);
       setTimeout(() => setShowWelcome(false), 2000);
+      router.replace("/availability");
     }
-  }, []);
+  }, [searchParams, router]);
 
   useEffect(() => {
     if (!deadline || isPastDeadline) return;

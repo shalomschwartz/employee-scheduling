@@ -37,8 +37,7 @@ function LoginForm() {
     if (result?.error) {
       setError(isManager ? "אימייל או סיסמה שגויים." : "שם או טלפון שגויים. פנה למנהל.");
     } else {
-      sessionStorage.setItem("justLoggedIn", "1");
-      router.push(isManager ? "/dashboard" : "/availability");
+      router.push(isManager ? "/dashboard?welcome=1" : "/availability?welcome=1");
       router.refresh();
     }
   }
