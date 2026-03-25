@@ -141,7 +141,7 @@ export default function AvailabilityPage() {
       setStatus("success");
       setAlreadySubmitted(true);
       setLastSaved(new Date());
-      setTimeout(() => setStatus("idle"), 3000);
+      setTimeout(() => setStatus("idle"), 5000);
     } catch {
       setStatus("error");
       setTimeout(() => setStatus("idle"), 4000);
@@ -201,7 +201,6 @@ export default function AvailabilityPage() {
           </button>
 
           <div className="flex items-center gap-3">
-            {status === "success" && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
             {status === "error" && <span className="text-sm text-red-600">שגיאה בשמירה. נסה שנית.</span>}
             <Button
               onClick={handleSubmit}
@@ -219,6 +218,20 @@ export default function AvailabilityPage() {
       <p className="text-xs text-gray-400 text-center">
         המנהל יצור את לוח המשמרות לאחר שכולם ישלחו.
       </p>
+
+      {status === "success" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setStatus("idle")}>
+          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-1">
+              <svg className="w-9 h-9 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">נשמר!</p>
+            <p className="text-sm text-gray-500 text-center">ניתן לסגור את האפליקציה</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
