@@ -98,14 +98,13 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
                     <button
                       type="button"
                       onClick={() => handleToggle(day, shiftCfg.id)}
-                      disabled={disabled}
                       aria-label={`${DAY_LABELS_HE[day]} ${shiftCfg.label}: ${styles.label}`}
                       className={cn(
                         "w-full h-12 sm:h-14 rounded-lg sm:rounded-xl border-2 transition-all cursor-pointer",
                         "active:scale-95 hover:brightness-95 touch-manipulation select-none",
                         "flex flex-col items-center justify-center gap-0.5",
                         styles.bg,
-                        disabled && "opacity-50 cursor-not-allowed"
+                        disabled && !onBlockedClick && "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <span className="text-base sm:text-xl font-bold leading-none">{styles.icon}</span>
