@@ -87,6 +87,7 @@ export default function AvailabilityPage() {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [deadline, setDeadline] = useState<Date | null>(null);
   const [isPastDeadline, setIsPastDeadline] = useState(false);
+  const [showDeadlinePopup, setShowDeadlinePopup] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
@@ -199,7 +200,13 @@ export default function AvailabilityPage() {
         </CardHeader>
 
         <CardContent className="px-2 sm:px-6 pt-4">
-          <AvailabilityGrid value={constraints} onChange={setConstraints} disabled={status === "loading"} shifts={shifts} />
+          <AvailabilityGrid
+            value={constraints}
+            onChange={setConstraints}
+            disabled={status === "loading" || isPastDeadline}
+            onBlockedClick={isPastDeadline ? () => setShowDeadlinePopup(true) : undefined}
+            shifts={shifts}
+          />
         </CardContent>
 
         <CardFooter className="flex items-center justify-between gap-4">
@@ -230,6 +237,16 @@ export default function AvailabilityPage() {
       <p className="text-xs text-gray-400 text-center">
         המנהל יצור את לוח המשמרות לאחר שכולם ישלחו.
       </p>
+
+      {showDeadlinePopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDeadlinePopup(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl px-8 py-7 flex flex-col items-center gap-3 mx-6 text-center">
+            <p className="text-3xl">⏰</p>
+            <p className="text-lg font-bold text-gray-900">מועד ההגשה עבר</p>
+            <p className="text-sm text-gray-500">לשינוי זמינות פנה למנהל</p>
+          </div>
+        </div>
+      )}
 
       {showWelcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 pointer-events-none">

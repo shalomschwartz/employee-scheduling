@@ -23,6 +23,7 @@ interface AvailabilityGridProps {
   value: ConstraintData;
   onChange: (data: ConstraintData) => void;
   disabled?: boolean;
+  onBlockedClick?: () => void;
   shifts?: ShiftConfig[];
 }
 
@@ -31,9 +32,9 @@ const DAY_LABELS_SHORT: Record<Day, string> = {
   thursday: "ה׳", friday: "ו׳", saturday: "ש׳",
 };
 
-export function AvailabilityGrid({ value, onChange, disabled, shifts = DEFAULT_SHIFTS }: AvailabilityGridProps) {
+export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, shifts = DEFAULT_SHIFTS }: AvailabilityGridProps) {
   function handleToggle(day: Day, shift: string) {
-    if (disabled) return;
+    if (disabled) { onBlockedClick?.(); return; }
     const cur = value[day]?.[shift] ?? "available";
     onChange({ ...value, [day]: { ...value[day], [shift]: nextOption(cur as AvailabilityOption) } });
   }
