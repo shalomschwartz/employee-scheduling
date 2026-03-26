@@ -49,6 +49,7 @@ export default function DashboardPage() {
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
   const [conflictsIgnored, setConflictsIgnored] = useState(false);
+  const [warningsIgnored, setWarningsIgnored] = useState(false);
 
   // Drag and drop
   const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: string } | null>(null);
@@ -403,6 +404,7 @@ const weekStart = getNextWeekStart();
         setExisting(data.schedule);
         setScheduleData(data.schedule.schedule as ScheduleData);
         setConflictsIgnored(false);
+        setWarningsIgnored(false);
         setToast("הסידור נוצר בהצלחה!");
         setTimeout(() => setToast(null), 3000);
       } else {
@@ -513,10 +515,13 @@ const weekStart = getNextWeekStart();
       )}
 
       {/* Warnings */}
-      {warnings.length > 0 && (
+      {warnings.length > 0 && !warningsIgnored && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="py-3">
-            <p className="text-xs font-semibold text-yellow-800 mb-1">אזהרות:</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-semibold text-yellow-800">אזהרות:</p>
+              <button onClick={() => setWarningsIgnored(true)} className="text-xs text-yellow-500 hover:text-yellow-700 font-medium px-2 py-0.5 rounded hover:bg-yellow-100 transition-colors">התעלם</button>
+            </div>
             <ul className="space-y-0.5">{warnings.map((w, i) => <li key={i} className="text-xs text-yellow-700">• {w}</li>)}</ul>
           </CardContent>
         </Card>
