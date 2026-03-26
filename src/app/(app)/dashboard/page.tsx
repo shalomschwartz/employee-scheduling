@@ -491,7 +491,7 @@ const weekStart = getNextWeekStart();
                 const name = (emp.name ?? emp.email).split(" ")[0];
                 return (
                   <div key={emp.id} className={cn(
-                    "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border",
                     hasSent
                       ? "bg-green-50 border-green-300 text-green-700"
                       : "bg-red-50 border-red-300 text-red-600"
