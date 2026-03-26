@@ -208,7 +208,7 @@ export default function SettingsPage() {
             {shifts.map((shift, i) => (
               <div key={shift.id} className={cn(
                 "flex flex-col gap-2 p-3 rounded-lg border bg-gray-50 transition-all",
-                overlappingIds.has(shift.id) ? "border-red-400 ring-2 ring-red-200" : "border-gray-200"
+                overlappingIds.has(shift.id) && !overlapIgnored ? "border-red-400 ring-2 ring-red-200" : "border-gray-200"
               )}>
                 {/* Row 1: number + name */}
                 <div className="flex items-center gap-2">
