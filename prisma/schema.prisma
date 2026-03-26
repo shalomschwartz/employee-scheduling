@@ -93,6 +93,18 @@ model GeneratedSchedule {
   @@unique([organizationId, weekStart])
 }
 
+// Admin-only table for tracking client credentials (operator use only)
+model ClientRecord {
+  id           String   @id @default(cuid())
+  orgName      String
+  managerName  String?
+  email        String   @unique
+  plainPassword String
+  phone        String?
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
 model Shift {
   id         String    @id @default(cuid())
   employeeId String
