@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
 
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
-  const [empFilter, setEmpFilter] = useState<string[]>([]);
+  const [empFilter, setEmpFilter] = useState<string | null>(null);
 
   // Hidden print-calendar ref for PDF capture
   const printRef = useRef<HTMLDivElement>(null);
@@ -615,6 +615,34 @@ const weekStart = getNextWeekStart();
             <p className="text-xs text-gray-400">X להסרה • + להוספה ידנית 📌</p>
             {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setEmpFilter(null)}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+                empFilter === null ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              )}
+            >
+              הכל
+            </button>
+            {employees.map((emp, i) => {
+              const id = emp.id;
+              const label = (emp.name ?? emp.email).split(" ")[0];
+              const selected = empFilter === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setEmpFilter(selected ? null : id)}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+                    selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           <div className="overflow-x-auto rounded-xl border-2 border-gray-300 shadow-sm">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -683,6 +711,7 @@ const weekStart = getNextWeekStart();
                           <div className="flex flex-col gap-2.5">
                             {names.map((name, ni) => {
                               const empId = slot?.employeeIds?.[ni];
+                              if (empFilter !== null && empId !== empFilter) return null;
                               const isPinned = !!empId && pinnedIds.includes(empId);
                               const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
                               const avBorder = av === "available" ? "ring-[3px] ring-green-400" : av === "prefer_not" ? "ring-[3px] ring-yellow-400" : "ring-[3px] ring-red-500";
@@ -822,18 +851,18 @@ const weekStart = getNextWeekStart();
                   onClick={() => setEmpFilter([])}
                   className={cn(
                     "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-                    empFilter.length === 0 ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                    empFilter === null ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                   )}
                 >
                   הכל
                 </button>
                 {employees.map((emp, i) => {
                   const name = emp.name ?? emp.email;
-                  const selected = empFilter.includes(name);
+                  const selected = empFilter === emp.id;
                   return (
                     <button
                       key={emp.id}
-                      onClick={() => setEmpFilter(prev => selected ? prev.filter(n => n !== name) : [...prev, name])}
+                      onClick={() => setEmpFilter(selected ? null : emp.id)}
                       className={cn(
                         "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
                         selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
@@ -881,7 +910,7 @@ const weekStart = getNextWeekStart();
                       {DAYS.map(day => (
                         <td key={day} className="py-1 px-1 align-top">
                           <div className="flex flex-col gap-0.5">
-                            {employees.filter(e => empFilter.length === 0 || empFilter.includes(e.name ?? e.email)).map(emp => {
+                            {employees.filter(e => empFilter === null || e.id === empFilter).map(emp => {
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                               const chipStyle = av === "available"
                                 ? "bg-emerald-500 text-white"
