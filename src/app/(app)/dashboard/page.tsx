@@ -477,21 +477,33 @@ const weekStart = getNextWeekStart();
         </div>
       </div>
 
-      {/* Stats strip */}
-      {!loading && (
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: "עובדים", value: employees.length },
-            { label: "הגישו זמינות", value: submitted, color: submitted === employees.length && employees.length > 0 ? "text-green-600" : "text-amber-600" },
-          ].map(s => (
-            <Card key={s.label}>
-              <CardContent className="py-3">
-                <p className="text-xs text-gray-500">{s.label}</p>
-                <p className={cn("text-xl font-bold mt-0.5", s.color ?? "text-gray-900")}>{s.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {/* Submission status */}
+      {!loading && employees.length > 0 && (
+        <Card>
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-700">הגשת זמינות</p>
+              <p className="text-xs text-gray-400">{submitted}/{employees.length} הגישו</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {employees.map(emp => {
+                const hasSent = emp.constraints.length > 0;
+                const name = (emp.name ?? emp.email).split(" ")[0];
+                return (
+                  <div key={emp.id} className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border",
+                    hasSent
+                      ? "bg-green-50 border-green-300 text-green-700"
+                      : "bg-red-50 border-red-300 text-red-600"
+                  )}>
+                    <span>{hasSent ? "✓" : "✗"}</span>
+                    <span>{name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Employee hours cards */}
