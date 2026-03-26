@@ -380,7 +380,7 @@ const weekStart = getNextWeekStart();
 
   function handleWhatsApp() {
     if (!scheduleData) return;
-    const WA_URL = "https://wa.me/972533306614?text=%D7%A9%D7%99%D7%91%D7%95%D7%A5%20%D7%94%D7%A9%D7%91%D7%95%D7%A2";
+    const WA_URL = "https://web.whatsapp.com/";
     const downloadConflicts = getDownloadConflicts();
     if (downloadConflicts.length > 0) {
       // onIgnore runs inside a user click → window.open won't be blocked
