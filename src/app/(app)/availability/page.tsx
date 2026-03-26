@@ -154,7 +154,7 @@ export default function AvailabilityPage() {
       setStatus("success");
       setAlreadySubmitted(true);
       setLastSaved(new Date());
-      setTimeout(() => setStatus("idle"), 5000);
+      setTimeout(() => setStatus("idle"), 2000);
     } catch {
       setStatus("error");
       setTimeout(() => setStatus("idle"), 4000);
