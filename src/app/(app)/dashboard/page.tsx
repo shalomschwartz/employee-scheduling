@@ -632,7 +632,7 @@ const weekStart = getNextWeekStart();
               return (
                 <button
                   key={id}
-                  onClick={() => setEmpFilter(selected ? null : id)}
+                  onClick={() => setEmpFilter(id)}
                   className={cn(
                     "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
                     selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
@@ -646,10 +646,10 @@ const weekStart = getNextWeekStart();
           <div className="overflow-x-auto rounded-xl border-2 border-gray-300 shadow-sm">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b-2 border-gray-300">
-                  <th className="text-right py-3 ps-4 pe-3 text-xs font-semibold text-gray-500 w-28 whitespace-nowrap border-e border-gray-200">משמרת</th>
+                <tr className="bg-gray-50 border-b-2 border-gray-400">
+                  <th className="text-right py-3 ps-4 pe-3 text-xs font-semibold text-gray-500 w-28 whitespace-nowrap border-e-2 border-gray-300">משמרת</th>
                   {DAYS.map(day => (
-                    <th key={day} className="py-3 px-3 text-center text-xs font-semibold text-gray-700 min-w-[90px] border-e border-gray-200 last:border-e-0">
+                    <th key={day} className="py-3 px-3 text-center text-xs font-semibold text-gray-700 min-w-[90px] border-e-2 border-gray-300 last:border-e-0">
                       {DAY_LABELS_HE[day as Day]}
                     </th>
                   ))}
@@ -660,8 +660,8 @@ const weekStart = getNextWeekStart();
                   const shiftCfg = shifts.find(s => s.id === shift);
                   const dotColors = ["bg-yellow-400","bg-orange-400","bg-indigo-400","bg-blue-400","bg-pink-400"];
                   return (
-                  <tr key={shift} className="border-b border-gray-200 last:border-0">
-                    <td className="py-3 ps-4 pe-3 align-middle border-e border-gray-200">
+                  <tr key={shift} className="border-b-2 border-gray-300 last:border-0">
+                    <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-gray-300">
                       <div className="flex items-center gap-2">
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
                         <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
@@ -703,7 +703,7 @@ const weekStart = getNextWeekStart();
                       return (
                         <td
                           key={day}
-                          className={cn("py-2 px-2 align-top transition-colors border-e border-gray-200 last:border-e-0", dragging && dragBg, dropOutline)}
+                          className={cn("py-2 px-2 align-top transition-colors border-e-2 border-gray-300 last:border-e-0", dragging && dragBg, dropOutline)}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
@@ -862,7 +862,7 @@ const weekStart = getNextWeekStart();
                   return (
                     <button
                       key={emp.id}
-                      onClick={() => setEmpFilter(selected ? null : emp.id)}
+                      onClick={() => setEmpFilter(emp.id)}
                       className={cn(
                         "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
                         selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
