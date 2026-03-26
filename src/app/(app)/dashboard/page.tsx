@@ -48,6 +48,7 @@ export default function DashboardPage() {
 
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
+  const [conflictsIgnored, setConflictsIgnored] = useState(false);
 
   // Drag and drop
   const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: string } | null>(null);
@@ -401,6 +402,7 @@ const weekStart = getNextWeekStart();
         const data = await res.json();
         setExisting(data.schedule);
         setScheduleData(data.schedule.schedule as ScheduleData);
+        setConflictsIgnored(false);
         setToast("הסידור נוצר בהצלחה!");
         setTimeout(() => setToast(null), 3000);
       } else {
@@ -521,10 +523,13 @@ const weekStart = getNextWeekStart();
       )}
 
       {/* Conflicts */}
-      {Object.keys(conflicts).length > 0 && (
+      {Object.keys(conflicts).length > 0 && !conflictsIgnored && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="py-3">
-            <p className="text-xs font-semibold text-red-800 mb-2">התנגשויות זמינות:</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-red-800">התנגשויות זמינות:</p>
+              <button onClick={() => setConflictsIgnored(true)} className="text-xs text-red-400 hover:text-red-600 font-medium px-2 py-0.5 rounded hover:bg-red-100 transition-colors">התעלם</button>
+            </div>
             <div className="space-y-2">
               {Object.entries(conflicts).map(([name, slots]) => {
                 const empIndex = employees.findIndex(e => (e.name ?? e.email) === name);
