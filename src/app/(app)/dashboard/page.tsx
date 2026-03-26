@@ -232,11 +232,6 @@ const weekStart = getNextWeekStart();
       setTimeout(() => setErrorToast(null), 3000);
       return;
     }
-    if (hasConsecutiveConflict(emp.id, day, shift)) {
-      setErrorToast(`${emp.name ?? emp.email} כבר משובץ/ת במשמרת צמודה באותו יום`);
-      setTimeout(() => setErrorToast(null), 3000);
-      return;
-    }
     const name = emp.name ?? emp.email;
 
     const doAdd = () => {
@@ -256,11 +251,11 @@ const weekStart = getNextWeekStart();
     };
 
     const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
-    if (availability === "unavailable") {
-      setConflictDialog({
-        lines: [`${name} ציין/ה שאינו/ה זמין/ה למשמרת זו`],
-        onIgnore: doAdd,
-      });
+    const warnings: string[] = [];
+    if (availability === "unavailable") warnings.push(`${name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
+    if (hasConsecutiveConflict(emp.id, day, shift)) warnings.push(`${name} כבר משובץ/ת במשמרת צמודה באותו יום`);
+    if (warnings.length > 0) {
+      setConflictDialog({ lines: warnings, onIgnore: doAdd });
       return;
     }
     doAdd();
@@ -286,13 +281,6 @@ const weekStart = getNextWeekStart();
       setDragging(null);
       return;
     }
-    if (hasConsecutiveConflict(dragging.empId, toDay, toShift)) {
-      setErrorToast(`${dragging.name} כבר משובץ/ת במשמרת צמודה באותו יום`);
-      setTimeout(() => setErrorToast(null), 3000);
-      setDragging(null);
-      return;
-    }
-
     const doMove = () => {
       const fromSlot = scheduleData[dragging.fromDay][dragging.fromShift];
       const idx = fromSlot.employeeIds.indexOf(dragging.empId);
@@ -322,8 +310,11 @@ const weekStart = getNextWeekStart();
     };
 
     const availability = emp?.constraints[0]?.data?.[toDay as Day]?.[toShift] ?? "available";
-    if (availability === "unavailable") {
-      setConflictDialog({ lines: [`${dragging.name} ציין/ה שאינו/ה זמין/ה למשמרת זו`], onIgnore: doMove });
+    const dragWarnings: string[] = [];
+    if (availability === "unavailable") dragWarnings.push(`${dragging.name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
+    if (hasConsecutiveConflict(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} כבר משובץ/ת במשמרת צמודה באותו יום`);
+    if (dragWarnings.length > 0) {
+      setConflictDialog({ lines: dragWarnings, onIgnore: doMove });
       setDragging(null);
       return;
     }
