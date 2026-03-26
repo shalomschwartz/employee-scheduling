@@ -98,6 +98,7 @@ export default function SettingsPage() {
   const [shiftSaving, setShiftSaving] = useState(false);
   const [shiftSaved, setShiftSaved] = useState(false);
   const [shiftError, setShiftError] = useState("");
+  const [overlapIgnored, setOverlapIgnored] = useState(false);
   const savedShifts = useRef<ShiftConfig[]>([]);
   const [regenerating, setRegenerating] = useState(false);
   const [regenerated, setRegenerated] = useState(false);
@@ -114,6 +115,7 @@ export default function SettingsPage() {
   function updateShift(id: string, field: keyof ShiftConfig, value: string | number) {
     setShifts(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
     setShiftSaved(false);
+    setOverlapIgnored(false);
   }
 
   async function handleRegenerate() {
@@ -260,10 +262,13 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          {overlappingIds.size > 0 && (
-            <p className="text-sm text-red-600 font-medium">
-              ⚠ משמרות חופפות: {shifts.filter(s => overlappingIds.has(s.id)).map(s => s.label).join(", ")}
-            </p>
+          {overlappingIds.size > 0 && !overlapIgnored && (
+            <div className="flex items-center justify-between gap-3 p-2 rounded-lg bg-red-50 border border-red-200">
+              <p className="text-sm text-red-600 font-medium">
+                ⚠ משמרות חופפות: {shifts.filter(s => overlappingIds.has(s.id)).map(s => s.label).join(", ")}
+              </p>
+              <button onClick={() => setOverlapIgnored(true)} className="text-xs text-red-400 hover:text-red-600 font-medium whitespace-nowrap px-2 py-0.5 rounded hover:bg-red-100 transition-colors flex-shrink-0">התעלם</button>
+            </div>
           )}
           {shiftError && <p className="text-sm text-red-600">{shiftError}</p>}
 
