@@ -445,7 +445,7 @@ const weekStart = getNextWeekStart();
             <div className="flex gap-2"><span className="font-bold text-blue-600">1.</span><span><span className="font-semibold">הוסף עובדים</span> — עבור להגדרות, הוסף את שמות העובדים ומספרי הטלפון שלהם.</span></div>
             <div className="flex gap-2"><span className="font-bold text-blue-600">2.</span><span><span className="font-semibold">קבע דדליין</span> — בהגדרות, בחר מועד אחרון להגשת זמינות (ברירת מחדל: רביעי 21:00).</span></div>
             <div className="flex gap-2"><span className="font-bold text-blue-600">3.</span><span><span className="font-semibold">עובדים ממלאים זמינות</span> — כל עובד נכנס למערכת ומסמן את הימים והמשמרות שמתאימים לו.</span></div>
-            <div className="flex gap-2"><span className="font-bold text-blue-600">4.</span><span><span className="font-semibold">צור סידור</span> — לחץ "צור סידור" וה-AI יבנה סידור אוטומטי לפי הזמינויות.</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">4.</span><span><span className="font-semibold">צור שיבוץ</span> — לחץ "צור שיבוץ" וה-AI יבנה סידור אוטומטי לפי הזמינויות.</span></div>
             <div className="flex gap-2"><span className="font-bold text-blue-600">5.</span><span><span className="font-semibold">ערוך ידנית</span> — ניתן לגרור עובדים בין משמרות ולהוסיף/להסיר ידנית.</span></div>
             <div className="flex gap-2"><span className="font-bold text-blue-600">6.</span><span><span className="font-semibold">שלח לעובדים</span> — לחץ "הורדה" להורדת PDF, או "שלח לוואצאפ" לפתיחת WhatsApp עם ה-PDF מוכן לשיתוף.</span></div>
           </div>
@@ -460,7 +460,7 @@ const weekStart = getNextWeekStart();
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
             <Button onClick={generate} loading={generating} variant="outline" size="md">
-              {scheduleData ? "צור מחדש" : "צור סידור"}
+              {"צור שיבוץ"}
             </Button>
             {scheduleData && (
               <Button onClick={handleDownload} size="md">הורדה</Button>
