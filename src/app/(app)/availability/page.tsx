@@ -93,7 +93,7 @@ export default function AvailabilityPage() {
   useEffect(() => {
     if (searchParams.get("welcome") === "1") {
       setShowWelcome(true);
-      setTimeout(() => setShowWelcome(false), 2000);
+      setTimeout(() => setShowWelcome(false), 1500);
       router.replace("/availability");
     }
   }, [searchParams, router]);
@@ -249,7 +249,7 @@ export default function AvailabilityPage() {
       )}
 
       {showWelcome && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 pointer-events-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWelcome(false)}>
           <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
             <p className="text-3xl">👋</p>
             <p className="text-2xl font-bold text-gray-900">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
