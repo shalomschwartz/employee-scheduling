@@ -161,6 +161,30 @@ const weekStart = getNextWeekStart();
     return map;
   }, [employees]);
 
+  const DAY_SHORT: Record<string, string> = {
+    sunday: "א׳", monday: "ב׳", tuesday: "ג׳", wednesday: "ד׳",
+    thursday: "ה׳", friday: "ו׳", saturday: "ש׳",
+  };
+
+  const shiftsPerEmployeeMap = useMemo(() => {
+    const map: Record<string, { shiftLabel: string; days: string[] }[]> = {};
+    if (!scheduleData) return map;
+    for (const emp of employees) {
+      const entries: { shiftLabel: string; days: string[] }[] = [];
+      for (const shiftCfg of shifts) {
+        const days: string[] = [];
+        for (const day of DAYS) {
+          if (scheduleData[day]?.[shiftCfg.id]?.employeeIds.includes(emp.id)) {
+            days.push(day);
+          }
+        }
+        if (days.length > 0) entries.push({ shiftLabel: shiftCfg.label, days });
+      }
+      map[emp.id] = entries;
+    }
+    return map;
+  }, [scheduleData, shifts, employees]);
+
   const hoursMap = useMemo(() => {
     const map: Record<string, number> = {};
     if (!scheduleData) return map;
@@ -519,6 +543,16 @@ const weekStart = getNextWeekStart();
                 <CardContent className="py-3">
                   <p className="text-xs font-semibold text-gray-700 truncate">{name}</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">{hours}<span className="text-xs font-normal text-gray-400 mr-1">שעות</span></p>
+                  {(shiftsPerEmployeeMap[emp.id]?.length ?? 0) > 0 && (
+                    <div className="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
+                      {shiftsPerEmployeeMap[emp.id].map(({ shiftLabel, days }) => (
+                        <div key={shiftLabel} className="flex items-center gap-1 text-xs text-gray-500">
+                          <span className="font-medium text-gray-600">{shiftLabel}:</span>
+                          <span>{days.map(d => DAY_SHORT[d]).join(" ")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
