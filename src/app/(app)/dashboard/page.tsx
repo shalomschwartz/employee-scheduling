@@ -555,7 +555,7 @@ const weekStart = getNextWeekStart();
             <p className="text-xs text-gray-400">X להסרה • + להוספה ידנית 📌</p>
             {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <div className="overflow-x-auto rounded-xl border-2 border-gray-300 shadow-sm">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -794,7 +794,7 @@ const weekStart = getNextWeekStart();
             </div>
 
             {/* Overview table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <div className="overflow-x-auto rounded-xl border-2 border-gray-300 shadow-sm">
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
