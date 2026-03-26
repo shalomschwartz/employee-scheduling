@@ -30,10 +30,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showWelcome, setShowWelcome] = useState(false);
-  const [showGuide, setShowGuide] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("guideHidden") !== "1";
-  });
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [existing, setExisting] = useState<GeneratedSchedule | null>(null);
   const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
@@ -443,12 +439,7 @@ const weekStart = getNextWeekStart();
       )}
 
       {/* Guide */}
-      {showGuide && (
-        <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 text-sm text-gray-700 relative">
-          <button
-            onClick={() => { setShowGuide(false); localStorage.setItem("guideHidden", "1"); }}
-            className="absolute top-3 left-3 text-gray-400 hover:text-gray-600 text-lg leading-none font-bold"
-          >×</button>
+      <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 text-sm text-gray-700">
           <p className="font-bold text-blue-800 mb-3 text-base">איך ShiftSync עובד</p>
           <div className="space-y-2">
             <div className="flex gap-2"><span className="font-bold text-blue-600">1.</span><span><span className="font-semibold">הוסף עובדים</span> — עבור להגדרות, הוסף את שמות העובדים ומספרי הטלפון שלהם.</span></div>
@@ -458,8 +449,7 @@ const weekStart = getNextWeekStart();
             <div className="flex gap-2"><span className="font-bold text-blue-600">5.</span><span><span className="font-semibold">ערוך ידנית</span> — ניתן לגרור עובדים בין משמרות ולהוסיף/להסיר ידנית.</span></div>
             <div className="flex gap-2"><span className="font-bold text-blue-600">6.</span><span><span className="font-semibold">שלח לעובדים</span> — לחץ "הורדה" להורדת PDF, או "שלח לוואצאפ" לפתיחת WhatsApp עם ה-PDF מוכן לשיתוף.</span></div>
           </div>
-        </div>
-      )}
+      </div>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
