@@ -229,16 +229,15 @@ const weekStart = getNextWeekStart();
     });
   }
 
-  function clearShiftRow(shift: string) {
+  function clearShiftCell(day: string, shift: string) {
     if (!scheduleData) return;
-    const updated = { ...scheduleData };
-    for (const day of DAYS) {
-      if (!updated[day]?.[shift]) continue;
-      updated[day] = {
-        ...updated[day],
-        [shift]: { ...updated[day][shift], employeeIds: [], employeeNames: [], pinnedIds: [] },
-      };
-    }
+    const updated = {
+      ...scheduleData,
+      [day]: {
+        ...scheduleData[day],
+        [shift]: { ...scheduleData[day]?.[shift], employeeIds: [], employeeNames: [], pinnedIds: [] },
+      },
+    };
     persistSchedule(updated);
   }
 
@@ -721,13 +720,6 @@ const weekStart = getNextWeekStart();
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
-                            <button
-                              onClick={() => clearShiftRow(shift)}
-                              title="נקה משמרת"
-                              className="text-gray-300 hover:text-red-400 transition-colors text-xs leading-none px-0.5"
-                            >
-                              🗑
-                            </button>
                           </div>
                           {shiftCfg?.role && (() => {
                             const rc = roleColorMap[shiftCfg.role];
@@ -784,7 +776,16 @@ const weekStart = getNextWeekStart();
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
                         >
-                          <div className="flex flex-col gap-2.5">
+                          <div className="group/cell flex flex-col gap-2.5">
+                            {(slot?.employeeIds ?? []).length > 0 && (
+                              <button
+                                onClick={e => { e.stopPropagation(); clearShiftCell(day, shift); }}
+                                title="נקה תא"
+                                className="self-end text-gray-300 hover:text-red-400 transition-colors text-xs leading-none opacity-0 group-hover/cell:opacity-100 -mb-1.5"
+                              >
+                                🗑
+                              </button>
+                            )}
                             {names.map((name, ni) => {
                               const empId = slot?.employeeIds?.[ni];
                               if (empFilter !== null && empId !== empFilter) return null;
