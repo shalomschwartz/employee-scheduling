@@ -475,7 +475,7 @@ export default function SettingsPage() {
                           {emp.roles.join(", ")}
                         </span>
                       )}
-                      <span className="text-gray-300 text-xs">{expandedEmp === emp.id ? "▲" : "▼"}</span>
+                      <svg className={cn("w-3.5 h-3.5 text-gray-400 transition-transform", expandedEmp === emp.id && "rotate-180")} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                     </button>
                     <div className="flex items-center gap-2">
                       {emp.phone && <span className="text-xs text-gray-400">{emp.phone}</span>}
