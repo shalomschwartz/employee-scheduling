@@ -16,6 +16,45 @@ interface Employee {
 }
 
 export default function SettingsPage() {
+  // ── Shift role types ────────────────────────────────────────────────────────
+  const [shiftRoles, setShiftRoles] = useState<string[]>([]);
+  const [newRole, setNewRole] = useState("");
+  const [rolesSaving, setRolesSaving] = useState(false);
+  const [rolesSaved, setRolesSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/shift-roles")
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.roles)) setShiftRoles(d.roles); });
+  }, []);
+
+  async function saveRoles(updated: string[]) {
+    setRolesSaving(true);
+    await fetch("/api/shift-roles", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roles: updated }),
+    });
+    setRolesSaving(false);
+    setRolesSaved(true);
+    setTimeout(() => setRolesSaved(false), 2000);
+  }
+
+  function addRole() {
+    const trimmed = newRole.trim();
+    if (!trimmed || shiftRoles.includes(trimmed)) return;
+    const updated = [...shiftRoles, trimmed];
+    setShiftRoles(updated);
+    setNewRole("");
+    saveRoles(updated);
+  }
+
+  function removeRole(role: string) {
+    const updated = shiftRoles.filter(r => r !== role);
+    setShiftRoles(updated);
+    saveRoles(updated);
+  }
+
   // ── Employees ──────────────────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [name, setName] = useState("");
@@ -193,12 +232,50 @@ export default function SettingsPage() {
     }
   }));
 
-  // All unique non-empty roles defined across shifts
-  const availableRoles = Array.from(new Set(shifts.map(s => s.role?.trim()).filter(Boolean))) as string[];
-
   return (
     <div className="space-y-6 max-w-lg">
       <h1 className="text-xl font-bold text-gray-900">הגדרות</h1>
+
+      {/* ── Shift role types ── */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900">סוגי תפקידים</h2>
+            <p className="text-xs text-gray-500 mt-0.5">הגדר את התפקידים האפשריים (למשל: מלצר, ברמן, הוסטס). ניתן לשייך תפקיד לכל משמרת ועובד.</p>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newRole}
+              onChange={e => setNewRole(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addRole())}
+              placeholder="שם תפקיד חדש"
+              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+            <Button onClick={addRole} size="md" disabled={!newRole.trim()}>הוסף</Button>
+          </div>
+
+          {shiftRoles.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-2">אין תפקידים מוגדרים עדיין.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {shiftRoles.map(role => (
+                <span key={role} className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                  {role}
+                  <button
+                    onClick={() => removeRole(role)}
+                    className="text-purple-400 hover:text-purple-700 font-bold leading-none"
+                    title="הסר תפקיד"
+                  >×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          {rolesSaving && <p className="text-xs text-gray-400">שומר...</p>}
+          {rolesSaved && <p className="text-xs text-green-600 font-medium">נשמר!</p>}
+        </CardContent>
+      </Card>
 
       {/* ── Shifts ── */}
       <Card>
@@ -273,13 +350,16 @@ export default function SettingsPage() {
                 {/* Row 3: role */}
                 <div className="flex items-center gap-2 ps-6">
                   <span className="text-[10px] text-gray-400 shrink-0">תפקיד:</span>
-                  <input
-                    type="text"
+                  <select
                     value={shift.role ?? ""}
                     onChange={e => updateShift(shift.id, "role", e.target.value)}
-                    placeholder="ללא (כל עובד)"
                     className="flex-1 text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  />
+                  >
+                    <option value="">ללא (כל עובד)</option>
+                    {shiftRoles.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             ))}
@@ -429,11 +509,11 @@ export default function SettingsPage() {
                       </div>
 
                       {/* Roles */}
-                      {availableRoles.length > 0 && (
+                      {shiftRoles.length > 0 && (
                         <div className="flex items-start gap-2">
                           <span className="text-xs text-gray-500 w-24 shrink-0 pt-0.5">תפקידים:</span>
                           <div className="flex flex-wrap gap-1.5">
-                            {availableRoles.map(role => {
+                            {shiftRoles.map(role => {
                               const active = emp.roles.includes(role);
                               return (
                                 <button
@@ -457,8 +537,8 @@ export default function SettingsPage() {
                           </div>
                         </div>
                       )}
-                      {availableRoles.length === 0 && (
-                        <p className="text-xs text-gray-400">הגדר תפקיד במשמרת כדי להציג כאן.</p>
+                      {shiftRoles.length === 0 && (
+                        <p className="text-xs text-gray-400">הגדר תפקידים בכרטיס "סוגי תפקידים" כדי להציג כאן.</p>
                       )}
                     </div>
                   )}
