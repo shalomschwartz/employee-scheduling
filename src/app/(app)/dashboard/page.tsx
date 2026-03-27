@@ -229,6 +229,19 @@ const weekStart = getNextWeekStart();
     });
   }
 
+  function clearShiftRow(shift: string) {
+    if (!scheduleData) return;
+    const updated = { ...scheduleData };
+    for (const day of DAYS) {
+      if (!updated[day]?.[shift]) continue;
+      updated[day] = {
+        ...updated[day],
+        [shift]: { ...updated[day][shift], employeeIds: [], employeeNames: [], pinnedIds: [] },
+      };
+    }
+    persistSchedule(updated);
+  }
+
   function removeFromSlot(name: string, day: string, shift: string) {
     if (!scheduleData) return;
     const slot = scheduleData[day][shift];
@@ -705,8 +718,17 @@ const weekStart = getNextWeekStart();
                     <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-gray-300">
                       <div className="flex items-center gap-2">
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
-                        <div>
-                          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
+                            <button
+                              onClick={() => clearShiftRow(shift)}
+                              title="נקה משמרת"
+                              className="text-gray-300 hover:text-red-400 transition-colors text-xs leading-none px-0.5"
+                            >
+                              🗑
+                            </button>
+                          </div>
                           {shiftCfg?.role && (() => {
                             const rc = roleColorMap[shiftCfg.role];
                             return (
