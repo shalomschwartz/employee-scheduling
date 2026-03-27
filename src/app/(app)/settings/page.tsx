@@ -209,6 +209,20 @@ export default function SettingsPage() {
     setShiftSaved(false);
   }
 
+  function duplicateShift(id: string) {
+    const src = shifts.find(s => s.id === id);
+    if (!src) return;
+    const newId = `SHIFT_${Date.now()}`;
+    setShifts(prev => {
+      const idx = prev.findIndex(s => s.id === id);
+      const copy = { ...src, id: newId, label: `${src.label} (עותק)` };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+    setShiftSaved(false);
+  }
+
   async function saveShifts() {
     setShiftSaving(true);
     setShiftError("");
@@ -346,6 +360,13 @@ export default function SettingsPage() {
                     <span className="w-5 text-center text-xs font-semibold text-gray-800">{shift.minWorkers ?? 2}</span>
                     <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
                   </div>
+                  <button
+                    onClick={() => duplicateShift(shift.id)}
+                    className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors rounded px-1.5 py-0.5 text-xs leading-none"
+                    title="שכפל משמרת"
+                  >
+                    ⎘
+                  </button>
                   <button
                     onClick={() => removeShift(shift.id)}
                     disabled={shifts.length <= 1}
