@@ -852,7 +852,7 @@ const weekStart = getNextWeekStart();
                             {(slot?.employeeIds ?? []).length > 0 && (
                               <button
                                 onClick={e => { e.stopPropagation(); clearShiftCell(day, shift); }}
-                                className="w-full text-center text-xs font-semibold py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+                                className="w-full text-center text-[10px] font-normal py-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                               >
                                 מחק משמרת
                               </button>
