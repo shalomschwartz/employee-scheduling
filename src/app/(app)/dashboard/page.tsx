@@ -288,7 +288,10 @@ const weekStart = getNextWeekStart();
     };
 
     const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
+    const shiftCfgForAdd = shifts.find(s => s.id === shift);
+    const shiftRole = shiftCfgForAdd?.role?.trim();
     const warnings: string[] = [];
+    if (shiftRole && !emp.roles.includes(shiftRole)) warnings.push(`${name} אינו/ה מוגדר/ת לתפקיד "${shiftRole}"`);
     if (availability === "unavailable") warnings.push(`${name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
     if (hasConsecutiveConflict(emp.id, day, shift)) warnings.push(`${name} כבר משובץ/ת במשמרת צמודה באותו יום`);
     if (warnings.length > 0) {
@@ -347,7 +350,9 @@ const weekStart = getNextWeekStart();
     };
 
     const availability = emp?.constraints[0]?.data?.[toDay as Day]?.[toShift] ?? "available";
+    const toShiftRole = shifts.find(s => s.id === toShift)?.role?.trim();
     const dragWarnings: string[] = [];
+    if (toShiftRole && !emp?.roles.includes(toShiftRole)) dragWarnings.push(`${dragging.name} אינו/ה מוגדר/ת לתפקיד "${toShiftRole}"`);
     if (availability === "unavailable") dragWarnings.push(`${dragging.name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
     if (hasConsecutiveConflict(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} כבר משובץ/ת במשמרת צמודה באותו יום`);
     if (dragWarnings.length > 0) {

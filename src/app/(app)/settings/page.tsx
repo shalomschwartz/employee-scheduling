@@ -62,6 +62,8 @@ export default function SettingsPage() {
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
+  const [dirtyEmps, setDirtyEmps] = useState<Set<string>>(new Set());
+  const [savingEmps, setSavingEmps] = useState<Set<string>>(new Set());
 
   // ── Deadline ────────────────────────────────────────────────────────────────
   const [deadlineInput, setDeadlineInput] = useState("");
@@ -134,13 +136,22 @@ export default function SettingsPage() {
     if (res.ok) setEmployees(prev => prev.filter(e => e.id !== id));
   }
 
-  async function patchEmployee(id: string, patch: { roles?: string[]; contractShifts?: number | null }) {
+  function updateEmpLocal(id: string, patch: { roles?: string[]; contractShifts?: number | null }) {
     setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
+    setDirtyEmps(prev => new Set(prev).add(id));
+  }
+
+  async function saveEmployee(id: string) {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    setSavingEmps(prev => new Set(prev).add(id));
     await fetch("/api/employees", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...patch }),
+      body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts }),
     });
+    setSavingEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
+    setDirtyEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
   }
 
   // ── Shifts ─────────────────────────────────────────────────────────────────
@@ -495,14 +506,14 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500 w-24 shrink-0">משמרות בשבוע:</span>
                         <button
-                          onClick={() => patchEmployee(emp.id, { contractShifts: Math.max(0, (emp.contractShifts ?? 0) - 1) || null })}
+                          onClick={() => updateEmpLocal(emp.id, { contractShifts: Math.max(0, (emp.contractShifts ?? 0) - 1) || null })}
                           className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none"
                         >−</button>
                         <span className="w-6 text-center text-xs font-semibold text-gray-800">
                           {emp.contractShifts ?? 0}
                         </span>
                         <button
-                          onClick={() => patchEmployee(emp.id, { contractShifts: (emp.contractShifts ?? 0) + 1 })}
+                          onClick={() => updateEmpLocal(emp.id, { contractShifts: (emp.contractShifts ?? 0) + 1 })}
                           className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none"
                         >+</button>
                         <span className="text-[10px] text-gray-400">{emp.contractShifts ? "יעד לשבוע" : "ללא חוזה"}</span>
@@ -514,7 +525,7 @@ export default function SettingsPage() {
                           <span className="text-xs text-gray-500 w-24 shrink-0 pt-0.5">תפקידים:</span>
                           <div className="flex flex-wrap gap-1.5">
                             <button
-                              onClick={() => patchEmployee(emp.id, { roles: [...shiftRoles] })}
+                              onClick={() => updateEmpLocal(emp.id, { roles: [...shiftRoles] })}
                               className={cn(
                                 "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
                                 emp.roles.length === shiftRoles.length
@@ -529,7 +540,7 @@ export default function SettingsPage() {
                               return (
                                 <button
                                   key={role}
-                                  onClick={() => patchEmployee(emp.id, {
+                                  onClick={() => updateEmpLocal(emp.id, {
                                     roles: active
                                       ? emp.roles.filter(r => r !== role)
                                       : [...emp.roles, role],
@@ -550,6 +561,19 @@ export default function SettingsPage() {
                       )}
                       {shiftRoles.length === 0 && (
                         <p className="text-xs text-gray-400">הגדר תפקידים בכרטיס "סוגי תפקידים" כדי להציג כאן.</p>
+                      )}
+
+                      {/* Save button */}
+                      {dirtyEmps.has(emp.id) && (
+                        <div className="pt-1">
+                          <Button
+                            size="md"
+                            onClick={() => saveEmployee(emp.id)}
+                            loading={savingEmps.has(emp.id)}
+                          >
+                            שמור
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
