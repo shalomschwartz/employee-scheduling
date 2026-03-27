@@ -815,7 +815,12 @@ const weekStart = getNextWeekStart();
                                       className="flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
                                     >
                                       <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
-                                      <span className="flex-1">{emp.name ?? emp.email}</span>
+                                      <span className="flex-1">
+                                        <span className="block">{emp.name ?? emp.email}</span>
+                                        {emp.roles.length > 0 && (
+                                          <span className="text-[10px] text-purple-500">{emp.roles.join(", ")}</span>
+                                        )}
+                                      </span>
                                       <span className="text-[10px] text-gray-400">{label}</span>
                                     </button>
                                   );
