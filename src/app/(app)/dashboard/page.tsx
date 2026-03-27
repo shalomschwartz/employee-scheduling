@@ -999,9 +999,9 @@ const weekStart = getNextWeekStart();
 
             {/* Legend */}
             <div className="flex gap-3 mb-3 text-xs text-gray-600">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-green-500" />זמין</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-400" />מעדיף לא</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-red-500" />לא זמין</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-green-100 ring-1 ring-green-200" />זמין</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-100 ring-1 ring-yellow-200" />מעדיף לא</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-red-100 ring-1 ring-red-200" />לא זמין</span>
             </div>
 
             {/* Overview table */}
@@ -1035,10 +1035,10 @@ const weekStart = getNextWeekStart();
                             {employees.filter(e => empFilter === null || e.id === empFilter).map(emp => {
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                               const chipStyle = av === "available"
-                                ? "bg-emerald-500 text-white"
+                                ? "bg-green-100 text-green-700 ring-1 ring-green-200"
                                 : av === "prefer_not"
-                                ? "bg-amber-400 text-white"
-                                : "bg-red-500 text-white";
+                                ? "bg-yellow-100 text-yellow-700 ring-1 ring-yellow-200"
+                                : "bg-red-100 text-red-600 ring-1 ring-red-200";
                               return (
                                 <div
                                   key={emp.id}
