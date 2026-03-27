@@ -776,16 +776,7 @@ const weekStart = getNextWeekStart();
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
                         >
-                          <div className="group/cell flex flex-col gap-2.5">
-                            {(slot?.employeeIds ?? []).length > 0 && (
-                              <button
-                                onClick={e => { e.stopPropagation(); clearShiftCell(day, shift); }}
-                                title="נקה תא"
-                                className="self-end text-gray-300 hover:text-red-400 transition-colors text-xs leading-none opacity-0 group-hover/cell:opacity-100 -mb-1.5"
-                              >
-                                🗑
-                              </button>
-                            )}
+                          <div className="flex flex-col gap-2.5">
                             {names.map((name, ni) => {
                               const empId = slot?.employeeIds?.[ni];
                               if (empFilter !== null && empId !== empFilter) return null;
@@ -856,6 +847,14 @@ const weekStart = getNextWeekStart();
                                 title="הוסף עובד"
                               >
                                 +
+                              </button>
+                            )}
+                            {(slot?.employeeIds ?? []).length > 0 && (
+                              <button
+                                onClick={e => { e.stopPropagation(); clearShiftCell(day, shift); }}
+                                className="w-full text-center text-xs font-semibold py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+                              >
+                                מחק משמרת
                               </button>
                             )}
                           </div>
