@@ -495,12 +495,14 @@ const weekStart = getNextWeekStart();
       <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 text-sm text-gray-700">
           <p className="font-bold text-blue-800 mb-3 text-base">איך ShiftSync עובד</p>
           <div className="space-y-2">
-            <div className="flex gap-2"><span className="font-bold text-blue-600">1.</span><span><span className="font-semibold">הוסף עובדים</span> — עבור להגדרות, הוסף את שמות העובדים ומספרי הטלפון שלהם.</span></div>
-            <div className="flex gap-2"><span className="font-bold text-blue-600">2.</span><span><span className="font-semibold">קבע דדליין</span> — בהגדרות, בחר מועד אחרון להגשת זמינות (ברירת מחדל: רביעי 21:00).</span></div>
-            <div className="flex gap-2"><span className="font-bold text-blue-600">3.</span><span><span className="font-semibold">עובדים ממלאים זמינות</span> — כל עובד נכנס למערכת ומסמן את הימים והמשמרות שמתאימים לו.</span></div>
-            <div className="flex gap-2"><span className="font-bold text-blue-600">4.</span><span><span className="font-semibold">צור שיבוץ</span> — לחץ "צור שיבוץ" וה-AI יבנה סידור אוטומטי לפי הזמינויות.</span></div>
-            <div className="flex gap-2"><span className="font-bold text-blue-600">5.</span><span><span className="font-semibold">ערוך ידנית</span> — ניתן לגרור עובדים בין משמרות ולהוסיף/להסיר ידנית.</span></div>
-            <div className="flex gap-2"><span className="font-bold text-blue-600">6.</span><span><span className="font-semibold">שלח לעובדים</span> — לחץ "הורדה" להורדת PDF, או "שלח לוואצאפ" לפתיחת WhatsApp עם ה-PDF מוכן לשיתוף.</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">1.</span><span><span className="font-semibold">הוסף עובדים</span> — עבור להגדרות, הוסף עובדים עם שם ומספר טלפון.</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">2.</span><span><span className="font-semibold">הגדר תפקידים</span> — בהגדרות, צור סוגי תפקידים (למשל מלצר, ברמן) והגדר לכל עובד אילו תפקידים הוא יכול למלא ולכל משמרת איזה תפקיד היא דורשת.</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">3.</span><span><span className="font-semibold">הגדר חוזים</span> — ניתן לקבוע לכל עובד מספר משמרות שבועי מחייב. האלגוריתם ידאג שהוא יגיע לכמות זו בדיוק.</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">4.</span><span><span className="font-semibold">קבע דדליין</span> — בהגדרות, בחר מועד אחרון להגשת זמינות (ברירת מחדל: רביעי 21:00).</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">5.</span><span><span className="font-semibold">עובדים ממלאים זמינות</span> — כל עובד נכנס למערכת ומסמן את הימים והמשמרות שמתאימים לו.</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">6.</span><span><span className="font-semibold">צור שיבוץ</span> — לחץ "צור שיבוץ". האלגוריתם ישבץ עובדים לפי זמינות, תפקיד, וחוזה — ויחלק משמרות באופן שווה.</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">7.</span><span><span className="font-semibold">ערוך ידנית</span> — גרור עובדים בין משמרות, הוסף/הסר ידנית, נעץ עובד למשמרת, או נקה תא בלחיצה על "מחק משמרת".</span></div>
+            <div className="flex gap-2"><span className="font-bold text-blue-600">8.</span><span><span className="font-semibold">שלח לעובדים</span> — לחץ "הורדה" להורדת PDF, או "שלח לוואצאפ" לפתיחת WhatsApp עם ה-PDF מוכן לשיתוף.</span></div>
           </div>
       </div>
 
