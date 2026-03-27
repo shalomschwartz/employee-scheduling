@@ -6,8 +6,9 @@ export interface EmployeeForScheduling {
   email: string;
   isShiftLead: boolean;
   constraints: Record<Day, Record<ShiftKey, AvailabilityOption>> | null;
-  roles: string[];              // which shift roles this employee can work
+  roles: string[];               // which shift roles this employee can work
   contractShifts: number | null; // target shifts/week (null = no contract)
+  minRestHours: number | null;   // minimum hours between shifts (null = default 7)
 }
 
 export interface ShiftSlot {
@@ -17,6 +18,17 @@ export interface ShiftSlot {
 }
 
 export type ScheduleData = Record<Day, Record<ShiftKey, ShiftSlot>>;
+
+// Time-gap helpers for rest-between-shifts enforcement
+const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+function gapMins(fromTime: string, toTime: string): number {
+  const from = toMins(fromTime); const to = toMins(toTime);
+  return to >= from ? to - from : 1440 - from + to;
+}
+function hasEnoughRest(si: number, assignedSi: number, shifts: ShiftConfig[], minRestMins: number): boolean {
+  const a = shifts[si]; const b = shifts[assignedSi];
+  return Math.min(gapMins(a.end, b.start), gapMins(b.end, a.start)) >= minRestMins;
+}
 
 // Fisher-Yates shuffle — breaks tie-breaking bias between runs
 function shuffle<T>(arr: T[]): T[] {
@@ -74,9 +86,10 @@ export function runScheduler(
         if (pinnedIds.includes(emp.id)) continue;
         // Hard cap: skip if employee has reached their contract shift limit
         if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
-        // Skip if employee already works an adjacent shift on this day
+        // Rest check: skip if insufficient rest between this and any already-assigned shift today
+        const restMins = (emp.minRestHours ?? 7) * 60;
         const empShifts = dayEmpShiftIdx[emp.id];
-        if (empShifts?.has(si - 1) || empShifts?.has(si + 1)) continue;
+        if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, restMins))) continue;
         // Role check
         if (!roleEligible(emp)) continue;
         const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
@@ -93,8 +106,9 @@ export function runScheduler(
         for (const emp of pool) {
           if (pinnedIds.includes(emp.id)) continue;
           if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
+          const restMins = (emp.minRestHours ?? 7) * 60;
           const empShifts = dayEmpShiftIdx[emp.id];
-          if (empShifts?.has(si - 1) || empShifts?.has(si + 1)) continue;
+          if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, restMins))) continue;
           const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
           if (val === "available") usedAvailable.push(emp);
           else if (val === "prefer_not") usedPreferNot.push(emp);

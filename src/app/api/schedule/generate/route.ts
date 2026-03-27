@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
     constraints: (emp.constraints[0]?.data as EmployeeForScheduling["constraints"]) ?? null,
     roles: empSettings[emp.id]?.roles ?? [],
     contractShifts: empSettings[emp.id]?.contractShifts ?? null,
+    minRestHours: empSettings[emp.id]?.minRestHours ?? null,
   }));
 
   const nameMap = Object.fromEntries(employees.map((e) => [e.id, e.name ?? e.email]));
