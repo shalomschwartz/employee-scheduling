@@ -59,6 +59,8 @@ export default function SettingsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [newRoles, setNewRoles] = useState<string[]>([]);
+  const [newContract, setNewContract] = useState<number>(0);
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
@@ -120,11 +122,23 @@ export default function SettingsPage() {
       body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
     });
     const data = await res.json();
+    if (!res.ok) { setEmpLoading(false); setEmpError(data.error ?? "שגיאה בהוספה"); return; }
+    // Save roles + contract immediately if set
+    if (newRoles.length > 0 || newContract > 0) {
+      await fetch("/api/employees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: data.id, roles: newRoles, contractShifts: newContract > 0 ? newContract : null }),
+      });
+      data.roles = newRoles;
+      data.contractShifts = newContract > 0 ? newContract : null;
+    }
     setEmpLoading(false);
-    if (!res.ok) { setEmpError(data.error ?? "שגיאה בהוספה"); return; }
     setEmployees(prev => [...prev, data]);
     setName("");
     setPhone("");
+    setNewRoles([]);
+    setNewContract(0);
   }
 
   async function handleDeleteEmployee(id: string) {
@@ -454,7 +468,7 @@ export default function SettingsPage() {
             הוסף עובדים לפי שם וטלפון. לחץ על שם העובד להגדרת תפקידים וחוזה.
           </p>
 
-          <form onSubmit={handleAddEmployee} className="space-y-2">
+          <form onSubmit={handleAddEmployee} className="space-y-3 p-3 rounded-xl border border-gray-200 bg-gray-50">
             <div className="flex gap-2">
               <Input
                 id="empName"
@@ -475,6 +489,34 @@ export default function SettingsPage() {
                 required
               />
             </div>
+            {/* Contract */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 shrink-0">חוזה (משמרות/שבוע):</span>
+              <button type="button" onClick={() => setNewContract(c => Math.max(0, c - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">−</button>
+              <span className="w-6 text-center text-sm font-semibold text-gray-800">{newContract === 0 ? "—" : newContract}</span>
+              <button type="button" onClick={() => setNewContract(c => Math.min(7, c + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
+            </div>
+            {/* Roles */}
+            {shiftRoles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <span className="text-xs text-gray-500 shrink-0">תפקידים:</span>
+                {shiftRoles.map(role => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setNewRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role])}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                      newRoles.includes(role)
+                        ? "bg-blue-500 text-white border-blue-500"
+                        : "bg-white text-gray-600 border-gray-300 hover:border-blue-300"
+                    )}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            )}
             <Button type="submit" loading={empLoading} size="md" className="w-full">
               הוסף עובד
             </Button>
