@@ -64,6 +64,7 @@ export default function SettingsPage() {
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
+  const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<string | null>(null);
   const [dirtyEmps, setDirtyEmps] = useState<Set<string>>(new Set());
   const [savingEmps, setSavingEmps] = useState<Set<string>>(new Set());
 
@@ -553,7 +554,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       {emp.phone && <span className="text-xs text-gray-400">{emp.phone}</span>}
                       <button
-                        onClick={() => handleDeleteEmployee(emp.id)}
+                        onClick={() => setConfirmDeleteEmp(emp.id)}
                         className="text-xs text-gray-400 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-red-50"
                       >
                         הסר
@@ -645,6 +646,32 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {confirmDeleteEmp && (() => {
+        const emp = employees.find(e => e.id === confirmDeleteEmp);
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
+              <p className="font-bold text-gray-900 text-base mb-1">הסרת עובד</p>
+              <p className="text-sm text-gray-500 mb-5">האם אתה בטוח שברצונך להסיר את <span className="font-semibold text-gray-800">{emp?.name}</span>?</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => { handleDeleteEmployee(confirmDeleteEmp); setConfirmDeleteEmp(null); }}
+                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+                >
+                  הסר
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteEmp(null)}
+                  className="flex-1 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold transition-colors"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
