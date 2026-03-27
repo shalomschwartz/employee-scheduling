@@ -362,10 +362,9 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => duplicateShift(shift.id)}
-                    className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors rounded px-1.5 py-0.5 text-xs leading-none"
-                    title="שכפל משמרת"
+                    className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 border border-blue-300 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none"
                   >
-                    ⎘
+                    שכפול
                   </button>
                   <button
                     onClick={() => removeShift(shift.id)}
