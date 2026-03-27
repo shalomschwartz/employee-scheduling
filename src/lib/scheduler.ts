@@ -72,6 +72,8 @@ export function runScheduler(
 
       for (const emp of pool) {
         if (pinnedIds.includes(emp.id)) continue;
+        // Hard cap: skip if employee has reached their contract shift limit
+        if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
         // Skip if employee already works an adjacent shift on this day
         const empShifts = dayEmpShiftIdx[emp.id];
         if (empShifts?.has(si - 1) || empShifts?.has(si + 1)) continue;
@@ -90,6 +92,7 @@ export function runScheduler(
         // fallback: use all employees regardless of role
         for (const emp of pool) {
           if (pinnedIds.includes(emp.id)) continue;
+          if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
           const empShifts = dayEmpShiftIdx[emp.id];
           if (empShifts?.has(si - 1) || empShifts?.has(si + 1)) continue;
           const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
