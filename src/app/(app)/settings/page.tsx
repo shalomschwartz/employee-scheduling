@@ -65,6 +65,7 @@ export default function SettingsPage() {
   const [empError, setEmpError] = useState("");
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
   const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<string | null>(null);
+  const [confirmDeleteShift, setConfirmDeleteShift] = useState<string | null>(null);
   const [dirtyEmps, setDirtyEmps] = useState<Set<string>>(new Set());
   const [savingEmps, setSavingEmps] = useState<Set<string>>(new Set());
 
@@ -382,7 +383,7 @@ export default function SettingsPage() {
                     שכפול
                   </button>
                   <button
-                    onClick={() => removeShift(shift.id)}
+                    onClick={() => setConfirmDeleteShift(shift.id)}
                     disabled={shifts.length <= 1}
                     className={cn(
                       "text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-300 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none",
@@ -645,6 +646,32 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {confirmDeleteShift && (() => {
+        const s = shifts.find(s => s.id === confirmDeleteShift);
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
+              <p className="font-bold text-gray-900 text-base mb-1">הסרת משמרת</p>
+              <p className="text-sm text-gray-500 mb-5">האם אתה בטוח שברצונך להסיר את <span className="font-semibold text-gray-800">{s?.label}</span>?</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => { removeShift(confirmDeleteShift); setConfirmDeleteShift(null); }}
+                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+                >
+                  הסר
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteShift(null)}
+                  className="flex-1 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold transition-colors"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {confirmDeleteEmp && (() => {
         const emp = employees.find(e => e.id === confirmDeleteEmp);
