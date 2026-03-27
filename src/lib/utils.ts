@@ -55,6 +55,7 @@ export interface ShiftConfig {
   start: string;
   end: string;
   minWorkers: number;
+  role?: string; // e.g. "מלצר", "ברמן" — only employees with this role are auto-assigned
 }
 
 export const DEFAULT_SHIFTS: ShiftConfig[] = [

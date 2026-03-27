@@ -11,6 +11,8 @@ interface Employee {
   id: string;
   name: string;
   phone?: string | null;
+  roles: string[];
+  contractShifts: number | null;
 }
 
 export default function SettingsPage() {
@@ -20,6 +22,7 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState("");
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
+  const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
 
   // ── Deadline ────────────────────────────────────────────────────────────────
   const [deadlineInput, setDeadlineInput] = useState("");
@@ -48,7 +51,6 @@ export default function SettingsPage() {
   async function saveDeadline() {
     if (!deadlineInput) return;
     setDeadlineSaving(true);
-    // datetime-local value treated as Jerusalem local time → convert to UTC
     const utcIso = new Date(deadlineInput).toISOString();
     await fetch("/api/deadline", {
       method: "PUT",
@@ -93,6 +95,15 @@ export default function SettingsPage() {
     if (res.ok) setEmployees(prev => prev.filter(e => e.id !== id));
   }
 
+  async function patchEmployee(id: string, patch: { roles?: string[]; contractShifts?: number | null }) {
+    setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
+    await fetch("/api/employees", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...patch }),
+    });
+  }
+
   // ── Shifts ─────────────────────────────────────────────────────────────────
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [shiftSaving, setShiftSaving] = useState(false);
@@ -120,7 +131,6 @@ export default function SettingsPage() {
 
   async function handleRegenerate() {
     setRegenerating(true);
-    // Save shifts first so the generator reads the updated minWorkers
     await fetch("/api/shifts", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -164,7 +174,6 @@ export default function SettingsPage() {
     setTimeout(() => setShiftSaved(false), 3000);
   }
 
-  // Show regenerate button when any schedule-affecting shift setting changed
   const shiftsChanged =
     shifts.length !== savedShifts.current.length ||
     shifts.some(s => {
@@ -172,7 +181,7 @@ export default function SettingsPage() {
       return !orig || orig.minWorkers !== s.minWorkers || orig.start !== s.start || orig.end !== s.end;
     });
 
-  // Live overlap detection — computed every render
+  // Live overlap detection
   const toM = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const overlappingIds = new Set<string>();
   shifts.forEach((a, i) => shifts.slice(i + 1).forEach(b => {
@@ -184,6 +193,9 @@ export default function SettingsPage() {
     }
   }));
 
+  // All unique non-empty roles defined across shifts
+  const availableRoles = Array.from(new Set(shifts.map(s => s.role?.trim()).filter(Boolean))) as string[];
+
   return (
     <div className="space-y-6 max-w-lg">
       <h1 className="text-xl font-bold text-gray-900">הגדרות</h1>
@@ -194,7 +206,7 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-gray-900">משמרות</h2>
-              <p className="text-xs text-gray-500 mt-0.5">ניתן לשנות שעות, שם, להוסיף או למחוק משמרות.</p>
+              <p className="text-xs text-gray-500 mt-0.5">ניתן לשנות שעות, שם, תפקיד, להוסיף או למחוק משמרות.</p>
             </div>
             <button
               onClick={addShift}
@@ -258,6 +270,17 @@ export default function SettingsPage() {
                     ×
                   </button>
                 </div>
+                {/* Row 3: role */}
+                <div className="flex items-center gap-2 ps-6">
+                  <span className="text-[10px] text-gray-400 shrink-0">תפקיד:</span>
+                  <input
+                    type="text"
+                    value={shift.role ?? ""}
+                    onChange={e => updateShift(shift.id, "role", e.target.value)}
+                    placeholder="ללא (כל עובד)"
+                    className="flex-1 text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -317,7 +340,7 @@ export default function SettingsPage() {
         <CardContent className="pt-5 space-y-4">
           <h2 className="font-semibold text-gray-900">עובדים</h2>
           <p className="text-xs text-gray-500">
-            הוסף עובדים לפי שם וטלפון. העובד יכנס עם שמו ומספר הטלפון שלו.
+            הוסף עובדים לפי שם וטלפון. לחץ על שם העובד להגדרת תפקידים וחוזה.
           </p>
 
           <form onSubmit={handleAddEmployee} className="space-y-2">
@@ -353,19 +376,92 @@ export default function SettingsPage() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {employees.map(emp => (
-                <li key={emp.id} className="flex items-center justify-between py-2.5">
-                  <div>
-                    <span className="text-sm font-medium text-gray-800">{emp.name}</span>
-                    {emp.phone && <span className="block text-xs text-gray-400">{emp.phone}</span>}
+                <li key={emp.id}>
+                  {/* Main row */}
+                  <div className="flex items-center justify-between py-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedEmp(expandedEmp === emp.id ? null : emp.id)}
+                      className="flex items-center gap-1.5 text-start"
+                    >
+                      <span className="text-sm font-medium text-gray-800">{emp.name}</span>
+                      {emp.contractShifts != null && emp.contractShifts > 0 && (
+                        <span className="text-[10px] text-blue-500 font-medium bg-blue-50 px-1.5 py-0.5 rounded-full">
+                          {emp.contractShifts} משמרות
+                        </span>
+                      )}
+                      {emp.roles.length > 0 && (
+                        <span className="text-[10px] text-purple-600 font-medium bg-purple-50 px-1.5 py-0.5 rounded-full">
+                          {emp.roles.join(", ")}
+                        </span>
+                      )}
+                      <span className="text-gray-300 text-xs">{expandedEmp === emp.id ? "▲" : "▼"}</span>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      {emp.phone && <span className="text-xs text-gray-400">{emp.phone}</span>}
+                      <button
+                        onClick={() => handleDeleteEmployee(emp.id)}
+                        className="text-xs text-gray-400 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-red-50"
+                      >
+                        הסר
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteEmployee(emp.id)}
-                    className={cn(
-                      "text-xs text-gray-400 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-red-50"
-                    )}
-                  >
-                    הסר
-                  </button>
+
+                  {/* Expanded section */}
+                  {expandedEmp === emp.id && (
+                    <div className="pb-3 ps-2 space-y-3">
+                      {/* Contract shifts */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 w-24 shrink-0">משמרות בשבוע:</span>
+                        <button
+                          onClick={() => patchEmployee(emp.id, { contractShifts: Math.max(0, (emp.contractShifts ?? 0) - 1) || null })}
+                          className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none"
+                        >−</button>
+                        <span className="w-6 text-center text-xs font-semibold text-gray-800">
+                          {emp.contractShifts ?? 0}
+                        </span>
+                        <button
+                          onClick={() => patchEmployee(emp.id, { contractShifts: (emp.contractShifts ?? 0) + 1 })}
+                          className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none"
+                        >+</button>
+                        <span className="text-[10px] text-gray-400">{emp.contractShifts ? "יעד לשבוע" : "ללא חוזה"}</span>
+                      </div>
+
+                      {/* Roles */}
+                      {availableRoles.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <span className="text-xs text-gray-500 w-24 shrink-0 pt-0.5">תפקידים:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {availableRoles.map(role => {
+                              const active = emp.roles.includes(role);
+                              return (
+                                <button
+                                  key={role}
+                                  onClick={() => patchEmployee(emp.id, {
+                                    roles: active
+                                      ? emp.roles.filter(r => r !== role)
+                                      : [...emp.roles, role],
+                                  })}
+                                  className={cn(
+                                    "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                                    active
+                                      ? "bg-purple-600 text-white border-purple-600"
+                                      : "bg-white text-gray-500 border-gray-300 hover:border-purple-400"
+                                  )}
+                                >
+                                  {role}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {availableRoles.length === 0 && (
+                        <p className="text-xs text-gray-400">הגדר תפקיד במשמרת כדי להציג כאן.</p>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

@@ -3,18 +3,31 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+type EmpSettings = { roles?: string[]; contractShifts?: number | null };
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session || session.user.role !== "MANAGER" || !session.user.organizationId)
     return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
 
-  const employees = await prisma.user.findMany({
-    where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
-    select: { id: true, name: true, phone: true },
-    orderBy: { createdAt: "asc" },
-  });
+  const [employees, org] = await Promise.all([
+    prisma.user.findMany({
+      where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
+      select: { id: true, name: true, phone: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.organization.findUnique({ where: { id: session.user.organizationId } }),
+  ]);
 
-  return NextResponse.json(employees);
+  const empSettings = ((org?.settings as Record<string, unknown>)?.employeeSettings ?? {}) as Record<string, EmpSettings>;
+
+  const result = employees.map(e => ({
+    ...e,
+    roles: empSettings[e.id]?.roles ?? [],
+    contractShifts: empSettings[e.id]?.contractShifts ?? null,
+  }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +63,35 @@ export async function POST(req: NextRequest) {
     select: { id: true, name: true, phone: true },
   });
 
-  return NextResponse.json(employee, { status: 201 });
+  return NextResponse.json({ ...employee, roles: [], contractShifts: null }, { status: 201 });
+}
+
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "MANAGER" || !session.user.organizationId)
+    return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
+
+  const { id, roles, contractShifts } = await req.json();
+  if (!id) return NextResponse.json({ error: "נדרש מזהה" }, { status: 400 });
+
+  const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
+  if (!org) return NextResponse.json({ error: "ארגון לא נמצא" }, { status: 404 });
+
+  const current = (org.settings ?? {}) as Record<string, unknown>;
+  const empSettings = (current.employeeSettings ?? {}) as Record<string, EmpSettings>;
+
+  empSettings[id] = {
+    ...empSettings[id],
+    ...(roles !== undefined ? { roles } : {}),
+    ...(contractShifts !== undefined ? { contractShifts } : {}),
+  };
+
+  await prisma.organization.update({
+    where: { id: session.user.organizationId },
+    data: { settings: { ...current, employeeSettings: empSettings } },
+  });
+
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: NextRequest) {

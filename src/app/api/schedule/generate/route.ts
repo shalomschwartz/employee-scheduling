@@ -23,12 +23,19 @@ export async function POST(req: NextRequest) {
     include: { constraints: { where: { weekStart }, take: 1 } },
   });
 
+  // Load per-employee settings (roles, contractShifts) from org settings
+  const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
+  const orgSettings = (org?.settings ?? {}) as Record<string, unknown>;
+  const empSettings = (orgSettings.employeeSettings ?? {}) as Record<string, { roles?: string[]; contractShifts?: number | null }>;
+
   const employeeData: EmployeeForScheduling[] = employees.map((emp) => ({
     id: emp.id,
     name: emp.name,
     email: emp.email,
     isShiftLead: emp.isShiftLead,
     constraints: (emp.constraints[0]?.data as EmployeeForScheduling["constraints"]) ?? null,
+    roles: empSettings[emp.id]?.roles ?? [],
+    contractShifts: empSettings[emp.id]?.contractShifts ?? null,
   }));
 
   const nameMap = Object.fromEntries(employees.map((e) => [e.id, e.name ?? e.email]));
@@ -50,8 +57,6 @@ export async function POST(req: NextRequest) {
   }
 
   // Load org-specific shift config — apply same normalization as GET /api/shifts
-  const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
-  const orgSettings = (org?.settings ?? {}) as Record<string, unknown>;
   const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const legacyMin = typeof orgSettings.minPerShift === "number" ? orgSettings.minPerShift : 2;
   const rawShifts: ShiftConfig[] = Array.isArray(orgSettings.shifts) ? (orgSettings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
