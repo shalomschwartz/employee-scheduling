@@ -25,6 +25,17 @@ const EMP_COLORS = [
 // Hex equivalents of EMP_COLORS for PDF rendering (html2canvas needs inline styles)
 const EMP_HEX = ["#273c75","#6c5ce7","#e84393","#0984e3","#e17055","#00cec9","#a29bfe","#2d3436"];
 
+const ROLE_COLORS = [
+  { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" }, // amber
+  { bg: "#dbeafe", text: "#1e40af", border: "#93c5fd" }, // blue
+  { bg: "#dcfce7", text: "#166534", border: "#86efac" }, // green
+  { bg: "#fce7f3", text: "#9d174d", border: "#f9a8d4" }, // pink
+  { bg: "#ede9fe", text: "#5b21b6", border: "#c4b5fd" }, // violet
+  { bg: "#ffedd5", text: "#9a3412", border: "#fdba74" }, // orange
+  { bg: "#e0f2fe", text: "#0c4a6e", border: "#7dd3fc" }, // sky
+  { bg: "#f0fdf4", text: "#14532d", border: "#4ade80" }, // emerald
+];
+
 export default function DashboardPage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -446,6 +457,12 @@ const weekStart = getNextWeekStart();
   const submitted = employees.filter(e => e.constraints.length > 0).length;
   const shiftKeys = shifts.map(s => s.id);
 
+  // Map each unique role name to a stable color
+  const uniqueRoles = Array.from(new Set(shifts.map(s => s.role).filter(Boolean))) as string[];
+  const roleColorMap = Object.fromEntries(
+    uniqueRoles.map((r, i) => [r, ROLE_COLORS[i % ROLE_COLORS.length]])
+  );
+
   return (
     <div className="space-y-4">
       {showWelcome && (
@@ -685,9 +702,17 @@ const weekStart = getNextWeekStart();
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
                         <div>
                           <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
-                          {shiftCfg?.role && (
-                            <span className="block text-[10px] text-purple-500 font-medium whitespace-nowrap">{shiftCfg.role}</span>
-                          )}
+                          {shiftCfg?.role && (() => {
+                            const rc = roleColorMap[shiftCfg.role];
+                            return (
+                              <span
+                                className="inline-block mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                style={{ background: rc?.bg, color: rc?.text, border: `1px solid ${rc?.border}` }}
+                              >
+                                {shiftCfg.role}
+                              </span>
+                            );
+                          })()}
                           <span className="block text-[10px] text-gray-400 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
                         </div>
                       </div>
