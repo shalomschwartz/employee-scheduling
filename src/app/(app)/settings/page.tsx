@@ -385,7 +385,7 @@ export default function SettingsPage() {
                     onClick={() => removeShift(shift.id)}
                     disabled={shifts.length <= 1}
                     className={cn(
-                      "text-xs text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors rounded px-2 py-0.5 font-medium leading-none",
+                      "text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-300 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none",
                       shifts.length <= 1 && "opacity-30 cursor-not-allowed"
                     )}
                   >
