@@ -20,15 +20,26 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const weekStart = searchParams.get("weekStart");
 
-  const employees = await prisma.user.findMany({
-    where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
-    include: weekStart
-      ? { constraints: { where: { weekStart: new Date(weekStart) }, take: 1 } }
-      : { constraints: { orderBy: { weekStart: "desc" }, take: 1 } },
-    orderBy: { name: "asc" },
-  });
+  const [employees, org] = await Promise.all([
+    prisma.user.findMany({
+      where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
+      include: weekStart
+        ? { constraints: { where: { weekStart: new Date(weekStart) }, take: 1 } }
+        : { constraints: { orderBy: { weekStart: "desc" }, take: 1 } },
+      orderBy: { name: "asc" },
+    }),
+    prisma.organization.findUnique({ where: { id: session.user.organizationId } }),
+  ]);
 
-  return NextResponse.json(employees);
+  const empSettings = ((org?.settings as Record<string, unknown>)?.employeeSettings ?? {}) as Record<string, { roles?: string[]; contractShifts?: number | null }>;
+
+  const result = employees.map(e => ({
+    ...e,
+    roles: empSettings[e.id]?.roles ?? [],
+    contractShifts: empSettings[e.id]?.contractShifts ?? null,
+  }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {

@@ -13,7 +13,7 @@ import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day, ty
 interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; pinnedIds?: string[]; }
 type ScheduleData = Record<string, Record<string, ShiftSlot>>;
 interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; }
-interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; }
+interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; roles: string[]; contractShifts: number | null; }
 
 const EMP_COLORS = [
   "bg-[#273c75] text-white", "bg-[#6c5ce7] text-white",
@@ -543,16 +543,35 @@ const weekStart = getNextWeekStart();
                 <CardContent className="py-3">
                   <p className="text-xs font-semibold text-gray-700 truncate">{name}</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">{hours}<span className="text-xs font-normal text-gray-400 mr-1">שעות</span></p>
-                  {(shiftsPerEmployeeMap[emp.id]?.length ?? 0) > 0 && (
-                    <div className="mt-2 space-y-0.5 border-t border-gray-100 pt-2">
-                      {shiftsPerEmployeeMap[emp.id].map(({ shiftLabel, days }) => (
-                        <div key={shiftLabel} className="flex items-center gap-1 text-xs text-gray-500">
-                          <span className="font-medium text-gray-600">{shiftLabel}:</span>
-                          <span>{days.map(d => DAY_SHORT[d]).join(" ")}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
+                  {/* Profile summary */}
+                  <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+                    {/* Contract */}
+                    {emp.contractShifts != null && emp.contractShifts > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <span className="font-medium text-gray-600">חוזה:</span>
+                        <span>{emp.contractShifts} משמרות/שבוע</span>
+                      </div>
+                    )}
+                    {/* Roles */}
+                    {emp.roles.length > 0 && (
+                      <div className="flex items-start gap-1 text-xs text-gray-500">
+                        <span className="font-medium text-gray-600 shrink-0">תפקידים:</span>
+                        <span>{emp.roles.join(", ")}</span>
+                      </div>
+                    )}
+                    {/* Assigned shifts breakdown */}
+                    {(shiftsPerEmployeeMap[emp.id]?.length ?? 0) > 0 && (
+                      <>
+                        {shiftsPerEmployeeMap[emp.id].map(({ shiftLabel, days }) => (
+                          <div key={shiftLabel} className="flex items-center gap-1 text-xs text-gray-500">
+                            <span className="font-medium text-gray-600">{shiftLabel}:</span>
+                            <span>{days.map(d => DAY_SHORT[d]).join(" ")}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
