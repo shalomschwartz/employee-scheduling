@@ -513,6 +513,17 @@ export default function SettingsPage() {
                         <div className="flex items-start gap-2">
                           <span className="text-xs text-gray-500 w-24 shrink-0 pt-0.5">תפקידים:</span>
                           <div className="flex flex-wrap gap-1.5">
+                            <button
+                              onClick={() => patchEmployee(emp.id, { roles: [...shiftRoles] })}
+                              className={cn(
+                                "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                                emp.roles.length === shiftRoles.length
+                                  ? "bg-purple-600 text-white border-purple-600"
+                                  : "bg-white text-gray-500 border-gray-300 hover:border-purple-400"
+                              )}
+                            >
+                              הכל
+                            </button>
                             {shiftRoles.map(role => {
                               const active = emp.roles.includes(role);
                               return (
