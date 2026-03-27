@@ -683,8 +683,13 @@ const weekStart = getNextWeekStart();
                     <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-gray-300">
                       <div className="flex items-center gap-2">
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
-                        <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
-                        <span className="text-[10px] text-gray-400 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
+                        <div>
+                          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
+                          {shiftCfg?.role && (
+                            <span className="block text-[10px] text-purple-500 font-medium whitespace-nowrap">{shiftCfg.role}</span>
+                          )}
+                          <span className="block text-[10px] text-gray-400 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
+                        </div>
                       </div>
                     </td>
                     {DAYS.map(day => {
