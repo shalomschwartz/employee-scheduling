@@ -401,7 +401,7 @@ export default function SettingsPage() {
                     onChange={e => updateShift(shift.id, "role", e.target.value)}
                     className="flex-1 text-xs bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                   >
-                    <option value="">ללא (כל עובד)</option>
+                    <option value="">כללי</option>
                     {shiftRoles.map(r => (
                       <option key={r} value={r}>{r}</option>
                     ))}
