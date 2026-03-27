@@ -57,6 +57,9 @@ export default function DashboardPage() {
   const [editingCell, setEditingCell] = useState<{ day: string; shift: string } | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
+  // Confirm clear dialog
+  const [confirmClear, setConfirmClear] = useState<{ day: string; shift: string } | null>(null);
+
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
   const [conflictsIgnored, setConflictsIgnored] = useState(false);
@@ -865,7 +868,7 @@ const weekStart = getNextWeekStart();
                             )}
                             {(slot?.employeeIds ?? []).length > 0 && (
                               <button
-                                onClick={e => { e.stopPropagation(); clearShiftCell(day, shift); }}
+                                onClick={e => { e.stopPropagation(); setConfirmClear({ day, shift }); }}
                                 className="w-full text-center text-[10px] font-normal py-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                               >
                                 מחק משמרת
@@ -930,6 +933,30 @@ const weekStart = getNextWeekStart();
                 התעלם
               </Button>
               <Button variant="outline" size="md" onClick={() => setConflictDialog(null)}>סגור</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm clear cell dialog */}
+      {confirmClear && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
+            <p className="font-bold text-gray-900 text-base mb-1">מחיקת משמרת</p>
+            <p className="text-sm text-gray-500 mb-5">האם אתה בטוח שברצונך להסיר את כל העובדים מהמשמרת?</p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => { clearShiftCell(confirmClear.day, confirmClear.shift); setConfirmClear(null); }}
+                className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+              >
+                מחק
+              </button>
+              <button
+                onClick={() => setConfirmClear(null)}
+                className="flex-1 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold transition-colors"
+              >
+                ביטול
+              </button>
             </div>
           </div>
         </div>
