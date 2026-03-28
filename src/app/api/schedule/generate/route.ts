@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
     constraints: (emp.constraints[0]?.data as EmployeeForScheduling["constraints"]) ?? null,
     roles: empSettings[emp.id]?.roles ?? [],
     contractShifts: empSettings[emp.id]?.contractShifts ?? null,
-    minRestHours: empSettings[emp.id]?.minRestHours ?? null,
   }));
 
   const nameMap = Object.fromEntries(employees.map((e) => [e.id, e.name ?? e.email]));
@@ -65,7 +64,8 @@ export async function POST(req: NextRequest) {
     .map(s => ({ ...s, minWorkers: s.minWorkers ?? legacyMin }))
     .sort((a, b) => toMins(a.start) - toMins(b.start));
 
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts);
+  const minRestHours = typeof orgSettings.minRestHours === "number" ? orgSettings.minRestHours : 7;
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts, minRestHours);
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};

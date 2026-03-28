@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
     ...e,
     roles: empSettings[e.id]?.roles ?? [],
     contractShifts: empSettings[e.id]?.contractShifts ?? null,
-    minRestHours: empSettings[e.id]?.minRestHours ?? null,
   }));
 
   return NextResponse.json(result);

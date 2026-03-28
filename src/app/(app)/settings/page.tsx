@@ -13,7 +13,6 @@ interface Employee {
   phone?: string | null;
   roles: string[];
   contractShifts: number | null;
-  minRestHours: number | null;
 }
 
 export default function SettingsPage() {
@@ -62,7 +61,6 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState("");
   const [newRoles, setNewRoles] = useState<string[]>([]);
   const [newContract, setNewContract] = useState<number>(0);
-  const [newRestHours, setNewRestHours] = useState<number>(7);
   const [empLoading, setEmpLoading] = useState(false);
   const [empError, setEmpError] = useState("");
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
@@ -76,13 +74,33 @@ export default function SettingsPage() {
   const [deadlineSaving, setDeadlineSaving] = useState(false);
   const [deadlineSaved, setDeadlineSaved] = useState(false);
 
+  // ── Min rest hours (global) ─────────────────────────────────────────────────
+  const [minRestHours, setMinRestHours] = useState(7);
+  const [restSaving, setRestSaving] = useState(false);
+  const [restSaved, setRestSaved] = useState(false);
+
   useEffect(() => {
     fetch("/api/deadline")
       .then(r => r.json())
       .then(d => {
         if (d.deadline) setDeadlineInput(toDatetimeLocal(d.deadline));
       });
+    fetch("/api/min-rest-hours")
+      .then(r => r.json())
+      .then(d => { if (typeof d.minRestHours === "number") setMinRestHours(d.minRestHours); });
   }, []);
+
+  async function saveRestHours() {
+    setRestSaving(true);
+    await fetch("/api/min-rest-hours", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ minRestHours }),
+    });
+    setRestSaving(false);
+    setRestSaved(true);
+    setTimeout(() => setRestSaved(false), 2000);
+  }
 
   function toDatetimeLocal(iso: string): string {
     const d = new Date(iso);
@@ -127,17 +145,15 @@ export default function SettingsPage() {
     });
     const data = await res.json();
     if (!res.ok) { setEmpLoading(false); setEmpError(data.error ?? "שגיאה בהוספה"); return; }
-    // Save roles, contract, and rest hours immediately
-    const minRestHours = newRestHours !== 7 ? newRestHours : null;
-    if (newRoles.length > 0 || newContract > 0 || minRestHours !== null) {
+    // Save roles + contract immediately if set
+    if (newRoles.length > 0 || newContract > 0) {
       await fetch("/api/employees", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: data.id, roles: newRoles, contractShifts: newContract > 0 ? newContract : null, minRestHours }),
+        body: JSON.stringify({ id: data.id, roles: newRoles, contractShifts: newContract > 0 ? newContract : null }),
       });
       data.roles = newRoles;
       data.contractShifts = newContract > 0 ? newContract : null;
-      data.minRestHours = minRestHours;
     }
     setEmpLoading(false);
     setEmployees(prev => [...prev, data]);
@@ -145,7 +161,6 @@ export default function SettingsPage() {
     setPhone("");
     setNewRoles([]);
     setNewContract(0);
-    setNewRestHours(7);
   }
 
   async function handleDeleteEmployee(id: string) {
@@ -157,7 +172,7 @@ export default function SettingsPage() {
     if (res.ok) setEmployees(prev => prev.filter(e => e.id !== id));
   }
 
-  function updateEmpLocal(id: string, patch: { roles?: string[]; contractShifts?: number | null; minRestHours?: number | null }) {
+  function updateEmpLocal(id: string, patch: { roles?: string[]; contractShifts?: number | null }) {
     setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
     setDirtyEmps(prev => new Set(prev).add(id));
   }
@@ -169,7 +184,7 @@ export default function SettingsPage() {
     await fetch("/api/employees", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts, minRestHours: emp.minRestHours }),
+      body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts }),
     });
     setSavingEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
     setDirtyEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
@@ -466,6 +481,26 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Min rest hours ── */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900">מינימום שעות מנוחה בין משמרות</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              מספר השעות המינימלי הנדרש בין סיום משמרת לתחילת משמרת הבאה (ברירת מחדל: 7 שעות).
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMinRestHours(h => Math.max(0, h - 1))} className="w-8 h-8 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-lg leading-none">−</button>
+            <span className="text-2xl font-bold text-gray-800 w-10 text-center">{minRestHours}</span>
+            <button onClick={() => setMinRestHours(h => Math.min(24, h + 1))} className="w-8 h-8 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-lg leading-none">+</button>
+            <span className="text-sm text-gray-500">שעות</span>
+            <Button onClick={saveRestHours} loading={restSaving} size="md">שמור</Button>
+            {restSaved && <span className="text-sm text-green-600 font-medium">נשמר!</span>}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ── Employees ── */}
       <Card>
         <CardContent className="pt-5 space-y-4">
@@ -496,19 +531,11 @@ export default function SettingsPage() {
               />
             </div>
             {/* Contract */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 shrink-0">חוזה (משמרות/שבוע):</span>
-                <button type="button" onClick={() => setNewContract(c => Math.max(0, c - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">−</button>
-                <span className="w-6 text-center text-sm font-semibold text-gray-800">{newContract === 0 ? "—" : newContract}</span>
-                <button type="button" onClick={() => setNewContract(c => Math.min(7, c + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 shrink-0">מנוחה בין משמרות (שעות):</span>
-                <button type="button" onClick={() => setNewRestHours(h => Math.max(0, h - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">−</button>
-                <span className="w-6 text-center text-sm font-semibold text-gray-800">{newRestHours}</span>
-                <button type="button" onClick={() => setNewRestHours(h => Math.min(24, h + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 shrink-0">חוזה (משמרות/שבוע):</span>
+              <button type="button" onClick={() => setNewContract(c => Math.max(0, c - 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">−</button>
+              <span className="w-6 text-center text-sm font-semibold text-gray-800">{newContract === 0 ? "—" : newContract}</span>
+              <button type="button" onClick={() => setNewContract(c => Math.min(7, c + 1))} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none">+</button>
             </div>
             {/* Roles */}
             {shiftRoles.length > 0 && (
@@ -593,23 +620,6 @@ export default function SettingsPage() {
                           className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none"
                         >+</button>
                         <span className="text-[10px] text-gray-400">{emp.contractShifts ? "יעד לשבוע" : "ללא חוזה"}</span>
-                      </div>
-
-                      {/* Min rest hours */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 w-24 shrink-0">מנוחה בין משמרות:</span>
-                        <button
-                          onClick={() => updateEmpLocal(emp.id, { minRestHours: Math.max(0, (emp.minRestHours ?? 7) - 1) })}
-                          className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none"
-                        >−</button>
-                        <span className="w-6 text-center text-xs font-semibold text-gray-800">
-                          {emp.minRestHours ?? 7}
-                        </span>
-                        <button
-                          onClick={() => updateEmpLocal(emp.id, { minRestHours: Math.min(24, (emp.minRestHours ?? 7) + 1) })}
-                          className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm leading-none"
-                        >+</button>
-                        <span className="text-[10px] text-gray-400">שעות (ברירת מחדל: 7)</span>
                       </div>
 
                       {/* Roles */}

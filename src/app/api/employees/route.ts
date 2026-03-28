@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-type EmpSettings = { roles?: string[]; contractShifts?: number | null; minRestHours?: number | null };
+type EmpSettings = { roles?: string[]; contractShifts?: number | null };
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -25,7 +25,6 @@ export async function GET() {
     ...e,
     roles: empSettings[e.id]?.roles ?? [],
     contractShifts: empSettings[e.id]?.contractShifts ?? null,
-    minRestHours: empSettings[e.id]?.minRestHours ?? null,
   }));
 
   return NextResponse.json(result);
@@ -72,7 +71,7 @@ export async function PATCH(req: NextRequest) {
   if (!session || session.user.role !== "MANAGER" || !session.user.organizationId)
     return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
 
-  const { id, roles, contractShifts, minRestHours } = await req.json();
+  const { id, roles, contractShifts } = await req.json();
   if (!id) return NextResponse.json({ error: "נדרש מזהה" }, { status: 400 });
 
   const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
@@ -85,7 +84,6 @@ export async function PATCH(req: NextRequest) {
     ...empSettings[id],
     ...(roles !== undefined ? { roles } : {}),
     ...(contractShifts !== undefined ? { contractShifts } : {}),
-    ...(minRestHours !== undefined ? { minRestHours } : {}),
   };
 
   await prisma.organization.update({

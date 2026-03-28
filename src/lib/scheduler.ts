@@ -8,7 +8,6 @@ export interface EmployeeForScheduling {
   constraints: Record<Day, Record<ShiftKey, AvailabilityOption>> | null;
   roles: string[];               // which shift roles this employee can work
   contractShifts: number | null; // target shifts/week (null = no contract)
-  minRestHours: number | null;   // minimum hours between shifts (null = default 7)
 }
 
 export interface ShiftSlot {
@@ -43,7 +42,8 @@ function shuffle<T>(arr: T[]): T[] {
 export function runScheduler(
   employees: EmployeeForScheduling[],
   pinnedSlots: Record<string, Record<string, string[]>> = {},
-  shifts: ShiftConfig[] = DEFAULT_SHIFTS
+  shifts: ShiftConfig[] = DEFAULT_SHIFTS,
+  minRestHours: number = 7
 ): { schedule: ScheduleData; warnings: string[] } {
   // Shuffle once so ties are broken randomly, not by DB order
   const pool = shuffle(employees);
@@ -87,9 +87,8 @@ export function runScheduler(
         // Hard cap: skip if employee has reached their contract shift limit
         if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
         // Rest check: skip if insufficient rest between this and any already-assigned shift today
-        const restMins = (emp.minRestHours ?? 7) * 60;
         const empShifts = dayEmpShiftIdx[emp.id];
-        if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, restMins))) continue;
+        if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, minRestHours * 60))) continue;
         // Role check
         if (!roleEligible(emp)) continue;
         const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
@@ -106,9 +105,8 @@ export function runScheduler(
         for (const emp of pool) {
           if (pinnedIds.includes(emp.id)) continue;
           if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
-          const restMins = (emp.minRestHours ?? 7) * 60;
           const empShifts = dayEmpShiftIdx[emp.id];
-          if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, restMins))) continue;
+          if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, minRestHours * 60))) continue;
           const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
           if (val === "available") usedAvailable.push(emp);
           else if (val === "prefer_not") usedPreferNot.push(emp);
