@@ -73,6 +73,8 @@ export async function PATCH(req: NextRequest) {
 
   const { id, roles, contractShifts } = await req.json();
   if (!id) return NextResponse.json({ error: "נדרש מזהה" }, { status: 400 });
+  if (contractShifts !== undefined && contractShifts !== null && (typeof contractShifts !== "number" || !Number.isInteger(contractShifts) || contractShifts < 0))
+    return NextResponse.json({ error: "ערך חוזה לא תקין" }, { status: 400 });
 
   const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
   if (!org) return NextResponse.json({ error: "ארגון לא נמצא" }, { status: 404 });

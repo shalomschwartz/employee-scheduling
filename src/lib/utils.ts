@@ -66,3 +66,16 @@ export const DEFAULT_SHIFTS: ShiftConfig[] = [
 
 export const AVAILABILITY_OPTIONS = ["available", "prefer_not", "unavailable"] as const;
 export type AvailabilityOption = (typeof AVAILABILITY_OPTIONS)[number];
+
+/** Convert "HH:MM" to minutes since midnight. */
+export const toMins = (t: string): number => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/** Gap in minutes from time A to time B (wraps past midnight). */
+export function gapMins(fromTime: string, toTime: string): number {
+  const from = toMins(fromTime);
+  const to = toMins(toTime);
+  return to >= from ? to - from : 1440 - from + to;
+}

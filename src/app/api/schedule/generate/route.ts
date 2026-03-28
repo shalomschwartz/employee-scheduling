@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getNextWeekStart, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
+import { getNextWeekStart, DEFAULT_SHIFTS, toMins, type ShiftConfig } from "@/lib/utils";
 import { runScheduler, type EmployeeForScheduling } from "@/lib/scheduler";
 import type { ShiftType } from "@prisma/client";
 
@@ -45,19 +45,21 @@ export async function POST(req: NextRequest) {
     where: { organizationId_weekStart: { organizationId: session.user.organizationId, weekStart } },
   });
   const pinnedSlots: Record<string, Record<string, string[]>> = {};
+  // Only keep pins for employees that still exist in this org (guard against deleted employees)
+  const validEmpIds = new Set(employees.map(e => e.id));
   if (existing?.schedule) {
     for (const [day, dayData] of Object.entries(existing.schedule as Record<string, Record<string, { pinnedIds?: string[] }>>)) {
       for (const [shift, slot] of Object.entries(dayData)) {
-        if (slot.pinnedIds?.length) {
+        const validPins = (slot.pinnedIds ?? []).filter(id => validEmpIds.has(id));
+        if (validPins.length) {
           pinnedSlots[day] ??= {};
-          pinnedSlots[day][shift] = slot.pinnedIds;
+          pinnedSlots[day][shift] = validPins;
         }
       }
     }
   }
 
   // Load org-specific shift config — apply same normalization as GET /api/shifts
-  const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const legacyMin = typeof orgSettings.minPerShift === "number" ? orgSettings.minPerShift : 2;
   const rawShifts: ShiftConfig[] = Array.isArray(orgSettings.shifts) ? (orgSettings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
   const shifts = [...rawShifts]
@@ -89,7 +91,10 @@ export async function POST(req: NextRequest) {
     update: { schedule, status: "DRAFT", updatedAt: new Date() },
   });
 
-  // Recreate Shift rows (best-effort tracking — skip custom shift IDs not in the DB enum)
+  // Recreate Shift rows (best-effort tracking).
+  // VALID_SHIFT_TYPES is constrained by the ShiftType DB enum (MORNING/AFTERNOON/EVENING).
+  // Custom shift IDs set by the org cannot be persisted as Shift rows until the enum is extended
+  // via a DB migration. The authoritative schedule is always the JSON in GeneratedSchedule.schedule.
   try {
     const VALID_SHIFT_TYPES = new Set<string>(["MORNING", "AFTERNOON", "EVENING"]);
     await prisma.shift.deleteMany({ where: { scheduleId: saved.id } });

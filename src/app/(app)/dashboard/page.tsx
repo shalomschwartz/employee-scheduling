@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type ConstraintData } from "@/components/availability/AvailabilityGrid";
-import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, cn, type Day, type ShiftConfig } from "@/lib/utils";
+import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, toMins, gapMins, cn, type Day, type ShiftConfig } from "@/lib/utils";
 
 interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; pinnedIds?: string[]; }
 type ScheduleData = Record<string, Record<string, ShiftSlot>>;
@@ -50,6 +50,11 @@ export default function DashboardPage() {
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [minRestHours, setMinRestHours] = useState(7);
   const [empFilter, setEmpFilter] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("shiftsync_guide_open") === "true";
+  });
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // Hidden print-calendar ref for PDF capture
   const printRef = useRef<HTMLDivElement>(null);
@@ -80,7 +85,8 @@ export default function DashboardPage() {
     }
   }, [searchParams, router]);
 
-const weekStart = getNextWeekStart();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const weekStart = useMemo(() => getNextWeekStart(), []);
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
   async function fetchEmployees() {
@@ -225,12 +231,24 @@ const weekStart = getNextWeekStart();
 
 
   async function persistSchedule(updated: ScheduleData) {
+    const previous = scheduleData;
     setScheduleData(updated);
-    await fetch("/api/schedule", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weekStart: weekStart.toISOString(), schedule: updated }),
-    });
+    try {
+      const res = await fetch("/api/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekStart: weekStart.toISOString(), schedule: updated }),
+      });
+      if (!res.ok) {
+        setScheduleData(previous);
+        setErrorToast("שגיאה בשמירת השינויים");
+        setTimeout(() => setErrorToast(null), 4000);
+      }
+    } catch {
+      setScheduleData(previous);
+      setErrorToast("שגיאת רשת — השינויים לא נשמרו");
+      setTimeout(() => setErrorToast(null), 4000);
+    }
   }
 
   function clearShiftCell(day: string, shift: string) {
@@ -265,9 +283,6 @@ const weekStart = getNextWeekStart();
     };
     persistSchedule(updated);
   }
-
-  const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-  function gapMins(from: string, to: string) { const f = toMins(from), t = toMins(to); return t >= f ? t - f : 1440 - f + t; }
 
   // Returns the shift IDs the employee is already in on that day (excluding the target shift)
   function empShiftsOnDay(empId: string, day: string, excludeShift: string): string[] {
@@ -406,19 +421,24 @@ const weekStart = getNextWeekStart();
   }
 
   async function executePdfDownload() {
-    const { default: html2canvas } = await import("html2canvas");
-    const { default: jsPDF } = await import("jspdf");
-    if (!printRef.current) return;
-    const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#eff6ff", useCORS: true });
-    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 8;
-    const scale = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
-    const w = canvas.width * scale;
-    const h = canvas.height * scale;
-    pdf.addImage(canvas.toDataURL("image/png"), "PNG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
-    pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}.pdf`);
+    setPdfLoading(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const { default: jsPDF } = await import("jspdf");
+      if (!printRef.current) return;
+      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#eff6ff", useCORS: true });
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const scale = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
+      const w = canvas.width * scale;
+      const h = canvas.height * scale;
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
+      pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}.pdf`);
+    } finally {
+      setPdfLoading(false);
+    }
   }
 
   function getDownloadConflicts(): string[] {
@@ -504,6 +524,37 @@ const weekStart = getNextWeekStart();
   const submitted = employees.filter(e => e.constraints.length > 0).length;
   const shiftKeys = shifts.map(s => s.id);
 
+  const filterBar = (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <button
+        onClick={() => setEmpFilter(null)}
+        className={cn(
+          "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+          empFilter === null ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+        )}
+      >
+        הכל
+      </button>
+      {employees.map((emp, i) => {
+        const id = emp.id;
+        const label = (emp.name ?? emp.email).split(" ")[0];
+        const selected = empFilter === id;
+        return (
+          <button
+            key={id}
+            onClick={() => setEmpFilter(id)}
+            className={cn(
+              "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+              selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+            )}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   // Map each unique role name to a stable color
   const uniqueRoles = Array.from(new Set(shifts.map(s => s.role).filter(Boolean))) as string[];
   const roleColorMap = Object.fromEntries(
@@ -522,30 +573,44 @@ const weekStart = getNextWeekStart();
       )}
 
       {/* Guide */}
-      <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 text-sm text-gray-700">
-          <p className="font-bold text-blue-800 mb-3 text-base">איך ShiftSync עובד</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Group 1 */}
-            <div className="bg-white rounded-lg border border-blue-100 p-3 space-y-2">
-              <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">הגדרה חד-פעמית</p>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">1.</span><span><span className="font-semibold">הוסף עובדים</span> — עבור להגדרות, הוסף עובדים עם שם ומספר טלפון.</span></div>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">2.</span><span><span className="font-semibold">הגדר תפקידים</span> — צור סוגי תפקידים (מלצר, ברמן…) והגדר לכל עובד ומשמרת את התפקיד המתאים.</span></div>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">3.</span><span><span className="font-semibold">הגדר חוזים</span> — קבע לכל עובד מספר משמרות שבועי מחייב.</span></div>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">4.</span><span><span className="font-semibold">קבע דדליין</span> — בחר מועד אחרון להגשת זמינות (ברירת מחדל: רביעי 21:00).</span></div>
-            </div>
-            {/* Group 2 */}
-            <div className="bg-white rounded-lg border border-blue-100 p-3 space-y-2">
-              <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">כל שבוע</p>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">5.</span><span><span className="font-semibold">עובדים ממלאים זמינות</span> — כל עובד נכנס ומסמן את הימים והמשמרות שמתאימים לו.</span></div>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">6.</span><span><span className="font-semibold">צור שיבוץ</span> — לחץ "צור שיבוץ". האלגוריתם ישבץ לפי זמינות, תפקיד וחוזה — ויחלק משמרות שווה.</span></div>
-            </div>
-            {/* Group 3 */}
-            <div className="bg-white rounded-lg border border-blue-100 p-3 space-y-2">
-              <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">עריכה ושיתוף</p>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">7.</span><span><span className="font-semibold">ערוך ידנית</span> — גרור עובדים בין משמרות, הוסף/הסר, נעץ עובד, או נקה תא עם "מחק משמרת".</span></div>
-              <div className="flex gap-2"><span className="font-bold text-blue-600">8.</span><span><span className="font-semibold">שלח לעובדים</span> — הורד PDF או שלח לוואצאפ לשיתוף.</span></div>
+      <div className="rounded-xl border-2 border-blue-200 bg-blue-50 text-sm text-gray-700">
+        <button
+          onClick={() => {
+            const next = !showGuide;
+            setShowGuide(next);
+            localStorage.setItem("shiftsync_guide_open", next ? "true" : "false");
+          }}
+          className="w-full flex items-center justify-between px-4 py-3 text-right"
+        >
+          <span className="font-bold text-blue-800 text-base">איך ShiftSync עובד</span>
+          <span className="text-blue-400 text-lg leading-none">{showGuide ? "▲" : "▼"}</span>
+        </button>
+        {showGuide && (
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Group 1 */}
+              <div className="bg-white rounded-lg border border-blue-100 p-3 space-y-2">
+                <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">הגדרה חד-פעמית</p>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">1.</span><span><span className="font-semibold">הוסף עובדים</span> — עבור להגדרות, הוסף עובדים עם שם ומספר טלפון.</span></div>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">2.</span><span><span className="font-semibold">הגדר תפקידים</span> — צור סוגי תפקידים (מלצר, ברמן…) והגדר לכל עובד ומשמרת את התפקיד המתאים.</span></div>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">3.</span><span><span className="font-semibold">הגדר חוזים</span> — קבע לכל עובד מספר משמרות שבועי מחייב.</span></div>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">4.</span><span><span className="font-semibold">קבע דדליין</span> — בחר מועד אחרון להגשת זמינות (ברירת מחדל: רביעי 21:00).</span></div>
+              </div>
+              {/* Group 2 */}
+              <div className="bg-white rounded-lg border border-blue-100 p-3 space-y-2">
+                <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">כל שבוע</p>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">5.</span><span><span className="font-semibold">עובדים ממלאים זמינות</span> — כל עובד נכנס ומסמן את הימים והמשמרות שמתאימים לו.</span></div>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">6.</span><span><span className="font-semibold">צור שיבוץ</span> — לחץ "צור שיבוץ". האלגוריתם ישבץ לפי זמינות, תפקיד וחוזה — ויחלק משמרות שווה.</span></div>
+              </div>
+              {/* Group 3 */}
+              <div className="bg-white rounded-lg border border-blue-100 p-3 space-y-2">
+                <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">עריכה ושיתוף</p>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">7.</span><span><span className="font-semibold">ערוך ידנית</span> — גרור עובדים בין משמרות, הוסף/הסר, נעץ עובד, או נקה תא עם "מחק משמרת".</span></div>
+                <div className="flex gap-2"><span className="font-bold text-blue-600">8.</span><span><span className="font-semibold">שלח לעובדים</span> — הורד PDF או שלח לוואצאפ לשיתוף.</span></div>
+              </div>
             </div>
           </div>
+        )}
       </div>
 
       {/* Header */}
@@ -560,7 +625,7 @@ const weekStart = getNextWeekStart();
               {"צור שיבוץ"}
             </Button>
             {scheduleData && (
-              <Button onClick={handleDownload} size="md">הורדה</Button>
+              <Button onClick={handleDownload} loading={pdfLoading} size="md">הורדה</Button>
             )}
             {scheduleData && (
               <Button
@@ -712,34 +777,7 @@ const weekStart = getNextWeekStart();
             <p className="text-xs text-gray-400">X להסרה • + להוספה ידנית 📌</p>
             {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => setEmpFilter(null)}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-                empFilter === null ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-              )}
-            >
-              הכל
-            </button>
-            {employees.map((emp, i) => {
-              const id = emp.id;
-              const label = (emp.name ?? emp.email).split(" ")[0];
-              const selected = empFilter === id;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setEmpFilter(id)}
-                  className={cn(
-                    "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-                    selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                  )}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          {filterBar}
           <div className="overflow-x-auto rounded-xl border-2 border-gray-300 shadow-sm">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -848,7 +886,7 @@ const weekStart = getNextWeekStart();
                                 {/* Remove button */}
                                 <button
                                   onClick={e => { e.stopPropagation(); removeFromSlot(name, day, shift); }}
-                                  className="absolute -top-1 -start-1 w-4 h-4 rounded-full bg-gray-400 hover:bg-red-500 text-white text-[9px] font-bold hidden group-hover:flex items-center justify-center z-10 transition-colors"
+                                  className="absolute -top-1 -start-1 w-4 h-4 rounded-full bg-gray-300 hover:bg-red-500 text-white text-[9px] font-bold flex items-center justify-center z-10 transition-colors opacity-50 group-hover:opacity-100"
                                   title="הסר ממשמרת"
                                 >
                                   ×
@@ -995,33 +1033,7 @@ const weekStart = getNextWeekStart();
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-1">
               <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
-              <div className="flex gap-1.5 flex-wrap justify-end">
-                <button
-                  onClick={() => setEmpFilter([])}
-                  className={cn(
-                    "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-                    empFilter === null ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                  )}
-                >
-                  הכל
-                </button>
-                {employees.map((emp, i) => {
-                  const name = emp.name ?? emp.email;
-                  const selected = empFilter === emp.id;
-                  return (
-                    <button
-                      key={emp.id}
-                      onClick={() => setEmpFilter(emp.id)}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-                        selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                      )}
-                    >
-                      {name.split(" ")[0]}
-                    </button>
-                  );
-                })}
-              </div>
+              {filterBar}
             </div>
 
             {/* Legend */}
@@ -1146,7 +1158,7 @@ const weekStart = getNextWeekStart();
                             ? <span style={{ color: "#d1d5db", fontSize: "13px" }}>—</span>
                             : names.map((name, ni) => (
                                 <div key={ni} style={{ display: "inline-block", margin: "2px 3px", padding: "3px 10px", fontSize: "13px", fontWeight: "700", color: "#111827" }}>
-                                  {name.split(" ")[0]}
+                                  {name}
                                 </div>
                               ))}
                         </td>

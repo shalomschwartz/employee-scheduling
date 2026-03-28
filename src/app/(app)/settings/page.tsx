@@ -15,6 +15,51 @@ interface Employee {
   contractShifts: number | null;
 }
 
+function RoleChipSelector({ roles, selected, onChange, showAll = false }: {
+  roles: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  showAll?: boolean;
+}) {
+  if (roles.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center">
+      {showAll && (
+        <button
+          type="button"
+          onClick={() => onChange([...roles])}
+          className={cn(
+            "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+            selected.length === roles.length
+              ? "bg-purple-600 text-white border-purple-600"
+              : "bg-white text-gray-500 border-gray-300 hover:border-purple-400"
+          )}
+        >
+          הכל
+        </button>
+      )}
+      {roles.map(role => {
+        const active = selected.includes(role);
+        return (
+          <button
+            key={role}
+            type="button"
+            onClick={() => onChange(active ? selected.filter(r => r !== role) : [...selected, role])}
+            className={cn(
+              "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+              active
+                ? "bg-blue-500 text-white border-blue-500"
+                : "bg-white text-gray-600 border-gray-300 hover:border-blue-300"
+            )}
+          >
+            {role}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   // ── Shift role types ────────────────────────────────────────────────────────
   const [shiftRoles, setShiftRoles] = useState<string[]>([]);
@@ -278,8 +323,17 @@ export default function SettingsPage() {
     shifts.length !== savedShifts.current.length ||
     shifts.some(s => {
       const orig = savedShifts.current.find(o => o.id === s.id);
-      return !orig || orig.minWorkers !== s.minWorkers || orig.start !== s.start || orig.end !== s.end;
+      return !orig || orig.minWorkers !== s.minWorkers || orig.start !== s.start || orig.end !== s.end || orig.label !== s.label || orig.role !== s.role;
     });
+
+  const dirtyShiftIds = new Set(
+    shifts
+      .filter(s => {
+        const orig = savedShifts.current.find(o => o.id === s.id);
+        return !orig || orig.label !== s.label || orig.start !== s.start || orig.end !== s.end || orig.minWorkers !== s.minWorkers || orig.role !== s.role;
+      })
+      .map(s => s.id)
+  );
 
   // Live overlap detection
   const toM = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
@@ -360,7 +414,7 @@ export default function SettingsPage() {
                 "flex flex-col gap-2 p-3 rounded-lg border bg-gray-50 transition-all",
                 overlappingIds.has(shift.id) && !overlapIgnored ? "border-red-400 ring-2 ring-red-200" : "border-gray-200"
               )}>
-                {/* Row 1: number + name */}
+                {/* Row 1: number + name + dirty badge */}
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400 w-4 text-center font-bold shrink-0">{i + 1}</span>
                   <input
@@ -370,6 +424,11 @@ export default function SettingsPage() {
                     className="flex-1 text-sm font-medium bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
                     placeholder="שם המשמרת"
                   />
+                  {dirtyShiftIds.has(shift.id) && (
+                    <span className="text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                      לא שמור
+                    </span>
+                  )}
                 </div>
                 {/* Row 2: time range + workers + delete */}
                 <div className="flex items-center gap-2 ps-6 flex-wrap">
@@ -541,21 +600,7 @@ export default function SettingsPage() {
             {shiftRoles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 items-center">
                 <span className="text-xs text-gray-500 shrink-0">תפקידים:</span>
-                {shiftRoles.map(role => (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => setNewRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role])}
-                    className={cn(
-                      "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
-                      newRoles.includes(role)
-                        ? "bg-blue-500 text-white border-blue-500"
-                        : "bg-white text-gray-600 border-gray-300 hover:border-blue-300"
-                    )}
-                  >
-                    {role}
-                  </button>
-                ))}
+                <RoleChipSelector roles={shiftRoles} selected={newRoles} onChange={setNewRoles} />
               </div>
             )}
             <Button type="submit" loading={empLoading} size="md" className="w-full">
@@ -623,46 +668,17 @@ export default function SettingsPage() {
                       </div>
 
                       {/* Roles */}
-                      {shiftRoles.length > 0 && (
+                      {shiftRoles.length > 0 ? (
                         <div className="flex items-start gap-2">
                           <span className="text-xs text-gray-500 w-24 shrink-0 pt-0.5">תפקידים:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            <button
-                              onClick={() => updateEmpLocal(emp.id, { roles: [...shiftRoles] })}
-                              className={cn(
-                                "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
-                                emp.roles.length === shiftRoles.length
-                                  ? "bg-purple-600 text-white border-purple-600"
-                                  : "bg-white text-gray-500 border-gray-300 hover:border-purple-400"
-                              )}
-                            >
-                              הכל
-                            </button>
-                            {shiftRoles.map(role => {
-                              const active = emp.roles.includes(role);
-                              return (
-                                <button
-                                  key={role}
-                                  onClick={() => updateEmpLocal(emp.id, {
-                                    roles: active
-                                      ? emp.roles.filter(r => r !== role)
-                                      : [...emp.roles, role],
-                                  })}
-                                  className={cn(
-                                    "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
-                                    active
-                                      ? "bg-purple-600 text-white border-purple-600"
-                                      : "bg-white text-gray-500 border-gray-300 hover:border-purple-400"
-                                  )}
-                                >
-                                  {role}
-                                </button>
-                              );
-                            })}
-                          </div>
+                          <RoleChipSelector
+                            roles={shiftRoles}
+                            selected={emp.roles}
+                            onChange={roles => updateEmpLocal(emp.id, { roles })}
+                            showAll
+                          />
                         </div>
-                      )}
-                      {shiftRoles.length === 0 && (
+                      ) : (
                         <p className="text-xs text-gray-400">הגדר תפקידים בכרטיס "סוגי תפקידים" כדי להציג כאן.</p>
                       )}
 

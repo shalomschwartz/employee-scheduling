@@ -1,4 +1,4 @@
-import { DAYS, DEFAULT_SHIFTS, DAY_LABELS_HE, type Day, type ShiftKey, type AvailabilityOption, type ShiftConfig } from "@/lib/utils";
+import { DAYS, DEFAULT_SHIFTS, DAY_LABELS_HE, toMins, gapMins, type Day, type ShiftKey, type AvailabilityOption, type ShiftConfig } from "@/lib/utils";
 
 export interface EmployeeForScheduling {
   id: string;
@@ -13,17 +13,11 @@ export interface EmployeeForScheduling {
 export interface ShiftSlot {
   employeeIds: string[];
   understaffed: boolean;
-  noShiftLead: boolean;
 }
 
 export type ScheduleData = Record<Day, Record<ShiftKey, ShiftSlot>>;
 
-// Time-gap helpers for rest-between-shifts enforcement
-const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-function gapMins(fromTime: string, toTime: string): number {
-  const from = toMins(fromTime); const to = toMins(toTime);
-  return to >= from ? to - from : 1440 - from + to;
-}
+// Time-gap helpers (toMins, gapMins) are imported from @/lib/utils
 function shiftsOverlap(a: ShiftConfig, b: ShiftConfig): boolean {
   // B starts before A ends, or A starts before B ends
   return gapMins(a.start, b.start) < gapMins(a.start, a.end)
@@ -168,7 +162,6 @@ export function runScheduler(
       schedule[day][shift] = {
         employeeIds: assigned.map((e) => e.id),
         understaffed,
-        noShiftLead: false,
       };
     }
   }
