@@ -24,8 +24,14 @@ function gapMins(fromTime: string, toTime: string): number {
   const from = toMins(fromTime); const to = toMins(toTime);
   return to >= from ? to - from : 1440 - from + to;
 }
+function shiftsOverlap(a: ShiftConfig, b: ShiftConfig): boolean {
+  // B starts before A ends, or A starts before B ends
+  return gapMins(a.start, b.start) < gapMins(a.start, a.end)
+      || gapMins(b.start, a.start) < gapMins(b.start, b.end);
+}
 function hasEnoughRest(si: number, assignedSi: number, shifts: ShiftConfig[], minRestMins: number): boolean {
   const a = shifts[si]; const b = shifts[assignedSi];
+  if (shiftsOverlap(a, b)) return false; // overlap = physically impossible
   return Math.min(gapMins(a.end, b.start), gapMins(b.end, a.start)) >= minRestMins;
 }
 
@@ -57,7 +63,7 @@ export function runScheduler(
 
   for (const day of DAYS) {
     schedule[day] = {} as Record<ShiftKey, ShiftSlot>;
-    // Track which shift indices each employee is assigned to this day (for adjacent-shift prevention)
+    // Track which shift indices each employee is assigned to this day (for rest/overlap enforcement)
     const dayEmpShiftIdx: Record<string, Set<number>> = {};
 
     for (const [si, shiftCfg] of shifts.entries()) {
