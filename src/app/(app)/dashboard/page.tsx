@@ -48,6 +48,7 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
 
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
+  const [minRestHours, setMinRestHours] = useState(7);
   const [empFilter, setEmpFilter] = useState<string | null>(null);
 
   // Hidden print-calendar ref for PDF capture
@@ -93,12 +94,12 @@ const weekStart = getNextWeekStart();
       fetch(`/api/schedule?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch("/api/shifts").then(r => r.json()),
-    ]).then(([sched, emps, shiftsCfg]) => {
+      fetch("/api/min-rest-hours").then(r => r.json()),
+    ]).then(([sched, emps, shiftsCfg, restCfg]) => {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
       if (Array.isArray(emps)) setEmployees(emps);
-      if (shiftsCfg?.shifts) {
-        setShifts(shiftsCfg.shifts);
-      }
+      if (shiftsCfg?.shifts) setShifts(shiftsCfg.shifts);
+      if (typeof restCfg?.minRestHours === "number") setMinRestHours(restCfg.minRestHours);
       setLoading(false);
     }).catch(() => setLoading(false));
 
@@ -265,12 +266,36 @@ const weekStart = getNextWeekStart();
     persistSchedule(updated);
   }
 
-  function hasConsecutiveConflict(empId: string, day: string, shift: string): boolean {
-    if (!scheduleData) return false;
-    const si = shifts.findIndex(s => s.id === shift);
-    if (si < 0) return false;
-    const adjacent = [shifts[si - 1]?.id, shifts[si + 1]?.id].filter(Boolean) as string[];
-    return adjacent.some(adjId => scheduleData[day]?.[adjId]?.employeeIds.includes(empId));
+  const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  function gapMins(from: string, to: string) { const f = toMins(from), t = toMins(to); return t >= f ? t - f : 1440 - f + t; }
+
+  // Returns the shift IDs the employee is already in on that day (excluding the target shift)
+  function empShiftsOnDay(empId: string, day: string, excludeShift: string): string[] {
+    if (!scheduleData) return [];
+    return shifts.map(s => s.id).filter(sid => sid !== excludeShift && scheduleData[day]?.[sid]?.employeeIds.includes(empId));
+  }
+
+  function hasOverlapConflict(empId: string, day: string, shift: string): boolean {
+    const cfg = shifts.find(s => s.id === shift);
+    if (!cfg) return false;
+    return empShiftsOnDay(empId, day, shift).some(sid => {
+      const other = shifts.find(s => s.id === sid);
+      if (!other) return false;
+      // Two shifts overlap if neither ends before the other starts
+      const gap1 = gapMins(cfg.end, other.start);   // gap from cfg→other
+      const gap2 = gapMins(other.end, cfg.start);    // gap from other→cfg
+      return Math.min(gap1, gap2) === 0;
+    });
+  }
+
+  function hasRestViolation(empId: string, day: string, shift: string): boolean {
+    const cfg = shifts.find(s => s.id === shift);
+    if (!cfg) return false;
+    return empShiftsOnDay(empId, day, shift).some(sid => {
+      const other = shifts.find(s => s.id === sid);
+      if (!other) return false;
+      return Math.min(gapMins(cfg.end, other.start), gapMins(other.end, cfg.start)) < minRestHours * 60;
+    });
   }
 
   function addToSlot(emp: Employee, day: string, shift: string) {
@@ -308,7 +333,8 @@ const weekStart = getNextWeekStart();
     const warnings: string[] = [];
     if (shiftRole && !emp.roles.includes(shiftRole)) warnings.push(`${name} אינו/ה מוגדר/ת לתפקיד "${shiftRole}"`);
     if (availability === "unavailable") warnings.push(`${name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
-    if (hasConsecutiveConflict(emp.id, day, shift)) warnings.push(`${name} כבר משובץ/ת במשמרת צמודה באותו יום`);
+    if (hasOverlapConflict(emp.id, day, shift)) warnings.push(`${name} כבר משובץ/ת במשמרת חופפת באותו יום`);
+    else if (hasRestViolation(emp.id, day, shift)) warnings.push(`${name} לא יהיו ${minRestHours} שעות מנוחה בין המשמרות`);
     if (warnings.length > 0) {
       setConflictDialog({ lines: warnings, onIgnore: doAdd });
       return;
@@ -369,7 +395,8 @@ const weekStart = getNextWeekStart();
     const dragWarnings: string[] = [];
     if (toShiftRole && !emp?.roles.includes(toShiftRole)) dragWarnings.push(`${dragging.name} אינו/ה מוגדר/ת לתפקיד "${toShiftRole}"`);
     if (availability === "unavailable") dragWarnings.push(`${dragging.name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
-    if (hasConsecutiveConflict(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} כבר משובץ/ת במשמרת צמודה באותו יום`);
+    if (hasOverlapConflict(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} כבר משובץ/ת במשמרת חופפת באותו יום`);
+    else if (hasRestViolation(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} לא יהיו ${minRestHours} שעות מנוחה בין המשמרות`);
     if (dragWarnings.length > 0) {
       setConflictDialog({ lines: dragWarnings, onIgnore: doMove });
       setDragging(null);
