@@ -130,8 +130,8 @@ export default function DashboardPage() {
   const empMap = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees]);
 
   const warnings = useMemo(() => {
-    if (!scheduleData) return [];
-    const result: string[] = [];
+    if (!scheduleData) return {} as Record<string, string[]>;
+    const result: Record<string, string[]> = {};
     for (const day of DAYS) {
       const dayData = scheduleData[day];
       if (!dayData) continue;
@@ -140,10 +140,13 @@ export default function DashboardPage() {
         if (!slot) continue;
         const count = slot.employeeIds.length;
         const min = shiftCfg.minWorkers ?? 2;
-        if (count === 0) {
-          result.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים משובצים`);
-        } else if (count < min) {
-          result.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${count}/${min} עובדים`);
+        let msg: string | null = null;
+        if (count === 0) msg = `${shiftCfg.label}: אין עובדים משובצים`;
+        else if (count < min) msg = `${shiftCfg.label}: רק ${count}/${min} עובדים`;
+        if (msg) {
+          const label = DAY_LABELS_HE[day as Day];
+          result[label] ??= [];
+          result[label].push(msg);
         }
       }
     }
@@ -723,14 +726,23 @@ export default function DashboardPage() {
       )}
 
       {/* Warnings */}
-      {warnings.length > 0 && !warningsIgnored && (
+      {Object.keys(warnings).length > 0 && !warningsIgnored && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="py-3">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-yellow-800">אזהרות:</p>
               <button onClick={() => setWarningsIgnored(true)} className="text-xs text-yellow-500 hover:text-yellow-700 font-medium px-2 py-0.5 rounded hover:bg-yellow-100 transition-colors">התעלם</button>
             </div>
-            <ul className="space-y-0.5">{warnings.map((w, i) => <li key={i} className="text-xs text-yellow-700">• {w}</li>)}</ul>
+            <div className="flex flex-wrap gap-3">
+              {Object.entries(warnings).map(([day, msgs]) => (
+                <div key={day} className="bg-yellow-100 border border-yellow-200 rounded-lg px-3 py-2 min-w-[120px]">
+                  <p className="text-[11px] font-bold text-yellow-800 mb-1">{day}</p>
+                  <ul className="space-y-0.5">
+                    {msgs.map((m, i) => <li key={i} className="text-xs text-yellow-700">• {m}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
