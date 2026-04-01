@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   const [employees, org] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
+      where: { organizationId: session.user.organizationId, role: { in: ["EMPLOYEE", "MANAGER"] } },
       include: weekStart
         ? { constraints: { where: { weekStart: new Date(weekStart) }, take: 1 } }
         : { constraints: { orderBy: { weekStart: "desc" }, take: 1 } },

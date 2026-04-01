@@ -12,7 +12,7 @@ export async function GET() {
 
   const [employees, org] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
+      where: { organizationId: session.user.organizationId, role: { in: ["EMPLOYEE", "MANAGER"] } },
       select: { id: true, name: true, phone: true },
       orderBy: { createdAt: "asc" },
     }),

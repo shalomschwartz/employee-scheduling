@@ -9,6 +9,7 @@ import { InstallPWA } from "@/components/InstallPWA";
 
 const managerLinks = [
   { href: "/dashboard", label: "לוח בקרה" },
+  { href: "/availability", label: "זמינות שלי" },
   { href: "/settings", label: "הגדרות" },
 ];
 

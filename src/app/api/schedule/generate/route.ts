@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const weekStart = body.weekStart ? new Date(body.weekStart) : getNextWeekStart();
 
   const employees = await prisma.user.findMany({
-    where: { organizationId: session.user.organizationId, role: "EMPLOYEE" },
+    where: { organizationId: session.user.organizationId, role: { in: ["EMPLOYEE", "MANAGER"] } },
     include: { constraints: { where: { weekStart }, take: 1 } },
   });
 
