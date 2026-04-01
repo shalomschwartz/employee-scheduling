@@ -80,18 +80,20 @@ export function runScheduler(
       shiftCounts[a.id] - shiftCounts[b.id];
 
     // Build a ranked candidate list for a shift, excluding already-assigned ids.
-    // Returns null if a role-fallback warning was already emitted.
+    // ignoreContract: true in pass 1 so coverage is never blocked by contract caps.
     const getRanked = (
       si: number,
       shiftCfg: ShiftConfig,
       excludeIds: Set<string>,
-      emitRoleWarning: boolean
+      emitRoleWarning: boolean,
+      ignoreContract = false
     ): EmployeeForScheduling[] => {
       const shift = shiftCfg.id as ShiftKey;
       const shiftRole = shiftCfg.role?.trim();
       const eligible = (emp: EmployeeForScheduling, ignoreRole = false) => {
         if (excludeIds.has(emp.id)) return false;
-        if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) return false;
+        // In pass 1 (coverage) we relax the contract cap so every shift gets at least one person
+        if (!ignoreContract && emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) return false;
         const empShifts = dayEmpShiftIdx[emp.id];
         if (empShifts && [...empShifts].some(aSi => !hasEnoughRest(si, aSi, shifts, minRestMins))) return false;
         if (!ignoreRole && shiftRole && !emp.roles.includes(shiftRole)) return false;
@@ -160,7 +162,8 @@ export function runScheduler(
       if (schedule[day][shift].employeeIds.length >= 1) continue; // pinned already covered
 
       const excludeIds = new Set(schedule[day][shift].employeeIds);
-      const ranked = getRanked(si, shiftCfg, excludeIds, true);
+      // ignoreContract=true: contract caps must not prevent coverage
+      const ranked = getRanked(si, shiftCfg, excludeIds, true, true);
       if (ranked.length > 0) assign(ranked[0], si, shift);
     }
 
