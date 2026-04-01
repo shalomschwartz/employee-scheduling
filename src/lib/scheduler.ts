@@ -19,17 +19,15 @@ export type ScheduleData = Record<Day, Record<ShiftKey, ShiftSlot>>;
 
 // Time-gap helpers (toMins, gapMins) are imported from @/lib/utils
 function shiftsOverlap(a: ShiftConfig, b: ShiftConfig): boolean {
-  // B starts before A ends, or A starts before B ends
   return gapMins(a.start, b.start) < gapMins(a.start, a.end)
       || gapMins(b.start, a.start) < gapMins(b.start, b.end);
 }
 function hasEnoughRest(si: number, assignedSi: number, shifts: ShiftConfig[], minRestMins: number): boolean {
   const a = shifts[si]; const b = shifts[assignedSi];
-  if (shiftsOverlap(a, b)) return false; // overlap = physically impossible
+  if (shiftsOverlap(a, b)) return false;
   return Math.min(gapMins(a.end, b.start), gapMins(b.end, a.start)) >= minRestMins;
 }
 
-// Fisher-Yates shuffle — breaks tie-breaking bias between runs
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -45,124 +43,141 @@ export function runScheduler(
   shifts: ShiftConfig[] = DEFAULT_SHIFTS,
   minRestHours: number = 7
 ): { schedule: ScheduleData; warnings: string[] } {
-  // Shuffle once so ties are broken randomly, not by DB order
   const pool = shuffle(employees);
-
-  // Track number of shifts assigned (not hours) for even distribution
   const shiftCounts: Record<string, number> = {};
   for (const emp of pool) shiftCounts[emp.id] = 0;
 
   const schedule = {} as ScheduleData;
   const warnings: string[] = [];
+  const minRestMins = minRestHours * 60;
 
   for (const day of DAYS) {
     schedule[day] = {} as Record<ShiftKey, ShiftSlot>;
-    // Track which shift indices each employee is assigned to this day (for rest/overlap enforcement)
+    // Tracks which shift indices each employee already has this day (for rest/overlap checks)
     const dayEmpShiftIdx: Record<string, Set<number>> = {};
 
+    // ── Seed pinned employees into every slot ────────────────────────────────
     for (const [si, shiftCfg] of shifts.entries()) {
       const shift = shiftCfg.id as ShiftKey;
       const pinnedIds = pinnedSlots[day]?.[shift] ?? [];
-
-      // Always include pinned employees first (manager overrides)
       const pinned = pinnedIds
         .map(id => pool.find(e => e.id === id))
         .filter(Boolean) as EmployeeForScheduling[];
-      const assigned: EmployeeForScheduling[] = [...pinned];
       for (const emp of pinned) {
         shiftCounts[emp.id] += 1;
         (dayEmpShiftIdx[emp.id] ??= new Set()).add(si);
       }
+      schedule[day][shift] = { employeeIds: pinned.map(e => e.id), understaffed: true };
+    }
 
-      // Role filter: if shift has a role, only employees with that role are eligible
+    // ── Shared helpers ───────────────────────────────────────────────────────
+    const softCap = () => {
+      const total = Object.values(shiftCounts).reduce((s, c) => s + c, 0);
+      return pool.length > 0 ? total / pool.length + 1 : 1;
+    };
+
+    const byShiftCount = (a: EmployeeForScheduling, b: EmployeeForScheduling) =>
+      shiftCounts[a.id] - shiftCounts[b.id];
+
+    // Build a ranked candidate list for a shift, excluding already-assigned ids.
+    // Returns null if a role-fallback warning was already emitted.
+    const getRanked = (
+      si: number,
+      shiftCfg: ShiftConfig,
+      excludeIds: Set<string>,
+      emitRoleWarning: boolean
+    ): EmployeeForScheduling[] => {
+      const shift = shiftCfg.id as ShiftKey;
       const shiftRole = shiftCfg.role?.trim();
-      const roleEligible = (emp: EmployeeForScheduling) =>
-        !shiftRole || emp.roles.includes(shiftRole);
-
-      const available: EmployeeForScheduling[] = [];
-      const preferNot: EmployeeForScheduling[] = [];
-
-      for (const emp of pool) {
-        if (pinnedIds.includes(emp.id)) continue;
-        // Hard cap: skip if employee has reached their contract shift limit
-        if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
-        // Rest check: skip if insufficient rest between this and any already-assigned shift today
+      const eligible = (emp: EmployeeForScheduling, ignoreRole = false) => {
+        if (excludeIds.has(emp.id)) return false;
+        if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) return false;
         const empShifts = dayEmpShiftIdx[emp.id];
-        if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, minRestHours * 60))) continue;
-        // Role check
-        if (!roleEligible(emp)) continue;
-        const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
-        if (val === "available") available.push(emp);
-        else if (val === "prefer_not") preferNot.push(emp);
-      }
+        if (empShifts && [...empShifts].some(aSi => !hasEnoughRest(si, aSi, shifts, minRestMins))) return false;
+        if (!ignoreRole && shiftRole && !emp.roles.includes(shiftRole)) return false;
+        return true;
+      };
 
-      // If role filter left nobody, fall back to all available employees and warn
-      const usedAvailable = available;
-      const usedPreferNot = preferNot;
-      if (shiftRole && usedAvailable.length === 0 && usedPreferNot.length === 0 && assigned.length === 0) {
-        warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים עם תפקיד "${shiftRole}"`);
-        // fallback: use all employees regardless of role
+      const bucket = (ignoreRole = false) => {
+        const avail: EmployeeForScheduling[] = [];
+        const pref: EmployeeForScheduling[] = [];
         for (const emp of pool) {
-          if (pinnedIds.includes(emp.id)) continue;
-          if (emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
-          const empShifts = dayEmpShiftIdx[emp.id];
-          if (empShifts && [...empShifts].some(assignedSi => !hasEnoughRest(si, assignedSi, shifts, minRestHours * 60))) continue;
+          if (!eligible(emp, ignoreRole)) continue;
           const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
-          if (val === "available") usedAvailable.push(emp);
-          else if (val === "prefer_not") usedPreferNot.push(emp);
+          if (val === "available") avail.push(emp);
+          else if (val === "prefer_not") pref.push(emp);
         }
+        return [...avail, ...pref];
+      };
+
+      let candidates = bucket();
+
+      // Role fallback: if no one qualifies by role, warn once then ignore role
+      if (shiftRole && candidates.length === 0) {
+        if (emitRoleWarning) {
+          warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים עם תפקיד "${shiftRole}"`);
+        }
+        candidates = bucket(true);
       }
 
-      // Compute current average shift count
-      const totalShifts = Object.values(shiftCounts).reduce((s, c) => s + c, 0);
-      const avgShifts = pool.length > 0 ? totalShifts / pool.length : 0;
-      const softCap = avgShifts + 1; // allow 1 above average before deprioritising
-
-      // Priority buckets (within each bucket, sort by fewest shifts first):
-      // 1. Under contract → highest priority
-      // 2. Below/at soft cap → normal
-      // 3. Above soft cap → deprioritized
-      const byShiftCount = (a: EmployeeForScheduling, b: EmployeeForScheduling) =>
-        shiftCounts[a.id] - shiftCounts[b.id];
-
-      const candidates = [...usedAvailable, ...usedPreferNot];
-
-      const underContract = candidates.filter(e =>
-        e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts
-      );
-      const belowCap = candidates.filter(e =>
-        !(e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts) &&
-        shiftCounts[e.id] <= softCap
-      );
-      const aboveCap = candidates.filter(e =>
-        !(e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts) &&
-        shiftCounts[e.id] > softCap
-      );
+      const cap = softCap();
+      const underContract = candidates.filter(e => e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts);
+      const belowCap = candidates.filter(e => !(e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts) && shiftCounts[e.id] <= cap);
+      const aboveCap  = candidates.filter(e => !(e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts) && shiftCounts[e.id] > cap);
 
       underContract.sort(byShiftCount);
       belowCap.sort(byShiftCount);
       aboveCap.sort(byShiftCount);
 
+      return [...underContract, ...belowCap, ...aboveCap];
+    };
+
+    const assign = (emp: EmployeeForScheduling, si: number, shift: ShiftKey) => {
+      schedule[day][shift].employeeIds.push(emp.id);
+      shiftCounts[emp.id] += 1;
+      (dayEmpShiftIdx[emp.id] ??= new Set()).add(si);
+    };
+
+    // ── Pass 1: coverage — guarantee at least 1 employee per shift ───────────
+    for (const [si, shiftCfg] of shifts.entries()) {
+      const shift = shiftCfg.id as ShiftKey;
+      if (schedule[day][shift].employeeIds.length >= 1) continue; // pinned already covered
+
+      const excludeIds = new Set(schedule[day][shift].employeeIds);
+      const ranked = getRanked(si, shiftCfg, excludeIds, true);
+      if (ranked.length > 0) assign(ranked[0], si, shift);
+    }
+
+    // ── Pass 2: fill — top-up each shift to minWorkers ───────────────────────
+    for (const [si, shiftCfg] of shifts.entries()) {
+      const shift = shiftCfg.id as ShiftKey;
       const minWorkers = shiftCfg.minWorkers ?? 2;
-      for (const emp of [...underContract, ...belowCap, ...aboveCap]) {
-        if (assigned.length >= minWorkers) break;
-        assigned.push(emp);
-        shiftCounts[emp.id] += 1;
-        (dayEmpShiftIdx[emp.id] ??= new Set()).add(si);
+      const current = schedule[day][shift].employeeIds;
+      if (current.length >= minWorkers) continue;
+
+      const excludeIds = new Set(current);
+      // Role warning already emitted in pass 1; suppress duplicate in pass 2
+      const ranked = getRanked(si, shiftCfg, excludeIds, false);
+      for (const emp of ranked) {
+        if (schedule[day][shift].employeeIds.length >= minWorkers) break;
+        if (schedule[day][shift].employeeIds.includes(emp.id)) continue;
+        assign(emp, si, shift);
       }
+    }
 
-      const understaffed = assigned.length < minWorkers;
+    // ── Finalise understaffed flags + warnings ───────────────────────────────
+    for (const shiftCfg of shifts) {
+      const shift = shiftCfg.id as ShiftKey;
+      const minWorkers = shiftCfg.minWorkers ?? 2;
+      const ids = schedule[day][shift].employeeIds;
+      const understaffed = ids.length < minWorkers;
+      schedule[day][shift] = { employeeIds: ids, understaffed };
 
-      if (assigned.length === 0) {
+      if (ids.length === 0) {
         warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים זמינים`);
       } else if (understaffed) {
-        warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${assigned.length}/${minWorkers} עובדים שובצו`);
+        warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: רק ${ids.length}/${minWorkers} עובדים שובצו`);
       }
-
-      schedule[day][shift] = {
-        employeeIds: assigned.map((e) => e.id),
-        understaffed,
-      };
     }
   }
 
