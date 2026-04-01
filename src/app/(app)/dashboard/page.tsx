@@ -850,7 +850,7 @@ export default function DashboardPage() {
                       const slot = scheduleData[day]?.[shift];
                       const names = slot?.employeeNames ?? [];
                       const isEditingThis = editingCell?.day === day && editingCell?.shift === shift;
-                      const shiftRole = shifts.find(s => s.id === shift)?.role?.trim();
+                      const shiftRole = shiftCfg?.role?.trim() || undefined;
                       const AVAIL_ORDER = { available: 0, prefer_not: 1, unavailable: 2 };
                       const availableToAdd = employees
                         .filter(e => !(slot?.employeeIds ?? []).includes(e.id))
