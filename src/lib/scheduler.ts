@@ -125,11 +125,27 @@ export function runScheduler(
       const belowCap = candidates.filter(e => !(e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts) && shiftCounts[e.id] <= cap);
       const aboveCap  = candidates.filter(e => !(e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts) && shiftCounts[e.id] > cap);
 
+      // Sort by shift count, then shuffle within tied groups for true randomness each run
       underContract.sort(byShiftCount);
       belowCap.sort(byShiftCount);
       aboveCap.sort(byShiftCount);
 
-      return [...underContract, ...belowCap, ...aboveCap];
+      const shuffleTied = (arr: EmployeeForScheduling[]) => {
+        let i = 0;
+        while (i < arr.length) {
+          let j = i + 1;
+          while (j < arr.length && shiftCounts[arr[j].id] === shiftCounts[arr[i].id]) j++;
+          // shuffle the tied slice in-place
+          for (let k = j - 1; k > i; k--) {
+            const r = i + Math.floor(Math.random() * (k - i + 1));
+            [arr[k], arr[r]] = [arr[r], arr[k]];
+          }
+          i = j;
+        }
+        return arr;
+      };
+
+      return [...shuffleTied(underContract), ...shuffleTied(belowCap), ...shuffleTied(aboveCap)];
     };
 
     const assign = (emp: EmployeeForScheduling, si: number, shift: ShiftKey) => {
