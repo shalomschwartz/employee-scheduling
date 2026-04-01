@@ -52,7 +52,6 @@ export function runScheduler(
   const minRestMins = minRestHours * 60;
 
   // dayEmpShiftIdx[day][empId] = Set of shift indices assigned that day
-  // Keyed by day so rest/overlap checks remain per-day
   const dayEmpShiftIdx: Record<string, Record<string, Set<number>>> = {};
 
   // ── Seed pinned employees into every slot ──────────────────────────────────
@@ -83,18 +82,22 @@ export function runScheduler(
   const byShiftCount = (a: EmployeeForScheduling, b: EmployeeForScheduling) =>
     shiftCounts[a.id] - shiftCounts[b.id];
 
-  // Build a ranked candidate list for a shift, excluding already-assigned ids.
-  // ignoreContract: true in pass 1 fallback so coverage is never blocked by contract caps.
+  // getRanked builds a ranked candidate list for a slot.
+  // ignoreContract: skip contract cap check (used as last resort).
+  // includeUnavailable: also include employees who marked this shift "unavailable"
+  //   (used only in pass 1's final fallback to guarantee at least 1 person per slot).
   const getRanked = (
     day: string,
     si: number,
     shiftCfg: ShiftConfig,
     excludeIds: Set<string>,
     emitRoleWarning: boolean,
-    ignoreContract = false
+    ignoreContract = false,
+    includeUnavailable = false
   ): EmployeeForScheduling[] => {
     const shift = shiftCfg.id as ShiftKey;
     const shiftRole = shiftCfg.role?.trim() || undefined;
+
     const eligible = (emp: EmployeeForScheduling, ignoreRole = false) => {
       if (excludeIds.has(emp.id)) return false;
       if (!ignoreContract && emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) return false;
@@ -107,13 +110,15 @@ export function runScheduler(
     const bucket = (ignoreRole = false) => {
       const avail: EmployeeForScheduling[] = [];
       const pref: EmployeeForScheduling[] = [];
+      const unavail: EmployeeForScheduling[] = [];
       for (const emp of pool) {
         if (!eligible(emp, ignoreRole)) continue;
         const val: AvailabilityOption = emp.constraints?.[day as Day]?.[shift] ?? "available";
         if (val === "available") avail.push(emp);
         else if (val === "prefer_not") pref.push(emp);
+        else if (includeUnavailable) unavail.push(emp);
       }
-      return [...avail, ...pref];
+      return [...avail, ...pref, ...unavail];
     };
 
     let candidates = bucket();
@@ -167,28 +172,31 @@ export function runScheduler(
   }
 
   // ── Global pass 1: coverage — guarantee at least 1 employee per shift ──────
-  // Shuffle pairs so no day is systematically favored when draining the pool
-  const shuffledPairs = shuffle(allPairs);
-  for (const { day, si, shiftCfg } of shuffledPairs) {
+  // Shuffle pairs so no day is systematically favored when draining the pool.
+  // Three-level fallback ensures coverage even in edge cases:
+  //   level 1 — respect contracts, skip unavailable
+  //   level 2 — ignore contracts, skip unavailable
+  //   level 3 — ignore contracts, include unavailable (last resort)
+  for (const { day, si, shiftCfg } of shuffle(allPairs)) {
     const shift = shiftCfg.id as ShiftKey;
-    if (schedule[day as Day][shift].employeeIds.length >= 1) continue; // pinned already covered
+    if (schedule[day as Day][shift].employeeIds.length >= 1) continue;
 
     const excludeIds = new Set(schedule[day as Day][shift].employeeIds);
-    // Try with contracts respected first; only ignore contracts as a last resort
-    let ranked = getRanked(day, si, shiftCfg, excludeIds, true, false);
-    if (ranked.length === 0) ranked = getRanked(day, si, shiftCfg, excludeIds, false, true);
+    let ranked = getRanked(day, si, shiftCfg, excludeIds, true,  false, false);
+    if (ranked.length === 0) ranked = getRanked(day, si, shiftCfg, excludeIds, false, true,  false);
+    if (ranked.length === 0) ranked = getRanked(day, si, shiftCfg, excludeIds, false, true,  true);
     if (ranked.length > 0) assign(ranked[0], day, si, shift);
   }
 
   // ── Global pass 2: fill — top-up each shift to minWorkers ─────────────────
-  for (const { day, si, shiftCfg } of allPairs) {
+  // Also shuffled so no day monopolises the pool when filling to minWorkers.
+  for (const { day, si, shiftCfg } of shuffle(allPairs)) {
     const shift = shiftCfg.id as ShiftKey;
     const minWorkers = shiftCfg.minWorkers ?? 2;
     const current = schedule[day as Day][shift].employeeIds;
     if (current.length >= minWorkers) continue;
 
     const excludeIds = new Set(current);
-    // Role warning already emitted in pass 1; suppress duplicate in pass 2
     const ranked = getRanked(day, si, shiftCfg, excludeIds, false);
     for (const emp of ranked) {
       if (schedule[day as Day][shift].employeeIds.length >= minWorkers) break;
