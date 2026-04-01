@@ -1172,18 +1172,24 @@ export default function DashboardPage() {
             <tbody>
               {shiftKeys.map((shift, si) => {
                 const shiftCfg = shifts.find(s => s.id === shift);
-                const pdfColors = ["#15803d","#ca8a04","#3730a3","#0369a1","#9d174d","#92400e"];
+                // Each shift row gets a distinct pastel background
+                const rowBgs   = ["#fef9c3","#dbeafe","#dcfce7","#fce7f3","#ede9fe","#ffedd5"];
+                const rowBorders = ["#fde047","#93c5fd","#86efac","#f9a8d4","#c4b5fd","#fdba74"];
+                const labelColors = ["#854d0e","#1e40af","#166534","#9d174d","#5b21b6","#9a3412"];
+                const rowBg     = rowBgs[si % rowBgs.length];
+                const rowBorder = rowBorders[si % rowBorders.length];
+                const labelColor = labelColors[si % labelColors.length];
                 return (
                   <tr key={shift}>
-                    <td style={{ padding: "12px", textAlign: "center", backgroundColor: "#dbeafe", border: "1.5px solid #60a5fa" }}>
-                      <span style={{ color: pdfColors[si % pdfColors.length], fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
+                    <td style={{ padding: "12px", textAlign: "center", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
+                      <span style={{ color: labelColor, fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
                       <br />
                       <span style={{ fontSize: "12px", color: "#9ca3af" }} dir="ltr">{shiftCfg?.start} – {shiftCfg?.end}</span>
                     </td>
                     {DAYS.map(day => {
                       const names = scheduleData[day]?.[shift]?.employeeNames ?? [];
                       return (
-                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle", border: "1.5px solid #93c5fd" }}>
+                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
                           {names.length === 0
                             ? <span style={{ color: "#d1d5db", fontSize: "13px" }}>—</span>
                             : names.map((name, ni) => (
