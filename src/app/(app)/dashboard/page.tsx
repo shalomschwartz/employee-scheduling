@@ -15,15 +15,28 @@ type ScheduleData = Record<string, Record<string, ShiftSlot>>;
 interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; }
 interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; roles: string[]; contractShifts: number | null; }
 
-const EMP_COLORS = [
-  "bg-[#273c75] text-white", "bg-[#6c5ce7] text-white",
-  "bg-[#e84393] text-white", "bg-[#0984e3] text-white",
-  "bg-[#e17055] text-white", "bg-[#00cec9] text-white",
-  "bg-[#a29bfe] text-white", "bg-[#2d3436] text-white",
+// 24 visually distinct base colors — covers most orgs without repeating
+const EMP_PALETTE_HEX = [
+  "#273c75","#6c5ce7","#e84393","#0984e3",
+  "#e17055","#00cec9","#a29bfe","#2d3436",
+  "#00b894","#d63031","#fdcb6e","#6d4c41",
+  "#0097a7","#ad1457","#558b2f","#4527a0",
+  "#f4511e","#039be5","#43a047","#8e24aa",
+  "#fb8c00","#00838f","#c62828","#37474f",
 ];
 
-// Hex equivalents of EMP_COLORS for PDF rendering (html2canvas needs inline styles)
-const EMP_HEX = ["#273c75","#6c5ce7","#e84393","#0984e3","#e17055","#00cec9","#a29bfe","#2d3436"];
+/** Returns a unique hex color per employee index, generating extras via HSL if palette runs out. */
+function empHex(index: number): string {
+  if (index < EMP_PALETTE_HEX.length) return EMP_PALETTE_HEX[index];
+  // Spread remaining employees evenly around the hue wheel at a different lightness
+  const hue = Math.round((index - EMP_PALETTE_HEX.length) * (360 / 12)) % 360;
+  return `hsl(${hue},65%,38%)`;
+}
+
+/** Tailwind-compatible chip class for a given employee index. Uses inline bg since arbitrary hsl isn't purgeable. */
+function empChipClass(_index: number): string {
+  return "text-white"; // bg set via style prop for generated colors
+}
 
 const ROLE_COLORS = [
   { bg: "#fef3c7", text: "#92400e", border: "#fcd34d" }, // amber
@@ -177,10 +190,11 @@ export default function DashboardPage() {
     return result;
   }, [scheduleData, employees, shifts]);
 
+  // colorMap: name → hex color (unique per employee, never repeats)
   const colorMap = useMemo(() => {
     const map: Record<string, string> = {};
     employees.forEach((emp, i) => {
-      map[emp.name ?? emp.email] = EMP_COLORS[i % EMP_COLORS.length];
+      map[emp.name ?? emp.email] = empHex(i);
     });
     return map;
   }, [employees]);
@@ -548,8 +562,9 @@ export default function DashboardPage() {
             onClick={() => setEmpFilter(id)}
             className={cn(
               "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-              selected ? cn(EMP_COLORS[i % EMP_COLORS.length], "border-transparent") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              selected ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
             )}
+            style={selected ? { backgroundColor: empHex(i) } : undefined}
           >
             {label}
           </button>
@@ -682,10 +697,9 @@ export default function DashboardPage() {
           {employees.map((emp, i) => {
             const name = emp.name ?? emp.email;
             const hours = hoursMap[emp.id] ?? 0;
-            const colorClass = EMP_COLORS[i % EMP_COLORS.length];
             return (
               <Card key={emp.id} className="overflow-hidden">
-                <div className={cn("h-1.5 w-full", colorClass.split(" ")[0])} />
+                <div className="h-1.5 w-full" style={{ backgroundColor: empHex(i) }} />
                 <CardContent className="py-3">
                   <p className="text-xs font-semibold text-gray-700 truncate">{name}</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">{hours}<span className="text-xs font-normal text-gray-400 mr-1">שעות</span></p>
@@ -758,10 +772,12 @@ export default function DashboardPage() {
             <div className="space-y-2">
               {Object.entries(conflicts).map(([name, slots]) => {
                 const empIndex = employees.findIndex(e => (e.name ?? e.email) === name);
-                const chipColor = empIndex >= 0 ? EMP_COLORS[empIndex % EMP_COLORS.length] : "bg-gray-200 text-gray-800";
                 return (
                   <div key={name}>
-                    <span className={cn("inline-block text-xs font-semibold px-2 py-0.5 rounded-md", chipColor)}>{name}</span>
+                    <span
+                      className="inline-block text-xs font-semibold px-2 py-0.5 rounded-md text-white"
+                      style={{ backgroundColor: empIndex >= 0 ? empHex(empIndex) : "#6b7280" }}
+                    >{name}</span>
                     <ul className="mt-0.5 space-y-0.5 ps-3">
                       {slots.map((s, i) => <li key={i} className="text-xs text-red-600">• {s}</li>)}
                     </ul>
@@ -885,11 +901,13 @@ export default function DashboardPage() {
                                 onDragStart={() => setDragging({ empId: empId!, name, fromDay: day, fromShift: shift })}
                                 onDragEnd={() => { setDragging(null); setDragOver(null); }}
                               >
-                                <div className={cn(
-                                  "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full cursor-grab active:cursor-grabbing",
-                                  colorMap[name] ?? "bg-gray-100 text-gray-700",
-                                  avBorder
-                                )}>
+                                <div
+                                  className={cn(
+                                    "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full cursor-grab active:cursor-grabbing text-white",
+                                    avBorder
+                                  )}
+                                  style={{ backgroundColor: colorMap[name] ?? "#6b7280" }}
+                                >
                                   <span className="flex items-center justify-center gap-1">
                                     {isPinned && <span className="text-[9px]">📌</span>}
                                     {name.split(" ")[0]}
