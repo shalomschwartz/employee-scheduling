@@ -850,10 +850,14 @@ export default function DashboardPage() {
                       const slot = scheduleData[day]?.[shift];
                       const names = slot?.employeeNames ?? [];
                       const isEditingThis = editingCell?.day === day && editingCell?.shift === shift;
+                      const shiftRole = shifts.find(s => s.id === shift)?.role?.trim();
                       const AVAIL_ORDER = { available: 0, prefer_not: 1, unavailable: 2 };
                       const availableToAdd = employees
                         .filter(e => !(slot?.employeeIds ?? []).includes(e.id))
                         .sort((a, b) => {
+                          const qualA = !shiftRole || a.roles.includes(shiftRole) ? 0 : 1;
+                          const qualB = !shiftRole || b.roles.includes(shiftRole) ? 0 : 1;
+                          if (qualA !== qualB) return qualA - qualB;
                           const av = a.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                           const bv = b.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                           return AVAIL_ORDER[av] - AVAIL_ORDER[bv];
@@ -933,21 +937,32 @@ export default function DashboardPage() {
                                 ) : availableToAdd.map(emp => {
                                   const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                                   const dot = av === "available" ? "bg-green-500" : av === "prefer_not" ? "bg-yellow-400" : "bg-red-600";
-                                  const label = av === "available" ? "זמין" : av === "prefer_not" ? "מעדיף לא" : "לא זמין";
+                                  const avLabel = av === "available" ? "זמין" : av === "prefer_not" ? "מעדיף לא" : "לא זמין";
+                                  const qualified = !shiftRole || emp.roles.includes(shiftRole);
                                   return (
                                     <button
                                       key={emp.id}
                                       onClick={() => addToSlot(emp, day, shift)}
-                                      className="flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
+                                      className={cn(
+                                        "flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs transition-colors border-b border-gray-50 last:border-0",
+                                        qualified ? "hover:bg-gray-50" : "bg-red-50 hover:bg-red-100"
+                                      )}
                                     >
                                       <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
                                       <span className="flex-1">
                                         <span className="block">{emp.name ?? emp.email}</span>
-                                        {emp.roles.length > 0 && (
-                                          <span className="text-[10px] text-purple-500">{emp.roles.join(", ")}</span>
-                                        )}
+                                        <span className="text-[10px] text-gray-400">{avLabel}</span>
                                       </span>
-                                      <span className="text-[10px] text-gray-400">{label}</span>
+                                      {shiftRole && (
+                                        <span className={cn(
+                                          "text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap",
+                                          qualified
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-red-100 text-red-600"
+                                        )}>
+                                          {qualified ? "מוסמך" : "לא מוסמך"}
+                                        </span>
+                                      )}
                                     </button>
                                   );
                                 })}
