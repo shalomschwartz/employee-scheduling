@@ -162,8 +162,10 @@ export function runScheduler(
       if (schedule[day][shift].employeeIds.length >= 1) continue; // pinned already covered
 
       const excludeIds = new Set(schedule[day][shift].employeeIds);
-      // ignoreContract=true: contract caps must not prevent coverage
-      const ranked = getRanked(si, shiftCfg, excludeIds, true, true);
+      // Try with contracts respected first; only ignore contracts as a last resort
+      // so an employee isn't pushed over their limit unless there is truly no one else
+      let ranked = getRanked(si, shiftCfg, excludeIds, true, false);
+      if (ranked.length === 0) ranked = getRanked(si, shiftCfg, excludeIds, false, true);
       if (ranked.length > 0) assign(ranked[0], si, shift);
     }
 
