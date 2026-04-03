@@ -173,16 +173,20 @@ export function runScheduler(
 
       const shiftRole = shiftCfg.role?.trim() || undefined;
 
-      // Try role-qualified candidates first, then fall back to any employee within contract.
-      // Contracts are always respected — if no one is within contract, the slot stays empty.
+      // Try role-qualified candidates (within contract) first.
       let ranked = findCandidates(day, si, shiftCfg, excludeIds, { ignoreContract: false, ignoreRole: false, includeUnavailable: false });
 
       if (ranked.length === 0 && shiftRole) {
-        // Role fallback: no one qualified for this role — warn once, then try all roles
-        if (emitWarning) {
-          warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים עם תפקיד "${shiftRole}"`);
+        // Only fall back to ignoring role if NO employee in the org has this role at all.
+        // If role-qualified employees exist but are over contract, leave the slot empty —
+        // don't assign someone unqualified just because the qualified ones are capped.
+        const anyoneWithRole = pool.some(e => e.roles.includes(shiftRole));
+        if (!anyoneWithRole) {
+          if (emitWarning) {
+            warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים עם תפקיד "${shiftRole}"`);
+          }
+          ranked = findCandidates(day, si, shiftCfg, excludeIds, { ignoreContract: false, ignoreRole: true, includeUnavailable: false });
         }
-        ranked = findCandidates(day, si, shiftCfg, excludeIds, { ignoreContract: false, ignoreRole: true, includeUnavailable: false });
       }
 
       if (ranked.length > 0) assign(ranked[0], day, si, shift);
