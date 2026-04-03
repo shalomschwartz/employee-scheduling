@@ -200,7 +200,9 @@ export function runScheduler(
       if (schedule[day as Day][shift].employeeIds.length >= minWorkers) continue;
 
       const excludeIds = new Set(schedule[day as Day][shift].employeeIds);
-      const ranked = getRanked(day, si, shiftCfg, excludeIds, false);
+      // Try respecting contracts first; fall back to ignoring them (same as pass 1)
+      let ranked = getRanked(day, si, shiftCfg, excludeIds, false, false, false);
+      if (ranked.length === 0) ranked = getRanked(day, si, shiftCfg, excludeIds, false, true, false);
       if (ranked.length > 0) {
         assign(ranked[0], day, si, shift);
         progress = true;
