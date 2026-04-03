@@ -171,25 +171,25 @@ export function runScheduler(
       const excludeIds = new Set(schedule[day as Day][shift].employeeIds);
       const emitWarning = pos === 0; // only warn on first position to avoid duplicates
 
-      // 4-level fallback
+      const shiftRole = shiftCfg.role?.trim() || undefined;
+
+      // Always try role-qualified candidates first
       let ranked = findCandidates(day, si, shiftCfg, excludeIds, { ignoreContract: false, ignoreRole: false, includeUnavailable: false });
 
-      if (ranked.length === 0) {
-        // Role fallback
-        const shiftRole = shiftCfg.role?.trim() || undefined;
-        if (shiftRole && emitWarning) {
+      if (ranked.length === 0 && shiftRole) {
+        // Role fallback (warn once per shift)
+        if (emitWarning) {
           warnings.push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}: אין עובדים עם תפקיד "${shiftRole}"`);
         }
         ranked = findCandidates(day, si, shiftCfg, excludeIds, { ignoreContract: false, ignoreRole: true, includeUnavailable: false });
       }
 
-      if (ranked.length === 0) {
-        // Contract fallback
+      // Contract and unavailability fallbacks only for coverage (pos===0).
+      // For fill positions (pos>=1) contracts are hard limits.
+      if (ranked.length === 0 && pos === 0) {
         ranked = findCandidates(day, si, shiftCfg, excludeIds, { ignoreContract: true, ignoreRole: true, includeUnavailable: false });
       }
-
-      if (ranked.length === 0) {
-        // Last resort: include unavailable employees
+      if (ranked.length === 0 && pos === 0) {
         ranked = findCandidates(day, si, shiftCfg, excludeIds, { ignoreContract: true, ignoreRole: true, includeUnavailable: true });
       }
 
