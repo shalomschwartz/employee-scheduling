@@ -1157,16 +1157,16 @@ export default function DashboardPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "white", border: "2px solid #60a5fa" }}>
             <thead>
               <tr>
-                <th style={{ padding: "12px", textAlign: "center", backgroundColor: "#1e3a5f", border: "1.5px solid #1e3a5f", fontWeight: "700", fontSize: "14px", width: "110px", color: "#ffffff" }}>
+                <th style={{ padding: "12px", textAlign: "center", backgroundColor: "#bfdbfe", border: "1.5px solid #60a5fa", fontWeight: "700", fontSize: "14px", width: "110px", color: "#1e40af" }}>
                   משמרת
                 </th>
                 {DAYS.map((day, di) => {
                   const date = format(addDays(weekStart, di), "d/M");
                   return (
-                    <th key={day} style={{ padding: "12px", textAlign: "center", backgroundColor: "#1e3a5f", border: "1.5px solid #1e3a5f", fontWeight: "700" }}>
-                      <span style={{ fontSize: "14px", color: "#ffffff" }}>{DAY_LABELS_HE[day as Day]}</span>
+                    <th key={day} style={{ padding: "12px", textAlign: "center", backgroundColor: "#bfdbfe", border: "1.5px solid #60a5fa", fontWeight: "700" }}>
+                      <span style={{ fontSize: "14px", color: "#1e40af" }}>{DAY_LABELS_HE[day as Day]}</span>
                       <br />
-                      <span style={{ fontSize: "12px", color: "#93c5fd", fontWeight: "normal" }}>{date}</span>
+                      <span style={{ fontSize: "12px", color: "#3b82f6", fontWeight: "normal" }}>{date}</span>
                     </th>
                   );
                 })}
