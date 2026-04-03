@@ -1187,6 +1187,12 @@ export default function DashboardPage() {
                     <td style={{ padding: "12px", textAlign: "center", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
                       <span style={{ color: labelColor, fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
                       <br />
+                      {shiftCfg?.role?.trim() && (
+                        <>
+                          <span style={{ fontSize: "11px", fontWeight: "600", color: labelColor, opacity: 0.8 }}>{shiftCfg.role}</span>
+                          <br />
+                        </>
+                      )}
                       <span style={{ fontSize: "12px", color: "#9ca3af" }} dir="ltr">{shiftCfg?.start} – {shiftCfg?.end}</span>
                     </td>
                     {DAYS.map(day => {
