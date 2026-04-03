@@ -1157,16 +1157,16 @@ export default function DashboardPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "white", border: "2px solid #60a5fa" }}>
             <thead>
               <tr>
-                <th style={{ padding: "12px", textAlign: "center", backgroundColor: "#dbeafe", border: "1.5px solid #60a5fa", fontWeight: "700", fontSize: "14px", width: "110px" }}>
+                <th style={{ padding: "12px", textAlign: "center", backgroundColor: "#1e3a5f", border: "1.5px solid #1e3a5f", fontWeight: "700", fontSize: "14px", width: "110px", color: "#ffffff" }}>
                   משמרת
                 </th>
                 {DAYS.map((day, di) => {
                   const date = format(addDays(weekStart, di), "d/M");
                   return (
-                    <th key={day} style={{ padding: "12px", textAlign: "center", backgroundColor: "#dbeafe", border: "1.5px solid #60a5fa", fontWeight: "700" }}>
-                      <span style={{ fontSize: "14px", color: "#111827" }}>{DAY_LABELS_HE[day as Day]}</span>
+                    <th key={day} style={{ padding: "12px", textAlign: "center", backgroundColor: "#1e3a5f", border: "1.5px solid #1e3a5f", fontWeight: "700" }}>
+                      <span style={{ fontSize: "14px", color: "#ffffff" }}>{DAY_LABELS_HE[day as Day]}</span>
                       <br />
-                      <span style={{ fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>{date}</span>
+                      <span style={{ fontSize: "12px", color: "#93c5fd", fontWeight: "normal" }}>{date}</span>
                     </th>
                   );
                 })}
@@ -1175,9 +1175,9 @@ export default function DashboardPage() {
             <tbody>
               {(() => {
                 // Shift label column: same-role shifts share the same color
-                const rowBgs     = ["#fef9c3","#dbeafe","#dcfce7","#fce7f3","#ede9fe","#ffedd5"];
-                const rowBorders = ["#fde047","#93c5fd","#86efac","#f9a8d4","#c4b5fd","#fdba74"];
-                const labelColors = ["#854d0e","#1e40af","#166534","#9d174d","#5b21b6","#9a3412"];
+                const rowBgs     = ["#fef9c3","#dcfce7","#fce7f3","#ede9fe","#ffedd5","#fef3c7"];
+                const rowBorders = ["#fde047","#86efac","#f9a8d4","#c4b5fd","#fdba74","#fcd34d"];
+                const labelColors = ["#854d0e","#166534","#9d174d","#5b21b6","#9a3412","#92400e"];
                 const roleColorIdx: Record<string, number> = {};
                 let nextIdx = 0;
                 shiftKeys.forEach(s => {
