@@ -947,7 +947,9 @@ export default function DashboardPage() {
                                       <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
                                       <span className="flex-1">
                                         <span className="block">{emp.name ?? emp.email}</span>
-                                        <span className="text-[10px] text-gray-400">{avLabel}</span>
+                                        <span className="text-[10px] text-gray-400">
+                                          {emp.roles.length > 0 ? emp.roles.join(", ") : "ללא תפקיד"}{" · "}{avLabel}
+                                        </span>
                                       </span>
                                     </button>
                                   );
