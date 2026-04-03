@@ -189,19 +189,22 @@ export function runScheduler(
   }
 
   // ── Global pass 2: fill — top-up each shift to minWorkers ─────────────────
-  // Also shuffled so no day monopolises the pool when filling to minWorkers.
-  for (const { day, si, shiftCfg } of shuffle(allPairs)) {
-    const shift = shiftCfg.id as ShiftKey;
-    const minWorkers = shiftCfg.minWorkers ?? 2;
-    const current = schedule[day as Day][shift].employeeIds;
-    if (current.length >= minWorkers) continue;
+  // Round-robin: add ONE employee per slot per round so no slot can drain the
+  // pool before other slots have had a chance to receive their second employee.
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const { day, si, shiftCfg } of shuffle(allPairs)) {
+      const shift = shiftCfg.id as ShiftKey;
+      const minWorkers = shiftCfg.minWorkers ?? 2;
+      if (schedule[day as Day][shift].employeeIds.length >= minWorkers) continue;
 
-    const excludeIds = new Set(current);
-    const ranked = getRanked(day, si, shiftCfg, excludeIds, false);
-    for (const emp of ranked) {
-      if (schedule[day as Day][shift].employeeIds.length >= minWorkers) break;
-      if (schedule[day as Day][shift].employeeIds.includes(emp.id)) continue;
-      assign(emp, day, si, shift);
+      const excludeIds = new Set(schedule[day as Day][shift].employeeIds);
+      const ranked = getRanked(day, si, shiftCfg, excludeIds, false);
+      if (ranked.length > 0) {
+        assign(ranked[0], day, si, shift);
+        progress = true;
+      }
     }
   }
 
