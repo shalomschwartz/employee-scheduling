@@ -1173,15 +1173,25 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {shiftKeys.map((shift, si) => {
-                const shiftCfg = shifts.find(s => s.id === shift);
-                // Each shift row gets a distinct pastel background
-                const rowBgs   = ["#fef9c3","#dbeafe","#dcfce7","#fce7f3","#ede9fe","#ffedd5"];
+              {(() => {
+                // Build role→colorIndex map so same-role shifts share the same color
+                const rowBgs     = ["#fef9c3","#dbeafe","#dcfce7","#fce7f3","#ede9fe","#ffedd5"];
                 const rowBorders = ["#fde047","#93c5fd","#86efac","#f9a8d4","#c4b5fd","#fdba74"];
                 const labelColors = ["#854d0e","#1e40af","#166534","#9d174d","#5b21b6","#9a3412"];
-                const rowBg     = rowBgs[si % rowBgs.length];
-                const rowBorder = rowBorders[si % rowBorders.length];
-                const labelColor = labelColors[si % labelColors.length];
+                const roleColorIdx: Record<string, number> = {};
+                let nextIdx = 0;
+                shiftKeys.forEach(s => {
+                  const cfg = shifts.find(x => x.id === s);
+                  const key = cfg?.role?.trim() || `__${s}`;
+                  if (!(key in roleColorIdx)) roleColorIdx[key] = nextIdx++;
+                });
+                return shiftKeys.map((shift) => {
+                const shiftCfg = shifts.find(s => s.id === shift);
+                const colorKey = shiftCfg?.role?.trim() || `__${shift}`;
+                const ci = roleColorIdx[colorKey] ?? 0;
+                const rowBg      = rowBgs[ci % rowBgs.length];
+                const rowBorder  = rowBorders[ci % rowBorders.length];
+                const labelColor = labelColors[ci % labelColors.length];
                 return (
                   <tr key={shift}>
                     <td style={{ padding: "12px", textAlign: "center", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
@@ -1211,7 +1221,7 @@ export default function DashboardPage() {
                     })}
                   </tr>
                 );
-              })}
+              }); })()}
             </tbody>
           </table>
 
