@@ -26,11 +26,8 @@ export async function GET(): Promise<NextResponse> {
   const rawShifts = Array.isArray(settings.shifts) ? (settings.shifts as ShiftConfig[]) : DEFAULT_SHIFTS;
   const legacyMin = typeof settings.minPerShift === "number" ? settings.minPerShift : 2;
 
-  const toMins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-  // Backfill minWorkers for shifts saved before per-shift counts were introduced
-  const shifts = [...rawShifts]
-    .map(s => ({ ...s, minWorkers: s.minWorkers ?? legacyMin }))
-    .sort((a, b) => toMins(a.start) - toMins(b.start));
+  // Backfill minWorkers. Preserve saved order — do NOT sort; manager may have a custom ordering.
+  const shifts = rawShifts.map(s => ({ ...s, minWorkers: s.minWorkers ?? legacyMin }));
 
   return NextResponse.json({ shifts });
 }

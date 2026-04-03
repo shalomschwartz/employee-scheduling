@@ -86,6 +86,8 @@ export default function DashboardPage() {
 
   // Drag and drop
   const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: string } | null>(null);
+  const [draggingRow, setDraggingRow] = useState<string | null>(null);
+  const [dragOverRow, setDragOverRow] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<{ day: string; shift: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
@@ -435,6 +437,19 @@ export default function DashboardPage() {
       return;
     }
     doMove();
+  }
+
+  function handleRowDrop(toShiftId: string) {
+    setDragOverRow(null);
+    if (!draggingRow || draggingRow === toShiftId) { setDraggingRow(null); return; }
+    const newShifts = [...shifts];
+    const fromIdx = newShifts.findIndex(s => s.id === draggingRow);
+    const toIdx = newShifts.findIndex(s => s.id === toShiftId);
+    const [moved] = newShifts.splice(fromIdx, 1);
+    newShifts.splice(toIdx, 0, moved);
+    setShifts(newShifts);
+    setDraggingRow(null);
+    fetch("/api/shifts", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shifts: newShifts }) });
   }
 
   async function executePdfDownload() {
@@ -823,9 +838,20 @@ export default function DashboardPage() {
                   const shiftCfg = shifts.find(s => s.id === shift);
                   const dotColors = ["bg-yellow-400","bg-orange-400","bg-indigo-400","bg-blue-400","bg-pink-400"];
                   return (
-                  <tr key={shift} className="border-b-2 border-gray-300 last:border-0">
+                  <tr
+                    key={shift}
+                    className={cn("border-b-2 border-gray-300 last:border-0 transition-opacity", draggingRow === shift && "opacity-40")}
+                    draggable
+                    onDragStart={() => setDraggingRow(shift)}
+                    onDragEnd={() => { setDraggingRow(null); setDragOverRow(null); }}
+                    onDragOver={e => { e.preventDefault(); setDragOverRow(shift); }}
+                    onDragLeave={() => setDragOverRow(null)}
+                    onDrop={() => handleRowDrop(shift)}
+                    style={dragOverRow === shift && draggingRow !== shift ? { outline: "2px solid #6366f1", outlineOffset: "-2px" } : undefined}
+                  >
                     <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-gray-300">
                       <div className="flex items-center gap-2">
+                        <span className="text-gray-300 cursor-grab active:cursor-grabbing select-none text-base leading-none" title="גרור לסידור מחדש">⠿</span>
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
