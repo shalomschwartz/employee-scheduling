@@ -163,7 +163,10 @@ export function runScheduler(
   for (let pos = 0; pos < maxPos; pos++) {
     for (const { day, si, shiftCfg } of shuffle(allPairs)) {
       const shift = shiftCfg.id as ShiftKey;
-      if (schedule[day as Day][shift].employeeIds.length > pos) continue;
+      const minWorkers = shiftCfg.minWorkers ?? 2;
+      const currentCount = schedule[day as Day][shift].employeeIds.length;
+      if (currentCount >= minWorkers) continue; // already fully staffed — never over-fill
+      if (currentCount > pos) continue;          // already ahead of this position
 
       const excludeIds = new Set(schedule[day as Day][shift].employeeIds);
       const emitWarning = pos === 0; // only warn on first position to avoid duplicates
