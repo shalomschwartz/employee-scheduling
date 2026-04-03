@@ -1185,9 +1185,6 @@ export default function DashboardPage() {
                   const key = cfg?.role?.trim() || `__${s}`;
                   if (!(key in roleColorIdx)) roleColorIdx[key] = nextIdx++;
                 });
-                // Day columns: each day gets a unique color (7 distinct pastels)
-                const dayBgs     = ["#fef9c3","#dcfce7","#ede9fe","#fce7f3","#dbeafe","#ffedd5","#fef3c7"];
-                const dayBorders = ["#fde047","#86efac","#c4b5fd","#f9a8d4","#93c5fd","#fdba74","#fcd34d"];
                 return shiftKeys.map((shift) => {
                 const shiftCfg = shifts.find(s => s.id === shift);
                 const colorKey = shiftCfg?.role?.trim() || `__${shift}`;
@@ -1208,12 +1205,10 @@ export default function DashboardPage() {
                       )}
                       <span style={{ fontSize: "12px", color: "#9ca3af" }} dir="ltr">{shiftCfg?.start} – {shiftCfg?.end}</span>
                     </td>
-                    {DAYS.map((day, di) => {
+                    {DAYS.map((day) => {
                       const names = scheduleData[day]?.[shift]?.employeeNames ?? [];
-                      const dayBg = dayBgs[di % dayBgs.length];
-                      const dayBorder = dayBorders[di % dayBorders.length];
                       return (
-                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle", backgroundColor: dayBg, border: `1.5px solid ${dayBorder}` }}>
+                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
                           {names.length === 0
                             ? <span style={{ color: "#d1d5db", fontSize: "13px" }}>—</span>
                             : names.map((name, ni) => (
