@@ -1174,7 +1174,7 @@ export default function DashboardPage() {
             </thead>
             <tbody>
               {(() => {
-                // Build role→colorIndex map so same-role shifts share the same color
+                // Shift label column: same-role shifts share the same color
                 const rowBgs     = ["#fef9c3","#dbeafe","#dcfce7","#fce7f3","#ede9fe","#ffedd5"];
                 const rowBorders = ["#fde047","#93c5fd","#86efac","#f9a8d4","#c4b5fd","#fdba74"];
                 const labelColors = ["#854d0e","#1e40af","#166534","#9d174d","#5b21b6","#9a3412"];
@@ -1185,6 +1185,9 @@ export default function DashboardPage() {
                   const key = cfg?.role?.trim() || `__${s}`;
                   if (!(key in roleColorIdx)) roleColorIdx[key] = nextIdx++;
                 });
+                // Day columns: each day gets a unique color (7 distinct pastels)
+                const dayBgs     = ["#fef9c3","#dcfce7","#ede9fe","#fce7f3","#dbeafe","#ffedd5","#fef3c7"];
+                const dayBorders = ["#fde047","#86efac","#c4b5fd","#f9a8d4","#93c5fd","#fdba74","#fcd34d"];
                 return shiftKeys.map((shift) => {
                 const shiftCfg = shifts.find(s => s.id === shift);
                 const colorKey = shiftCfg?.role?.trim() || `__${shift}`;
@@ -1205,10 +1208,12 @@ export default function DashboardPage() {
                       )}
                       <span style={{ fontSize: "12px", color: "#9ca3af" }} dir="ltr">{shiftCfg?.start} – {shiftCfg?.end}</span>
                     </td>
-                    {DAYS.map(day => {
+                    {DAYS.map((day, di) => {
                       const names = scheduleData[day]?.[shift]?.employeeNames ?? [];
+                      const dayBg = dayBgs[di % dayBgs.length];
+                      const dayBorder = dayBorders[di % dayBorders.length];
                       return (
-                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
+                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle", backgroundColor: dayBg, border: `1.5px solid ${dayBorder}` }}>
                           {names.length === 0
                             ? <span style={{ color: "#d1d5db", fontSize: "13px" }}>—</span>
                             : names.map((name, ni) => (
