@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Heebo } from "next/font/google";
+import { Heebo, Manrope } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const heebo = Heebo({ subsets: ["latin", "hebrew"] });
+const heebo = Heebo({ subsets: ["latin", "hebrew"], variable: "--font-heebo" });
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", weight: ["400","600","700","800"] });
 
 export const metadata: Metadata = {
   title: {
@@ -37,7 +38,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="he" dir="rtl" className="h-full">
-      <body className={`${heebo.className} h-full`}>
+      <body className={`${heebo.variable} ${manrope.variable} ${heebo.className} h-full`}>
         <Providers>{children}</Providers>
       </body>
     </html>

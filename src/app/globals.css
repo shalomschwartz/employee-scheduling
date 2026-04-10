@@ -4,22 +4,31 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 214 100% 98%;
+    --foreground: 210 98% 11%;
   }
 
   * {
-    @apply border-gray-200;
+    @apply border-surface-high;
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-surface text-navy antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3 {
+    font-family: "Manrope", "Heebo", sans-serif;
+    font-weight: 800;
   }
 }
 
 @layer utilities {
   .touch-manipulation {
     touch-action: manipulation;
+  }
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 }
