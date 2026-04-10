@@ -364,7 +364,15 @@ export default function DashboardPage() {
     const availability = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
     const shiftCfgForAdd = shifts.find(s => s.id === shift);
     const shiftRole = shiftCfgForAdd?.role?.trim();
+
+    // Count how many shifts this employee is already assigned to this week
+    const weekShiftCount = scheduleData
+      ? Object.values(scheduleData).flatMap(d => Object.values(d)).filter(s => s.employeeIds.includes(emp.id)).length
+      : 0;
+
     const warnings: string[] = [];
+    if (emp.contractShifts != null && emp.contractShifts > 0 && weekShiftCount >= emp.contractShifts)
+      warnings.push(`${name} כבר מגיע/ה ל-${emp.contractShifts} משמרות לפי החוזה (כרגע: ${weekShiftCount})`);
     if (shiftRole && !emp.roles.includes(shiftRole)) warnings.push(`${name} אינו/ה מוגדר/ת לתפקיד "${shiftRole}"`);
     if (availability === "unavailable") warnings.push(`${name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
     if (hasOverlapConflict(emp.id, day, shift)) warnings.push(`${name} כבר משובץ/ת במשמרת חופפת באותו יום`);
@@ -426,7 +434,13 @@ export default function DashboardPage() {
 
     const availability = emp?.constraints[0]?.data?.[toDay as Day]?.[toShift] ?? "available";
     const toShiftRole = shifts.find(s => s.id === toShift)?.role?.trim();
+    const dragWeekCount = scheduleData
+      ? Object.values(scheduleData).flatMap(d => Object.values(d)).filter(s => s.employeeIds.includes(dragging.empId)).length
+      : 0;
+    const dragEmp = empMap[dragging.empId];
     const dragWarnings: string[] = [];
+    if (dragEmp?.contractShifts != null && dragEmp.contractShifts > 0 && dragWeekCount > dragEmp.contractShifts)
+      dragWarnings.push(`${dragging.name} כבר מגיע/ה ל-${dragEmp.contractShifts} משמרות לפי החוזה (כרגע: ${dragWeekCount})`);
     if (toShiftRole && !emp?.roles.includes(toShiftRole)) dragWarnings.push(`${dragging.name} אינו/ה מוגדר/ת לתפקיד "${toShiftRole}"`);
     if (availability === "unavailable") dragWarnings.push(`${dragging.name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
     if (hasOverlapConflict(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} כבר משובץ/ת במשמרת חופפת באותו יום`);
