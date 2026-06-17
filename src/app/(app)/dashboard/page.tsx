@@ -616,7 +616,7 @@ export default function DashboardPage() {
 
   function handleWhatsApp() {
     if (!scheduleData) return;
-    const WA_URL = "https://web.whatsapp.com/";
+    const WA_URL = `https://wa.me/?text=${encodeURIComponent(`סידור עבודה לשבוע ${weekLabel} מצורף`)}`;
     const downloadConflicts = getDownloadConflicts();
     if (downloadConflicts.length > 0) {
       // onIgnore runs inside a user click → window.open won't be blocked
@@ -1120,7 +1120,7 @@ export default function DashboardPage() {
                                 {/* Remove button */}
                                 <button
                                   onClick={e => { e.stopPropagation(); removeFromSlot(day, shift, ni); }}
-                                  className="absolute -top-1.5 -start-1.5 w-5 h-5 rounded-full bg-surface-white dark:bg-white/[0.04] border border-surface-high dark:border-white/[0.08] hover:bg-danger-500 hover:border-danger-500 text-navy-muted dark:text-slate-400 hover:text-white flex items-center justify-center z-10 transition-colors opacity-0 group-hover:opacity-100 shadow-xs"
+                                  className="absolute -top-1.5 -start-1.5 w-5 h-5 rounded-full bg-surface-white dark:bg-white/[0.04] border border-surface-high dark:border-white/[0.08] hover:bg-danger-500 hover:border-danger-500 text-navy-muted dark:text-slate-400 hover:text-white flex items-center justify-center z-10 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 shadow-xs"
                                   title="הסר ממשמרת"
                                 >
                                   <X className="w-3 h-3" />
