@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getNextWeekStart, DEFAULT_SHIFTS, toMins, type ShiftConfig } from "@/lib/utils";
 import { runScheduler, type EmployeeForScheduling } from "@/lib/scheduler";
-import type { ShiftType } from "@prisma/client";
+import type { ShiftType, Prisma } from "@prisma/client";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -97,8 +97,7 @@ export async function POST(req: NextRequest) {
   // via a DB migration. The authoritative schedule is always the JSON in GeneratedSchedule.schedule.
   try {
     const VALID_SHIFT_TYPES = new Set<string>(["MORNING", "AFTERNOON", "EVENING"]);
-    await prisma.shift.deleteMany({ where: { scheduleId: saved.id } });
-    const shiftRows = [];
+    const shiftRows: Prisma.ShiftCreateManyInput[] = [];
     for (const [day, dayData] of Object.entries(rawSchedule)) {
       for (const [shiftType, slot] of Object.entries(dayData)) {
         if (!VALID_SHIFT_TYPES.has(shiftType)) continue;
@@ -115,7 +114,11 @@ export async function POST(req: NextRequest) {
         }
       }
     }
-    if (shiftRows.length > 0) await prisma.shift.createMany({ data: shiftRows });
+    // Delete + recreate atomically so the Shift table never sits half-updated.
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.shift.deleteMany({ where: { scheduleId: saved.id } });
+      if (shiftRows.length > 0) await tx.shift.createMany({ data: shiftRows });
+    });
   } catch {
     // Non-critical — schedule JSON is already saved above
   }

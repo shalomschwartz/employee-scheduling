@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import type { Session } from "next-auth";
 import { DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
 
-async function getOrgId(session: Awaited<ReturnType<typeof getServerSession>>) {
+async function getOrgId(session: Session | null) {
   if (!session?.user.organizationId) return null;
   return session.user.organizationId;
 }
@@ -46,12 +48,14 @@ export async function PUT(req: NextRequest) {
   if (!Array.isArray(shifts) || shifts.length === 0)
     return NextResponse.json({ error: "נדרשת לפחות משמרת אחת" }, { status: 400 });
 
-  const org = await prisma.organization.findUnique({ where: { id: orgId } });
-  const current = (org?.settings ?? {}) as Record<string, unknown>;
-
-  await prisma.organization.update({
-    where: { id: orgId },
-    data: { settings: { ...current, shifts } },
+  // Read + merge + write in one transaction so concurrent settings writes don't clobber each other.
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const org = await tx.organization.findUnique({ where: { id: orgId } });
+    const current = (org?.settings ?? {}) as Record<string, unknown>;
+    await tx.organization.update({
+      where: { id: orgId },
+      data: { settings: { ...current, shifts } as unknown as Prisma.InputJsonValue },
+    });
   });
 
   return NextResponse.json({ shifts });

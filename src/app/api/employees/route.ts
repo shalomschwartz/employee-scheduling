@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 type EmpSettings = { roles?: string[]; contractShifts?: number | null };
 
@@ -76,21 +77,27 @@ export async function PATCH(req: NextRequest) {
   if (contractShifts !== undefined && contractShifts !== null && (typeof contractShifts !== "number" || !Number.isInteger(contractShifts) || contractShifts < 0))
     return NextResponse.json({ error: "ערך חוזה לא תקין" }, { status: 400 });
 
-  const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
-  if (!org) return NextResponse.json({ error: "ארגון לא נמצא" }, { status: 404 });
+  // IDOR guard: only allow writing settings for an employee in this manager's org.
+  const emp = await prisma.user.findFirst({
+    where: { id, organizationId: session.user.organizationId },
+    select: { id: true },
+  });
+  if (!emp) return NextResponse.json({ error: "לא נמצא" }, { status: 404 });
 
-  const current = (org.settings ?? {}) as Record<string, unknown>;
-  const empSettings = (current.employeeSettings ?? {}) as Record<string, EmpSettings>;
-
-  empSettings[id] = {
-    ...empSettings[id],
-    ...(roles !== undefined ? { roles } : {}),
-    ...(contractShifts !== undefined ? { contractShifts } : {}),
-  };
-
-  await prisma.organization.update({
-    where: { id: session.user.organizationId },
-    data: { settings: { ...current, employeeSettings: empSettings } },
+  // Read + merge + write settings atomically.
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const org = await tx.organization.findUnique({ where: { id: session.user.organizationId! } });
+    const current = (org?.settings ?? {}) as Record<string, unknown>;
+    const empSettings = (current.employeeSettings ?? {}) as Record<string, EmpSettings>;
+    empSettings[id] = {
+      ...empSettings[id],
+      ...(roles !== undefined ? { roles } : {}),
+      ...(contractShifts !== undefined ? { contractShifts } : {}),
+    };
+    await tx.organization.update({
+      where: { id: session.user.organizationId! },
+      data: { settings: { ...current, employeeSettings: empSettings } },
+    });
   });
 
   return NextResponse.json({ ok: true });
