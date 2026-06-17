@@ -111,6 +111,8 @@ export default function DashboardPage() {
     return localStorage.getItem("shiftsync_guide_open") === "true";
   });
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [showTeam, setShowTeam] = useState(false);
+  const [showAvailDetail, setShowAvailDetail] = useState(false);
 
   // Hidden print-calendar ref for PDF capture
   const printRef = useRef<HTMLDivElement>(null);
@@ -636,7 +638,6 @@ export default function DashboardPage() {
   }
 
 
-  const submitted = employees.filter(e => e.constraints.length > 0).length;
   const shiftKeys = shifts.map(s => s.id);
 
   const filterBar = (
@@ -678,7 +679,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {showWelcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWelcome(false)}>
           <div className="bg-surface-white rounded-2xl shadow-lg px-10 py-8 flex flex-col items-center gap-3 mx-6">
@@ -689,7 +690,7 @@ export default function DashboardPage() {
       )}
 
       {/* Guide */}
-      <div className="rounded-xl border-2 border-blue-200 bg-blue-50 text-sm text-navy">
+      <div className="rounded-xl border border-surface-high bg-surface-white text-sm text-navy-muted shadow-card">
         <button
           onClick={() => {
             const next = !showGuide;
@@ -698,7 +699,7 @@ export default function DashboardPage() {
           }}
           className="w-full flex items-center justify-between px-4 py-3 text-right"
         >
-          <span className="font-bold text-blue-800 text-base">איך ShiftSync עובד</span>
+          <span className="font-semibold text-navy-muted text-sm">איך ShiftSync עובד</span>
           <ChevronDown className={cn("w-5 h-5 text-blue-400 transition-transform", showGuide && "rotate-180")} />
         </button>
         {showGuide && (
@@ -769,38 +770,15 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Submission status */}
+      {/* Team detail (collapsible) */}
       {!loading && employees.length > 0 && (
-        <Card>
-          <CardContent className="py-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-navy">הגשת זמינות</p>
-              <p className="text-xs text-navy-muted/70">{submitted}/{employees.length} הגישו</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {employees.map(emp => {
-                const hasSent = emp.constraints.length > 0;
-                const name = (emp.name ?? emp.email).split(" ")[0];
-                return (
-                  <div key={emp.id} className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border",
-                    hasSent
-                      ? "bg-green-50 border-green-300 text-green-700"
-                      : "bg-red-50 border-red-300 text-red-600"
-                  )}>
-                    {hasSent ? <CircleCheck className="w-4 h-4 flex-shrink-0" /> : <X className="w-4 h-4 flex-shrink-0" />}
-                    <span>{name}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Employee hours cards */}
-      {!loading && employees.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="rounded-2xl border border-surface-high bg-surface-white shadow-card overflow-hidden">
+          <button onClick={() => setShowTeam(v => !v)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-low transition-colors">
+            <span className="flex items-center gap-2 text-sm font-semibold text-navy"><Users className="w-4 h-4 text-brand-500" /> פרטי צוות</span>
+            <ChevronDown className={cn("w-5 h-5 text-navy-muted transition-transform", showTeam && "rotate-180")} />
+          </button>
+          {showTeam && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 px-4 pb-4">
           {employees.map((emp, i) => {
             const name = emp.name ?? emp.email;
             const hours = hoursMap[emp.id] ?? 0;
@@ -843,6 +821,8 @@ export default function DashboardPage() {
               </Card>
             );
           })}
+          </div>
+          )}
         </div>
       )}
 
@@ -1180,10 +1160,13 @@ export default function DashboardPage() {
       {!loading && employees.length > 0 && (
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="font-semibold text-sm text-navy">זמינות עובדים</h2>
-              {filterBar}
-            </div>
+            <button onClick={() => setShowAvailDetail(v => !v)} className="w-full flex items-center justify-between">
+              <h2 className="font-semibold text-sm text-navy flex items-center gap-2"><LayoutGrid className="w-4 h-4 text-brand-500" /> זמינות עובדים</h2>
+              <ChevronDown className={cn("w-5 h-5 text-navy-muted transition-transform", showAvailDetail && "rotate-180")} />
+            </button>
+            {showAvailDetail && (
+            <div className="mt-3">
+            <div className="mb-3">{filterBar}</div>
 
             {/* Legend */}
             <div className="flex gap-3 mb-3 text-xs text-navy-muted">
@@ -1248,6 +1231,8 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
+            </div>
+            )}
           </CardContent>
         </Card>
       )}
