@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound, Copy, Check, Send } from "lucide-react";
+import { useEscapeClose } from "@/lib/useEscapeClose";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
@@ -154,6 +155,10 @@ export default function DashboardPage() {
     const id = setTimeout(() => setUndoSnap(null), 6000);
     return () => clearTimeout(id);
   }, [undoSnap]);
+
+  useEscapeClose(!!confirmClear, () => setConfirmClear(null));
+  useEscapeClose(!!conflictDialog, () => setConflictDialog(null));
+  useEscapeClose(confirmRegen, () => setConfirmRegen(false));
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const weekStart = useMemo(() => getNextWeekStart(), []);

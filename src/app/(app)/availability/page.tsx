@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn, getNextWeekStart, DAYS, DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
+import { useEscapeClose } from "@/lib/useEscapeClose";
 
 function DeadlineBanner({ deadline }: { deadline: Date | null }) {
   const [timeLeft, setTimeLeft] = useState<number>(
@@ -180,6 +181,8 @@ export default function AvailabilityPage() {
     acc + shifts.filter(s => (constraints[day]?.[s.id] ?? "available") === "prefer_not").length, 0);
   const unavailableCount = DAYS.reduce((acc, day) =>
     acc + shifts.filter(s => (constraints[day]?.[s.id] ?? "available") === "unavailable").length, 0);
+
+  useEscapeClose(confirmAllAvail, () => setConfirmAllAvail(false));
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto" style={{ fontFamily: "Arial, sans-serif" }}>

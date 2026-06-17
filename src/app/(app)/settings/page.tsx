@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DEFAULT_SHIFTS, getNextWeekStart, type ShiftConfig } from "@/lib/utils";
+import { useEscapeClose } from "@/lib/useEscapeClose";
 
 interface Employee {
   id: string;
@@ -347,6 +348,9 @@ export default function SettingsPage() {
     }
   }));
 
+  useEscapeClose(!!confirmDeleteShift, () => setConfirmDeleteShift(null));
+  useEscapeClose(!!confirmDeleteEmp, () => setConfirmDeleteEmp(null));
+
   return (
     <div className="space-y-6 max-w-lg">
       <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגדרות</h1>
@@ -366,7 +370,7 @@ export default function SettingsPage() {
               onChange={e => setNewRole(e.target.value)}
               onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addRole())}
               placeholder="שם תפקיד חדש"
-              className="flex-1 text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="flex-1 text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             <Button onClick={addRole} size="md" disabled={!newRole.trim()}>הוסף</Button>
           </div>
@@ -421,7 +425,7 @@ export default function SettingsPage() {
                     type="text"
                     value={shift.label}
                     onChange={e => updateShift(shift.id, "label", e.target.value)}
-                    className="flex-1 text-sm font-medium bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                    className="flex-1 text-base sm:text-sm font-medium bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                     placeholder="שם המשמרת"
                   />
                   {dirtyShiftIds.has(shift.id) && (
@@ -438,22 +442,22 @@ export default function SettingsPage() {
                       type="time"
                       value={shift.start}
                       onChange={e => updateShift(shift.id, "start", e.target.value)}
-                      className="text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
+                      className="text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
                     />
                     <span className="text-navy-muted/70 dark:text-slate-500 text-xs">—</span>
                     <input
                       type="time"
                       value={shift.end}
                       onChange={e => updateShift(shift.id, "end", e.target.value)}
-                      className="text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
+                      className="text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
                     />
                     <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עד</span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עובדים:</span>
-                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className="w-6 h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">−</button>
+                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">−</button>
                     <span className="w-5 text-center text-xs font-semibold text-navy dark:text-slate-100">{shift.minWorkers ?? 2}</span>
-                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-6 h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">+</button>
+                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">+</button>
                   </div>
                   <button
                     onClick={() => duplicateShift(shift.id)}
@@ -478,7 +482,7 @@ export default function SettingsPage() {
                   <select
                     value={shift.role ?? ""}
                     onChange={e => updateShift(shift.id, "role", e.target.value)}
-                    className="flex-1 text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                    className="flex-1 text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   >
                     <option value="">כללי</option>
                     {shiftRoles.map(r => (
@@ -530,7 +534,7 @@ export default function SettingsPage() {
               type="datetime-local"
               value={deadlineInput}
               onChange={e => setDeadlineInput(e.target.value)}
-              className="text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             <Button onClick={saveDeadline} loading={deadlineSaving} size="md">
               שמור
@@ -550,9 +554,9 @@ export default function SettingsPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setMinRestHours(h => Math.max(0, h - 1))} className="w-8 h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">−</button>
+            <button onClick={() => setMinRestHours(h => Math.max(0, h - 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">−</button>
             <span className="text-2xl font-bold text-navy dark:text-slate-100 w-10 text-center">{minRestHours}</span>
-            <button onClick={() => setMinRestHours(h => Math.min(24, h + 1))} className="w-8 h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">+</button>
+            <button onClick={() => setMinRestHours(h => Math.min(24, h + 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">+</button>
             <span className="text-sm text-navy-muted dark:text-slate-400">שעות</span>
             <Button onClick={saveRestHours} loading={restSaving} size="md">שמור</Button>
             {restSaved && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">נשמר!</span>}
@@ -592,9 +596,9 @@ export default function SettingsPage() {
             {/* Contract */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-navy-muted dark:text-slate-400 shrink-0">חוזה (משמרות/שבוע):</span>
-              <button type="button" onClick={() => setNewContract(c => Math.max(0, c - 1))} className="w-6 h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">−</button>
+              <button type="button" onClick={() => setNewContract(c => Math.max(0, c - 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">−</button>
               <span className="w-6 text-center text-sm font-semibold text-navy dark:text-slate-100">{newContract === 0 ? "—" : newContract}</span>
-              <button type="button" onClick={() => setNewContract(c => Math.min(7, c + 1))} className="w-6 h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">+</button>
+              <button type="button" onClick={() => setNewContract(c => Math.min(7, c + 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">+</button>
             </div>
             {/* Roles */}
             {shiftRoles.length > 0 && (
@@ -655,14 +659,14 @@ export default function SettingsPage() {
                         <span className="text-xs text-navy-muted dark:text-slate-400 w-24 shrink-0">משמרות בשבוע:</span>
                         <button
                           onClick={() => updateEmpLocal(emp.id, { contractShifts: Math.max(0, (emp.contractShifts ?? 0) - 1) || null })}
-                          className="w-6 h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none"
+                          className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none"
                         >−</button>
                         <span className="w-6 text-center text-xs font-semibold text-navy dark:text-slate-100">
                           {emp.contractShifts ?? 0}
                         </span>
                         <button
                           onClick={() => updateEmpLocal(emp.id, { contractShifts: (emp.contractShifts ?? 0) + 1 })}
-                          className="w-6 h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none"
+                          className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none"
                         >+</button>
                         <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">{emp.contractShifts ? "יעד לשבוע" : "ללא חוזה"}</span>
                       </div>
