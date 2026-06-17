@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound, Copy, Check } from "lucide-react";
+import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound, Copy, Check, Send } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
@@ -137,6 +137,7 @@ export default function DashboardPage() {
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [undoSnap, setUndoSnap] = useState<{ data: ScheduleData; label: string } | null>(null);
   const [confirmRegen, setConfirmRegen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [orgCodeCopied, setOrgCodeCopied] = useState(false);
 
@@ -660,6 +661,29 @@ export default function DashboardPage() {
     else generate();
   }
 
+  async function publish() {
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/schedule/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekStart: weekStart.toISOString() }),
+      });
+      if (res.ok) {
+        setExisting(prev => (prev ? { ...prev, status: "PUBLISHED" } : prev));
+        setToast("הסידור פורסם לעובדים!");
+        setTimeout(() => setToast(null), 3000);
+      } else {
+        setErrorToast("שגיאה בפרסום הסידור");
+        setTimeout(() => setErrorToast(null), 4000);
+      }
+    } catch {
+      setErrorToast("שגיאת רשת — נסה שנית");
+      setTimeout(() => setErrorToast(null), 4000);
+    }
+    setPublishing(false);
+  }
+
   function doUndo() {
     if (!undoSnap) return;
     persistSchedule(undoSnap.data);
@@ -793,6 +817,11 @@ export default function DashboardPage() {
           <Button onClick={requestGenerate} loading={generating} disabled={employees.length === 0} size="lg" className="bg-gradient-to-l from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 shadow-card">
             <Sparkles className="w-[18px] h-[18px]" /> צור שיבוץ
           </Button>
+          {scheduleData && (
+            <Button onClick={publish} loading={publishing} size="lg" variant={existing?.status === "PUBLISHED" ? "outline" : "accent"}>
+              {existing?.status === "PUBLISHED" ? <><Check className="w-[18px] h-[18px]" /> פורסם</> : <><Send className="w-[18px] h-[18px]" /> פרסם</>}
+            </Button>
+          )}
           {scheduleData && (
             <button onClick={handleDownload} disabled={pdfLoading} aria-label="הורד PDF" className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] text-navy-muted dark:text-slate-400 hover:bg-surface-low dark:hover:bg-white/[0.03] hover:text-navy dark:hover:text-slate-100 transition-colors disabled:opacity-50">
               <Download className="w-5 h-5" />
