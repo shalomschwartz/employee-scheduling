@@ -37,12 +37,12 @@ export default function OnboardingPage() {
   return (
     <div className="max-w-md mx-auto mt-12">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">ברוך הבא ל-ShiftSync</h1>
-        <p className="text-sm text-gray-500 mt-1">הגדר את הארגון שלך להתחלה.</p>
+        <h1 className="text-2xl font-bold text-navy">ברוך הבא ל-ShiftSync</h1>
+        <p className="text-sm text-navy-muted mt-1">הגדר את הארגון שלך להתחלה.</p>
       </div>
       <Card>
         <CardHeader>
-          <h2 className="font-semibold text-gray-900">צור ארגון</h2>
+          <h2 className="font-semibold text-navy">צור ארגון</h2>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">

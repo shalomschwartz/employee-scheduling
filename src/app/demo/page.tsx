@@ -37,11 +37,11 @@ export default function DemoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface-low flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">הגדרת דמו</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-navy">הגדרת דמו</h1>
+          <p className="text-sm text-navy-muted mt-1">
             יצירת חברה לדוגמה עם עובדים ואילוצים מוגדרים מראש
           </p>
         </div>
@@ -49,16 +49,16 @@ export default function DemoPage() {
         {!result ? (
           <Card>
             <CardContent className="py-8 text-center space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-navy-muted">
                 לחץ על הכפתור ליצירת:
               </p>
-              <ul className="text-sm text-gray-500 space-y-1 text-right">
+              <ul className="text-sm text-navy-muted space-y-1 text-right">
                 <li>• מנהל: manager@demo.com</li>
                 <li>• אליס כהן (ראש משמרת): alice@demo.com</li>
                 <li>• בוב לוי: bob@demo.com</li>
                 <li>• קרול מזרחי: carol@demo.com</li>
               </ul>
-              <p className="text-xs text-gray-400">סיסמה לכולם: demo1234</p>
+              <p className="text-xs text-navy-muted/70">סיסמה לכולם: demo1234</p>
               {error && (
                 <p className="text-sm text-red-500">{error}</p>
               )}
@@ -74,15 +74,15 @@ export default function DemoPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">מנהל</p>
+                <p className="text-xs font-semibold text-navy-muted mb-2">מנהל</p>
                 <CredRow label="אימייל" value={result.credentials.manager.email} />
                 <CredRow label="סיסמה" value={result.credentials.manager.password} />
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">עובדים</p>
+                <p className="text-xs font-semibold text-navy-muted mb-2">עובדים</p>
                 {result.credentials.employees.map((emp, i) => (
                   <div key={i} className="mb-3">
-                    <p className="text-xs text-gray-700 font-medium mb-1">{emp.name}</p>
+                    <p className="text-xs text-navy font-medium mb-1">{emp.name}</p>
                     <CredRow label="אימייל" value={emp.email} />
                     <CredRow label="סיסמה" value={emp.password} />
                   </div>
@@ -104,9 +104,9 @@ export default function DemoPage() {
 
 function CredRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-500">{label}</span>
-      <span className="text-xs font-mono text-gray-800">{value}</span>
+    <div className="flex items-center justify-between py-1 border-b border-surface-high last:border-0">
+      <span className="text-xs text-navy-muted">{label}</span>
+      <span className="text-xs font-mono text-navy">{value}</span>
     </div>
   );
 }

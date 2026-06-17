@@ -50,10 +50,10 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
       <table className="w-full border-collapse table-fixed">
         <thead>
           <tr>
-            <th className="text-right text-xs font-medium text-gray-400 pb-2 ps-1 w-16 sm:w-24">משמרת</th>
+            <th className="text-right text-xs font-medium text-navy-muted/70 pb-2 ps-1 w-16 sm:w-24">משמרת</th>
             {DAYS.map(day => (
               <th key={day} className="text-center pb-2 px-0.5">
-                <div className="text-xs font-semibold text-gray-700">
+                <div className="text-xs font-semibold text-navy">
                   <span className="sm:hidden">{DAY_LABELS_SHORT[day]}</span>
                   <span className="hidden sm:inline">{DAY_LABELS_HE[day]}</span>
                 </div>
@@ -63,13 +63,13 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
         </thead>
         <tbody>
           {shifts.map((shiftCfg, si) => (
-            <tr key={shiftCfg.id} className="border-t border-gray-100">
+            <tr key={shiftCfg.id} className="border-t border-surface-high">
               <td className="py-1 ps-1 pe-1 sm:py-2 sm:ps-2 sm:pe-2 align-middle">
                 <div className="flex items-center gap-1 mb-0.5">
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", SHIFT_DOT_DEFAULTS[si % SHIFT_DOT_DEFAULTS.length])} />
-                  <span className="text-xs font-semibold text-gray-700 truncate">{shiftCfg.label}</span>
+                  <span className="text-xs font-semibold text-navy truncate">{shiftCfg.label}</span>
                 </div>
-                <div className="text-[10px] text-gray-400 mb-1 sm:ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
+                <div className="text-[10px] text-navy-muted/70 mb-1 sm:ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
                 <div className="hidden sm:flex gap-0.5 ps-3">
                   {OPTION_CYCLE.map(opt => (
                     <button

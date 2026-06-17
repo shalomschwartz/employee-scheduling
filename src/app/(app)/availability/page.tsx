@@ -171,8 +171,8 @@ export default function AvailabilityPage() {
   return (
     <div className="space-y-4 max-w-2xl mx-auto" style={{ fontFamily: "Arial, sans-serif" }}>
       <div>
-        <h1 className="text-xl font-bold text-gray-900">הגשת זמינות</h1>
-        <p className="text-sm text-gray-500 mt-0.5">שבוע {weekLabel}</p>
+        <h1 className="text-xl font-bold text-navy">הגשת זמינות</h1>
+        <p className="text-sm text-navy-muted mt-0.5">שבוע {weekLabel}</p>
       </div>
 
       <DeadlineBanner deadline={deadline} />
@@ -190,8 +190,8 @@ export default function AvailabilityPage() {
 
       <Card>
         <CardHeader>
-          <p className="font-semibold text-gray-900">שלום, {session?.user.name?.split(" ")[0] ?? ""}!</p>
-          <p className="text-xs text-gray-500 mt-0.5">לחץ על כל משבצת כדי לשנות את הסטטוס שלה 👆</p>
+          <p className="font-semibold text-navy">שלום, {session?.user.name?.split(" ")[0] ?? ""}!</p>
+          <p className="text-xs text-navy-muted mt-0.5">לחץ על כל משבצת כדי לשנות את הסטטוס שלה 👆</p>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {availableCount > 0 && <Badge variant="success">{availableCount} זמין</Badge>}
             {preferNotCount > 0 && <Badge variant="warning">{preferNotCount} מעדיף לא</Badge>}
@@ -213,7 +213,7 @@ export default function AvailabilityPage() {
           <button
             type="button"
             onClick={() => setConstraints(defaultConstraintData(shifts))}
-            className="text-sm text-gray-400 hover:text-gray-600"
+            className="text-sm text-navy-muted/70 hover:text-navy-muted"
             disabled={status === "loading"}
           >
             איפוס לזמין
@@ -234,7 +234,7 @@ export default function AvailabilityPage() {
         </CardFooter>
       </Card>
 
-      <p className="text-xs text-gray-400 text-center">
+      <p className="text-xs text-navy-muted/70 text-center">
         המנהל יצור את לוח המשמרות לאחר שכולם ישלחו.
       </p>
 
@@ -242,8 +242,8 @@ export default function AvailabilityPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDeadlinePopup(false)}>
           <div className="bg-white rounded-2xl shadow-2xl px-8 py-7 flex flex-col items-center gap-3 mx-6 text-center">
             <p className="text-3xl">⏰</p>
-            <p className="text-lg font-bold text-gray-900">מועד ההגשה עבר</p>
-            <p className="text-sm text-gray-500">לשינוי זמינות פנה למנהל</p>
+            <p className="text-lg font-bold text-navy">מועד ההגשה עבר</p>
+            <p className="text-sm text-navy-muted">לשינוי זמינות פנה למנהל</p>
           </div>
         </div>
       )}
@@ -252,7 +252,7 @@ export default function AvailabilityPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWelcome(false)}>
           <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
             <p className="text-3xl">👋</p>
-            <p className="text-2xl font-bold text-gray-900">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
+            <p className="text-2xl font-bold text-navy">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
           </div>
         </div>
       )}
@@ -265,8 +265,8 @@ export default function AvailabilityPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-2xl font-bold text-gray-900">נשמר!</p>
-            <p className="text-sm text-gray-500 text-center">ניתן לסגור את האפליקציה</p>
+            <p className="text-2xl font-bold text-navy">נשמר!</p>
+            <p className="text-sm text-navy-muted text-center">ניתן לסגור את האפליקציה</p>
           </div>
         </div>
       )}

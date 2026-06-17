@@ -56,12 +56,12 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <img src="/logo.png" alt="ShiftSync" className="h-20 mx-auto mb-1" />
-          <p className="text-sm text-gray-500 mt-1">ניהול משמרות חכם לצוות שלך</p>
+          <p className="text-sm text-navy-muted mt-1">ניהול משמרות חכם לצוות שלך</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">הרשמה</h2>
-          <p className="text-sm text-gray-500 mb-6">צור את חשבון ShiftSync שלך.</p>
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-surface-high">
+          <h2 className="text-lg font-semibold text-navy mb-1">הרשמה</h2>
+          <p className="text-sm text-navy-muted mb-6">צור את חשבון ShiftSync שלך.</p>
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600">
@@ -83,7 +83,7 @@ export default function RegisterPage() {
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-gray-500">
+          <p className="mt-6 text-center text-sm text-navy-muted">
             יש לך חשבון?{" "}
             <Link href="/login" className="text-brand-600 font-medium hover:underline">
               כניסה
