@@ -684,7 +684,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="space-y-6 rounded-3xl p-5 sm:p-6 text-slate-200" style={{ background: "#0a1220", backgroundImage: "radial-gradient(70% 110% at 90% -12%, rgba(79,124,255,0.12), transparent 60%)" }}>
+    <div className="space-y-6 text-slate-200">
       {showWelcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWelcome(false)}>
           <div className="bg-[#131f33] rounded-2xl shadow-lg px-10 py-8 flex flex-col items-center gap-3 mx-6">

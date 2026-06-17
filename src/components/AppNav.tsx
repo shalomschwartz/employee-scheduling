@@ -19,20 +19,30 @@ const employeeLinks = [
 
 interface AppNavProps {
   session: Session;
+  dark?: boolean;
 }
 
-export function AppNav({ session }: AppNavProps) {
+export function AppNav({ session, dark }: AppNavProps) {
   const pathname = usePathname();
   const isManager = session.user.role === "MANAGER";
   const links = isManager ? managerLinks : employeeLinks;
 
+  const header = dark
+    ? "bg-[#0a1220]/85 glass border-b border-white/10"
+    : "bg-surface/80 glass border-b border-surface-high shadow-nav";
+  const active = dark ? "bg-brand-500/20 text-white ring-1 ring-brand-400/30" : "bg-navy text-white shadow-sm";
+  const idle = dark ? "text-slate-400 hover:bg-white/5 hover:text-white" : "text-navy-muted hover:bg-surface-mid hover:text-navy";
+  const muted = dark ? "text-slate-400" : "text-navy-muted";
+
   return (
-    <header className="sticky top-0 z-50 bg-surface/80 glass border-b border-surface-high shadow-nav overflow-hidden">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+    <header className={cn("sticky top-0 z-50 overflow-hidden", header)}>
+      <div className={cn("mx-auto px-4 sm:px-8", dark ? "max-w-[1500px]" : "max-w-5xl")}>
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 font-headline font-bold text-navy">
-            <img src="/logo.png" alt="ShiftSync" className="h-20 -my-3" />
+          <Link href="/" className="flex items-center gap-2 font-headline font-bold">
+            {dark
+              ? <span className="text-white text-lg tracking-tight">ShiftSync</span>
+              : <img src="/logo.png" alt="ShiftSync" className="h-20 -my-3" />}
           </Link>
 
           {/* Nav links */}
@@ -41,12 +51,7 @@ export function AppNav({ session }: AppNavProps) {
               <Link
                 key={link.href}
                 href={link.href}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
-                  pathname.startsWith(link.href)
-                    ? "bg-navy text-white shadow-sm"
-                    : "text-navy-muted hover:bg-surface-mid hover:text-navy"
-                )}
+                className={cn("px-4 py-1.5 rounded-full text-sm font-semibold transition-all", pathname.startsWith(link.href) ? active : idle)}
               >
                 {link.label}
               </Link>
@@ -56,12 +61,12 @@ export function AppNav({ session }: AppNavProps) {
           {/* User menu */}
           <div className="flex items-center gap-3">
             <InstallPWA />
-            <span className="hidden sm:block text-xs text-navy-muted max-w-[120px] truncate font-medium">
+            <span className={cn("hidden sm:block text-xs max-w-[120px] truncate font-medium", muted)}>
               {session.user.name ?? session.user.email}
             </span>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-xs text-navy-muted hover:text-navy px-3 py-1.5 rounded-full hover:bg-surface-mid transition-all font-semibold"
+              className={cn("text-xs px-3 py-1.5 rounded-full transition-all font-semibold", idle)}
             >
               יציאה
             </button>
@@ -74,12 +79,7 @@ export function AppNav({ session }: AppNavProps) {
             <Link
               key={link.href}
               href={link.href}
-              className={cn(
-                "flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all",
-                pathname.startsWith(link.href)
-                  ? "bg-navy text-white"
-                  : "text-navy-muted hover:bg-surface-mid"
-              )}
+              className={cn("flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all", pathname.startsWith(link.href) ? active : idle)}
             >
               {link.label}
             </Link>
