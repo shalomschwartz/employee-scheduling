@@ -916,10 +916,10 @@ export default function DashboardPage() {
           <div className="overflow-x-auto rounded-2xl border border-surface-high bg-surface-white shadow-card">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-surface-low border-b-2 border-surface-highest">
-                  <th className="text-right py-3 ps-4 pe-3 text-xs font-semibold text-navy-muted w-28 whitespace-nowrap border-e-2 border-surface-high">משמרת</th>
+                <tr className="bg-surface-low border-b border-surface-highest">
+                  <th className="text-right py-3 ps-4 pe-3 text-xs font-semibold text-navy-muted w-28 whitespace-nowrap border-e border-surface-high/60">משמרת</th>
                   {DAYS.map(day => (
-                    <th key={day} className="py-3 px-3 text-center text-xs font-semibold text-navy min-w-[90px] border-e-2 border-surface-high last:border-e-0">
+                    <th key={day} className="py-3 px-3 text-center text-xs font-semibold text-navy min-w-[90px] border-e border-surface-high/60 last:border-e-0">
                       {DAY_LABELS_HE[day as Day]}
                     </th>
                   ))}
@@ -932,7 +932,7 @@ export default function DashboardPage() {
                   return (
                   <tr
                     key={shift}
-                    className={cn("border-b-2 border-surface-high last:border-0 transition-opacity", draggingRow === shift && "opacity-40")}
+                    className={cn("border-b border-surface-high last:border-0 transition-opacity", draggingRow === shift && "opacity-40")}
                     draggable
                     onDragStart={() => setDraggingRow(shift)}
                     onDragEnd={() => { setDraggingRow(null); setDragOverRow(null); }}
@@ -941,7 +941,7 @@ export default function DashboardPage() {
                     onDrop={() => handleRowDrop(shift)}
                     style={dragOverRow === shift && draggingRow !== shift ? { outline: "2px solid #6366f1", outlineOffset: "-2px" } : undefined}
                   >
-                    <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-surface-high">
+                    <td className="py-3 ps-4 pe-3 align-middle border-e border-surface-high/60">
                       <div className="flex items-center gap-2">
                         <GripVertical className="w-4 h-4 text-navy-muted/40 cursor-grab active:cursor-grabbing flex-shrink-0" aria-label="גרור לסידור מחדש" />
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
@@ -1003,7 +1003,7 @@ export default function DashboardPage() {
                       return (
                         <td
                           key={day}
-                          className={cn("py-2 px-2 align-top transition-colors border-e-2 border-surface-high last:border-e-0", dragging && dragBg, dropOutline)}
+                          className={cn("py-2 px-2 align-top transition-colors border-e border-surface-high/60 last:border-e-0", dragging && dragBg, dropOutline)}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
@@ -1193,7 +1193,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Overview table */}
-            <div className="overflow-x-auto rounded-xl border-2 border-surface-high shadow-sm">
+            <div className="overflow-x-auto rounded-2xl border border-surface-high bg-surface-white shadow-card">
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-surface-low border-b border-surface-high">
