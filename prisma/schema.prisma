@@ -81,7 +81,7 @@ model GeneratedSchedule {
   organizationId String
   weekStart      DateTime
 
-  // Full schedule JSON produced by the OR-Tools solver
+  // Full schedule JSON produced by the scheduler (src/lib/scheduler.ts)
   schedule       Json
 
   status         ScheduleStatus @default(DRAFT)
