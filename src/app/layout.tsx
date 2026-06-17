@@ -37,8 +37,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="he" dir="rtl" className="h-full">
+    <html lang="he" dir="rtl" className="h-full dark" suppressHydrationWarning>
       <body className={`${heebo.variable} ${manrope.variable} ${heebo.className} h-full`}>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme');var d=document.documentElement;if(t==='light'){d.classList.remove('dark')}else{d.classList.add('dark')}}catch(e){}`,
+          }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>

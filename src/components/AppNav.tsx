@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { Session } from "next-auth";
 import { cn } from "@/lib/utils";
 import { InstallPWA } from "@/components/InstallPWA";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const managerLinks = [
   { href: "/dashboard", label: "לוח בקרה" },
@@ -28,11 +29,15 @@ export function AppNav({ session, dark }: AppNavProps) {
   const links = isManager ? managerLinks : employeeLinks;
 
   const header = dark
-    ? "bg-[#0a1220]/85 glass border-b border-white/10"
+    ? "bg-surface/80 dark:bg-[#0a1220]/85 glass border-b border-surface-high dark:border-white/10 shadow-nav dark:shadow-none"
     : "bg-surface/80 glass border-b border-surface-high shadow-nav";
-  const active = dark ? "bg-brand-500/20 text-white ring-1 ring-brand-400/30" : "bg-navy text-white shadow-sm";
-  const idle = dark ? "text-slate-400 hover:bg-white/5 hover:text-white" : "text-navy-muted hover:bg-surface-mid hover:text-navy";
-  const muted = dark ? "text-slate-400" : "text-navy-muted";
+  const active = dark
+    ? "bg-navy text-white shadow-sm dark:bg-brand-500/20 dark:text-white dark:shadow-none dark:ring-1 dark:ring-brand-400/30"
+    : "bg-navy text-white shadow-sm";
+  const idle = dark
+    ? "text-navy-muted hover:bg-surface-mid hover:text-navy dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
+    : "text-navy-muted hover:bg-surface-mid hover:text-navy";
+  const muted = dark ? "text-navy-muted dark:text-slate-400" : "text-navy-muted";
 
   return (
     <header className={cn("sticky top-0 z-50 overflow-hidden", header)}>
@@ -40,9 +45,14 @@ export function AppNav({ session, dark }: AppNavProps) {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 font-headline font-bold">
-            {dark
-              ? <span className="text-white text-lg tracking-tight">ShiftSync</span>
-              : <img src="/logo.png" alt="ShiftSync" className="h-20 -my-3" />}
+            {dark ? (
+              <>
+                <img src="/logo.png" alt="ShiftSync" className="h-20 -my-3 dark:hidden" />
+                <span className="hidden dark:inline text-white text-lg tracking-tight">ShiftSync</span>
+              </>
+            ) : (
+              <img src="/logo.png" alt="ShiftSync" className="h-20 -my-3" />
+            )}
           </Link>
 
           {/* Nav links */}
@@ -60,6 +70,7 @@ export function AppNav({ session, dark }: AppNavProps) {
 
           {/* User menu */}
           <div className="flex items-center gap-3">
+            {dark && <ThemeToggle />}
             <InstallPWA />
             <span className={cn("hidden sm:block text-xs max-w-[120px] truncate font-medium", muted)}>
               {session.user.name ?? session.user.email}

@@ -11,8 +11,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div
-      className={cn("min-h-screen flex flex-col", isManager ? "text-slate-200" : "bg-surface-low")}
-      style={isManager ? { background: "#0a1220", backgroundImage: "radial-gradient(55% 55% at 100% 0%, rgba(79,124,255,0.10), transparent 60%)" } : undefined}
+      className={cn(
+        "min-h-screen flex flex-col",
+        isManager
+          ? "manager-canvas bg-surface-low text-navy dark:text-slate-200"
+          : "bg-surface-low"
+      )}
     >
       <AppNav session={session} dark={isManager} />
       <main className={cn("flex-1 w-full px-4 py-6", isManager ? "max-w-[1500px] mx-auto sm:px-8" : "max-w-5xl mx-auto sm:px-6")}>
