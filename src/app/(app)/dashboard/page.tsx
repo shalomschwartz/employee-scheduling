@@ -1019,12 +1019,12 @@ export default function DashboardPage() {
                               >
                                 <div
                                   className={cn(
-                                    "flex items-center gap-1.5 ps-1 pe-2 py-1 rounded-full w-full cursor-grab active:cursor-grabbing bg-white/[0.04] border-2 transition-shadow hover:shadow-xs",
+                                    "flex items-center gap-2 ps-1 pe-3 py-1.5 rounded-full w-full cursor-grab active:cursor-grabbing bg-white/[0.05] border-2 transition-shadow hover:shadow-xs",
                                     avBorder
                                   )}
                                 >
-                                  <Avatar name={name} color={(empId && colorMap[empId]) || "#6b7280"} size={18} />
-                                  <span className="text-[11px] font-semibold text-slate-100 truncate flex-1 text-start leading-tight">{name.split(" ")[0]}</span>
+                                  <Avatar name={name} color={(empId && colorMap[empId]) || "#6b7280"} size={22} />
+                                  <span className="text-sm font-semibold text-slate-100 truncate flex-1 text-start leading-tight">{name.split(" ")[0]}</span>
                                   {isPinned && <Pin className="w-3 h-3 text-brand-400 flex-shrink-0" />}
                                 </div>
                                 {/* Remove button */}
@@ -1228,7 +1228,7 @@ export default function DashboardPage() {
                                 <div
                                   key={emp.id}
                                   className={cn(
-                                    "text-[10px] px-1.5 py-0.5 rounded font-medium text-center w-full",
+                                    "text-xs px-2 py-1 rounded-md font-medium text-center w-full",
                                     chipStyle
                                   )}
                                 >
