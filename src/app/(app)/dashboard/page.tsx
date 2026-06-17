@@ -70,6 +70,7 @@ export default function DashboardPage() {
 
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [minRestHours, setMinRestHours] = useState(7);
+  const [orgCode, setOrgCode] = useState<string | null>(null);
   const [empFilter, setEmpFilter] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -133,6 +134,7 @@ export default function DashboardPage() {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
       if (Array.isArray(emps)) setEmployees(emps);
       if (shiftsCfg?.shifts) setShifts(shiftsCfg.shifts);
+      if (typeof shiftsCfg?.orgCode === "string") setOrgCode(shiftsCfg.orgCode);
       if (typeof restCfg?.minRestHours === "number") setMinRestHours(restCfg.minRestHours);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -684,6 +686,11 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-xl font-bold text-navy">לוח בקרה</h1>
           <p className="text-sm text-navy-muted">שבוע {weekLabel}</p>
+          {orgCode && (
+            <p className="text-xs text-navy-muted mt-1">
+              קוד כניסה לעובדים: <span className="font-mono font-bold tracking-widest text-brand-700 select-all">{orgCode}</span>
+            </p>
+          )}
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">

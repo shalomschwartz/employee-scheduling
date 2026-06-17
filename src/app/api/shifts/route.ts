@@ -31,7 +31,7 @@ export async function GET(): Promise<NextResponse> {
   // Backfill minWorkers. Preserve saved order — do NOT sort; manager may have a custom ordering.
   const shifts = rawShifts.map(s => ({ ...s, minWorkers: s.minWorkers ?? legacyMin }));
 
-  return NextResponse.json({ shifts });
+  return NextResponse.json({ shifts, orgCode: typeof settings.code === "string" ? settings.code : null });
 }
 
 export async function PUT(req: NextRequest) {

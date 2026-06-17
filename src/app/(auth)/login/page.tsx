@@ -16,6 +16,7 @@ function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
+  const [orgCode, setOrgCode] = useState("");
   const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(hasError ? "פרטים שגויים." : "");
@@ -26,6 +27,7 @@ function LoginForm() {
     setUsername("");
     setPassword("");
     setPhone("");
+    setOrgCode("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -38,6 +40,7 @@ function LoginForm() {
       password: isManager ? password : "",
       isManager: isManager ? "true" : "false",
       phone: isManager ? "" : phone,
+      orgCode: isManager ? "" : orgCode,
       redirect: false,
     });
 
@@ -105,16 +108,30 @@ function LoginForm() {
           autoComplete={isManager ? "email" : "name"}
         />
         {!isManager && (
-          <Input
-            id="phone"
-            type="tel"
-            label="טלפון"
-            placeholder="050-0000000"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-            autoComplete="tel"
-          />
+          <>
+            <Input
+              id="phone"
+              type="tel"
+              label="טלפון"
+              placeholder="050-0000000"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              autoComplete="tel"
+            />
+            <Input
+              id="orgCode"
+              type="text"
+              label="קוד ארגון"
+              placeholder="הקוד שקיבלת מהמנהל"
+              value={orgCode}
+              onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
+              required
+              autoComplete="off"
+              maxLength={8}
+              className="uppercase tracking-widest"
+            />
+          </>
         )}
         {isManager && (
           <Input

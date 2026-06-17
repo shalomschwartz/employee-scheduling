@@ -100,7 +100,6 @@ model ClientRecord {
   orgName      String
   managerName  String?
   email        String   @unique
-  plainPassword String
   phone        String?
   notes        String?
   createdAt    DateTime @default(now())

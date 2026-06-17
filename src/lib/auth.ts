@@ -20,6 +20,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
         isManager: { label: "Is Manager", type: "text" },
         phone: { label: "Phone", type: "text" },
+        orgCode: { label: "Org Code", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.username) return null;
@@ -39,20 +40,24 @@ export const authOptions: NextAuthOptions = {
           }
           return { id: user.id, name: user.name, email: user.email };
         } else {
-          // Employee: look up by name + phone
-          if (!credentials.phone) return null;
+          // Employee: scope to an organization by its code, then match name + phone
+          // within that org (prevents cross-tenant logins when orgs share a deployment).
+          if (!credentials.phone || !credentials.orgCode) return null;
+          const code = credentials.orgCode.trim().toUpperCase();
+          const org = await prisma.organization.findFirst({
+            where: { settings: { path: ["code"], equals: code } },
+          });
+          if (!org) return null;
+          if ((org.settings as Record<string, unknown>)?.blocked === true) return null;
           const user = await prisma.user.findFirst({
             where: {
               name: { equals: credentials.username, mode: "insensitive" },
               phone: credentials.phone,
               role: "EMPLOYEE",
+              organizationId: org.id,
             },
           });
           if (!user) return null;
-          if (user.organizationId) {
-            const org = await prisma.organization.findUnique({ where: { id: user.organizationId } });
-            if ((org?.settings as Record<string, unknown>)?.blocked === true) return null;
-          }
           return { id: user.id, name: user.name, email: user.email };
         }
       },

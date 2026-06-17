@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { getNextWeekStart, DAYS, type Day, type ShiftKey, type AvailabilityOption } from "@/lib/utils";
 
 const DEMO_PASSWORD = "demo1234";
+const DEMO_CODE = "DEMO01";
+const DEMO_PHONES: Record<string, string> = {
+  "alice@demo.com": "050-1111111",
+  "bob@demo.com": "050-2222222",
+  "carol@demo.com": "050-3333333",
+};
 
 type ConstraintData = Record<Day, Record<ShiftKey, AvailabilityOption>>;
 
@@ -53,8 +60,15 @@ export async function POST() {
   });
 
   if (existing) {
-    // Org already exists — just re-save constraints for the current week
+    // Backfill the org login code + employee phones, then re-save constraints
+    await prisma.organization.update({
+      where: { id: existing.id },
+      data: { settings: { ...(existing.settings as Record<string, unknown>), code: DEMO_CODE } as Prisma.InputJsonValue },
+    });
     for (const emp of existing.users) {
+      if (!emp.phone && DEMO_PHONES[emp.email]) {
+        await prisma.user.update({ where: { id: emp.id }, data: { phone: DEMO_PHONES[emp.email] } });
+      }
       let data: ConstraintData;
       if (emp.email === "alice@demo.com") data = ALICE_CONSTRAINTS;
       else if (emp.email === "bob@demo.com") data = BOB_CONSTRAINTS;
@@ -66,24 +80,24 @@ export async function POST() {
         update: { data },
       });
     }
-    return NextResponse.json({ message: "זמינות עודכנה לשבוע הנוכחי.", credentials: getCredentials() });
+    return NextResponse.json({ message: "זמינות עודכנה לשבוע הנוכחי.", credentials: getCredentials(), orgCode: DEMO_CODE });
   }
 
   const hashed = await bcrypt.hash(DEMO_PASSWORD, 12);
-  const org = await prisma.organization.create({ data: { name: "Demo Company" } });
+  const org = await prisma.organization.create({ data: { name: "Demo Company", settings: { code: DEMO_CODE } } });
 
   await prisma.user.create({
     data: { name: "מנהל", email: "manager@demo.com", password: hashed, role: "MANAGER", organizationId: org.id },
   });
 
   const alice = await prisma.user.create({
-    data: { name: "אליס כהן", email: "alice@demo.com", password: hashed, role: "EMPLOYEE", organizationId: org.id },
+    data: { name: "אליס כהן", email: "alice@demo.com", phone: DEMO_PHONES["alice@demo.com"], password: hashed, role: "EMPLOYEE", organizationId: org.id },
   });
   const bob = await prisma.user.create({
-    data: { name: "בוב לוי", email: "bob@demo.com", password: hashed, role: "EMPLOYEE", organizationId: org.id },
+    data: { name: "בוב לוי", email: "bob@demo.com", phone: DEMO_PHONES["bob@demo.com"], password: hashed, role: "EMPLOYEE", organizationId: org.id },
   });
   const carol = await prisma.user.create({
-    data: { name: "קרול מזרחי", email: "carol@demo.com", password: hashed, role: "EMPLOYEE", organizationId: org.id },
+    data: { name: "קרול מזרחי", email: "carol@demo.com", phone: DEMO_PHONES["carol@demo.com"], password: hashed, role: "EMPLOYEE", organizationId: org.id },
   });
 
   await prisma.weeklyConstraints.createMany({
@@ -94,7 +108,7 @@ export async function POST() {
     ],
   });
 
-  return NextResponse.json({ message: "הדמו הוגדר בהצלחה!", credentials: getCredentials() });
+  return NextResponse.json({ message: "הדמו הוגדר בהצלחה!", credentials: getCredentials(), orgCode: DEMO_CODE });
 }
 
 function getCredentials() {

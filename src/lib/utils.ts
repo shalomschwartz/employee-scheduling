@@ -78,3 +78,11 @@ export function gapMins(fromTime: string, toTime: string): number {
   const to = toMins(toTime);
   return to >= from ? to - from : 1440 - from + to;
 }
+
+/** Short, human-friendly organization code (no ambiguous 0/O/1/I characters). */
+export function genOrgCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
