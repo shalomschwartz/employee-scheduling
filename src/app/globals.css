@@ -4,12 +4,16 @@
 
 @layer base {
   :root {
-    --background: 214 100% 98%;
-    --foreground: 210 98% 11%;
+    --background: 210 40% 98%;
+    --foreground: 209 69% 13%;
   }
 
   * {
     @apply border-surface-high;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -20,15 +24,46 @@
   h1, h2, h3 {
     font-family: "Manrope", "Heebo", sans-serif;
     font-weight: 800;
+    letter-spacing: -0.018em;
+  }
+
+  ::selection {
+    @apply bg-brand-100 text-navy;
+  }
+
+  /* Visible, on-brand focus ring for keyboard users on any interactive element */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-surface;
   }
 }
 
 @layer utilities {
-  .touch-manipulation {
-    touch-action: manipulation;
-  }
+  .touch-manipulation { touch-action: manipulation; }
   .glass {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+  /* Tabular figures keep numeric/time columns from shifting width */
+  .tnum { font-variant-numeric: tabular-nums; }
+}
+
+/* Subtle, unobtrusive scrollbars on desktop pointers */
+@media (pointer: fine) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
