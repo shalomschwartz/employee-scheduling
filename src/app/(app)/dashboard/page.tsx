@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
@@ -44,6 +45,39 @@ function shiftMinRange(cfg: ShiftConfig): [number, number] {
   let e = toMins(cfg.end);
   if (e <= s) e += 1440;
   return [s, e];
+}
+
+/** Colored initial circle for an employee. */
+function Avatar({ name, color, size = 18 }: { name: string | null; color: string; size?: number }) {
+  const ini = (name?.trim()?.charAt(0)) || "?";
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full font-bold text-white flex-shrink-0"
+      style={{ width: size, height: size, backgroundColor: color, fontSize: Math.round(size * 0.5) }}
+    >
+      {ini}
+    </span>
+  );
+}
+
+function KpiCard({ icon, label, value, accent, ok }: { icon: ReactNode; label: string; value: ReactNode; accent?: boolean; ok?: boolean }) {
+  return (
+    <div className={cn("rounded-2xl border bg-surface-white p-4 shadow-card", accent ? "border-brand-200 ring-1 ring-brand-100" : "border-surface-high")}>
+      <div className="flex items-center gap-2 text-navy-muted text-xs font-medium">
+        <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded-lg", ok ? "bg-success-100 text-success-600" : accent ? "bg-brand-100 text-brand-600" : "bg-surface-mid text-navy-muted")}>{icon}</span>
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-extrabold text-navy tnum">{value}</div>
+    </div>
+  );
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  );
 }
 
 const ROLE_COLORS = [
@@ -262,6 +296,20 @@ export default function DashboardPage() {
     }
     return map;
   }, [scheduleData, shifts]);
+
+  const stats = useMemo(() => {
+    const empCount = employees.length;
+    const submittedCount = employees.filter(e => e.constraints.length > 0).length;
+    let required = 0, filled = 0;
+    for (const day of DAYS) for (const sc of shifts) {
+      const min = sc.minWorkers ?? 2;
+      required += min;
+      filled += Math.min(scheduleData?.[day]?.[sc.id]?.employeeIds.length ?? 0, min);
+    }
+    const fillPct = scheduleData && required > 0 ? Math.round((filled / required) * 100) : null;
+    const totalHours = Math.round(Object.values(hoursMap).reduce((a, b) => a + b, 0));
+    return { empCount, submittedCount, fillPct, totalHours };
+  }, [employees, shifts, scheduleData, hoursMap]);
 
 
   async function persistSchedule(updated: ScheduleData) {
@@ -633,8 +681,8 @@ export default function DashboardPage() {
     <div className="space-y-4">
       {showWelcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWelcome(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
-            <p className="text-3xl">👋</p>
+          <div className="bg-surface-white rounded-2xl shadow-lg px-10 py-8 flex flex-col items-center gap-3 mx-6">
+            <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-100 text-brand-600"><Sparkles className="w-7 h-7" /></span>
             <p className="text-2xl font-bold text-navy">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
           </div>
         </div>
@@ -651,7 +699,7 @@ export default function DashboardPage() {
           className="w-full flex items-center justify-between px-4 py-3 text-right"
         >
           <span className="font-bold text-blue-800 text-base">איך ShiftSync עובד</span>
-          <span className="text-blue-400 text-lg leading-none">{showGuide ? "▲" : "▼"}</span>
+          <ChevronDown className={cn("w-5 h-5 text-blue-400 transition-transform", showGuide && "rotate-180")} />
         </button>
         {showGuide && (
           <div className="px-4 pb-4">
@@ -682,40 +730,44 @@ export default function DashboardPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-navy">לוח בקרה</h1>
-          <p className="text-sm text-navy-muted">שבוע {weekLabel}</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-navy tracking-tight">לוח בקרה</h1>
+          <p className="text-sm text-navy-muted mt-0.5">שבוע {weekLabel}</p>
           {orgCode && (
-            <p className="text-xs text-navy-muted mt-1">
-              קוד כניסה לעובדים: <span className="font-mono font-bold tracking-widest text-brand-700 select-all">{orgCode}</span>
-            </p>
+            <span className="inline-flex items-center gap-2 mt-3 rounded-xl bg-brand-50 ring-1 ring-brand-100 px-3 py-1.5">
+              <KeyRound className="w-4 h-4 text-brand-600" />
+              <span className="text-xs text-navy-muted">קוד עובדים</span>
+              <span className="font-mono font-bold tracking-[0.2em] text-brand-700 select-all">{orgCode}</span>
+            </span>
           )}
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
-            <Button onClick={generate} loading={generating} variant="outline" size="md">
-              {"צור שיבוץ"}
-            </Button>
-            {scheduleData && (
-              <Button onClick={handleDownload} loading={pdfLoading} size="md">הורדה</Button>
-            )}
-            {scheduleData && (
-              <Button
-                onClick={handleWhatsApp}
-                size="md"
-                className="text-white"
-                style={{ backgroundColor: "#25D366", borderColor: "#25D366" }}
-              >
-                <svg className="w-4 h-4 ml-1.5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                </svg>
-                שלח לווצאפ
-              </Button>
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={generate} loading={generating} size="lg" className="bg-gradient-to-l from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 shadow-card">
+            <Sparkles className="w-[18px] h-[18px]" /> צור שיבוץ
+          </Button>
+          {scheduleData && (
+            <button onClick={handleDownload} disabled={pdfLoading} aria-label="הורד PDF" className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-surface-high bg-surface-white text-navy-muted hover:bg-surface-low hover:text-navy transition-colors disabled:opacity-50">
+              <Download className="w-5 h-5" />
+            </button>
+          )}
+          {scheduleData && (
+            <button onClick={handleWhatsApp} aria-label="שלח בוואטסאפ" className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-surface-high bg-surface-white text-[#16a34a] hover:bg-green-50 transition-colors">
+              <WhatsAppIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
+
+      {/* KPI strip */}
+      {!loading && employees.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard icon={<Users className="w-3.5 h-3.5" />} label="עובדים" value={stats.empCount} />
+          <KpiCard icon={<LayoutGrid className="w-3.5 h-3.5" />} label="מילוי משמרות" value={stats.fillPct != null ? `${stats.fillPct}%` : "—"} accent />
+          <KpiCard icon={<Clock className="w-3.5 h-3.5" />} label="שעות שובצו" value={stats.totalHours} />
+          <KpiCard icon={<CircleCheck className="w-3.5 h-3.5" />} label="הגישו זמינות" value={`${stats.submittedCount}/${stats.empCount}`} ok={stats.empCount > 0 && stats.submittedCount === stats.empCount} />
+        </div>
+      )}
 
       {/* Submission status */}
       {!loading && employees.length > 0 && (
@@ -736,7 +788,7 @@ export default function DashboardPage() {
                       ? "bg-green-50 border-green-300 text-green-700"
                       : "bg-red-50 border-red-300 text-red-600"
                   )}>
-                    <span>{hasSent ? "✓" : "✗"}</span>
+                    {hasSent ? <CircleCheck className="w-4 h-4 flex-shrink-0" /> : <X className="w-4 h-4 flex-shrink-0" />}
                     <span>{name}</span>
                   </div>
                 );
@@ -799,7 +851,7 @@ export default function DashboardPage() {
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="py-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-yellow-800">אזהרות:</p>
+              <p className="text-xs font-semibold text-yellow-800 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> אזהרות</p>
               <button onClick={() => setWarningsIgnored(true)} className="text-xs text-yellow-500 hover:text-yellow-700 font-medium px-2 py-0.5 rounded hover:bg-yellow-100 transition-colors">התעלם</button>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -821,7 +873,7 @@ export default function DashboardPage() {
         <Card className="border-red-200 bg-red-50">
           <CardContent className="py-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-red-800">התנגשויות זמינות:</p>
+              <p className="text-xs font-semibold text-red-800 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> התנגשויות זמינות</p>
               <button onClick={() => setConflictsIgnored(true)} className="text-xs text-red-400 hover:text-red-600 font-medium px-2 py-0.5 rounded hover:bg-red-100 transition-colors">התעלם</button>
             </div>
             <div className="space-y-2">
@@ -857,11 +909,11 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-navy-muted/70">X להסרה • + להוספה ידנית 📌</p>
+            <p className="text-xs text-navy-muted/60 flex items-center gap-1.5"><GripVertical className="w-3.5 h-3.5" /> גרור עובדים בין משמרות · הוסף או הסר בכל תא</p>
             {existing && <p className="text-xs text-navy-muted/70">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
           {filterBar}
-          <div className="overflow-x-auto rounded-xl border-2 border-surface-high shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-surface-high bg-surface-white shadow-card">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-surface-low border-b-2 border-surface-highest">
@@ -891,7 +943,7 @@ export default function DashboardPage() {
                   >
                     <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-surface-high">
                       <div className="flex items-center gap-2">
-                        <span className="text-navy-muted/40 cursor-grab active:cursor-grabbing select-none text-base leading-none" title="גרור לסידור מחדש">⠿</span>
+                        <GripVertical className="w-4 h-4 text-navy-muted/40 cursor-grab active:cursor-grabbing flex-shrink-0" aria-label="גרור לסידור מחדש" />
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
@@ -962,7 +1014,7 @@ export default function DashboardPage() {
                               if (empFilter !== null && empId !== empFilter) return null;
                               const isPinned = !!empId && pinnedIds.includes(empId);
                               const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
-                              const avBorder = av === "available" ? "ring-[3px] ring-green-400" : av === "prefer_not" ? "ring-[3px] ring-yellow-400" : "ring-[3px] ring-red-500";
+                              const avBorder = av === "available" ? "border-success-500/50" : av === "prefer_not" ? "border-warning-500/60" : "border-danger-500/70";
                               return (
                               <div
                                 key={empId ?? name}
@@ -973,23 +1025,21 @@ export default function DashboardPage() {
                               >
                                 <div
                                   className={cn(
-                                    "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full cursor-grab active:cursor-grabbing text-white",
+                                    "flex items-center gap-1.5 ps-1 pe-2 py-1 rounded-full w-full cursor-grab active:cursor-grabbing bg-surface-white border-2 transition-shadow hover:shadow-xs",
                                     avBorder
                                   )}
-                                  style={{ backgroundColor: (empId && colorMap[empId]) || "#6b7280" }}
                                 >
-                                  <span className="flex items-center justify-center gap-1">
-                                    {isPinned && <span className="text-[9px]">📌</span>}
-                                    {name.split(" ")[0]}
-                                  </span>
+                                  <Avatar name={name} color={(empId && colorMap[empId]) || "#6b7280"} size={18} />
+                                  <span className="text-[11px] font-semibold text-navy truncate flex-1 text-start leading-tight">{name.split(" ")[0]}</span>
+                                  {isPinned && <Pin className="w-3 h-3 text-brand-500 flex-shrink-0" />}
                                 </div>
                                 {/* Remove button */}
                                 <button
                                   onClick={e => { e.stopPropagation(); removeFromSlot(day, shift, ni); }}
-                                  className="absolute -top-1 -start-1 w-4 h-4 rounded-full bg-surface-highest hover:bg-red-500 text-white text-[9px] font-bold flex items-center justify-center z-10 transition-colors opacity-50 group-hover:opacity-100"
+                                  className="absolute -top-1.5 -start-1.5 w-5 h-5 rounded-full bg-surface-white border border-surface-high hover:bg-danger-500 hover:border-danger-500 text-navy-muted hover:text-white flex items-center justify-center z-10 transition-colors opacity-0 group-hover:opacity-100 shadow-xs"
                                   title="הסר ממשמרת"
                                 >
-                                  ×
+                                  <X className="w-3 h-3" />
                                 </button>
                               </div>
                               );
@@ -1024,10 +1074,10 @@ export default function DashboardPage() {
                             ) : (slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2) && (
                               <button
                                 onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
-                                className="w-full text-center text-navy-muted/40 hover:text-navy-muted text-sm py-0.5 rounded hover:bg-surface-low transition-colors leading-none"
+                                className="w-full flex items-center justify-center gap-1 text-navy-muted/60 hover:text-brand-600 text-[11px] font-medium py-1 rounded-lg border border-dashed border-surface-highest hover:border-brand-300 hover:bg-brand-50/50 transition-colors"
                                 title="הוסף עובד"
                               >
-                                +
+                                <Plus className="w-3.5 h-3.5" /> הוסף
                               </button>
                             )}
                             {(slot?.employeeIds ?? []).length > 0 && (
