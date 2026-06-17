@@ -1172,7 +1172,7 @@ export default function DashboardPage() {
 
       {/* Employee constraints overview */}
       {!loading && employees.length > 0 && (
-        <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-low dark:bg-white/[0.03]">
+        <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-white dark:bg-white/[0.03] shadow-card">
           <div className="p-4">
             <button onClick={() => setShowAvailDetail(v => !v)} className="w-full flex items-center justify-between">
               <h2 className="font-semibold text-sm text-navy dark:text-slate-100 flex items-center gap-2"><LayoutGrid className="w-4 h-4 text-brand-600 dark:text-brand-400" /> זמינות עובדים</h2>
@@ -1184,9 +1184,9 @@ export default function DashboardPage() {
 
             {/* Legend */}
             <div className="flex gap-3 mb-3 text-xs text-navy-muted dark:text-slate-400">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-50 dark:bg-emerald-500/15 ring-1 ring-emerald-200 dark:ring-emerald-500/25" />זמין</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-amber-50 dark:bg-amber-500/15 ring-1 ring-amber-200 dark:ring-amber-500/25" />מעדיף לא</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-rose-50 dark:bg-rose-500/15 ring-1 ring-rose-200 dark:ring-rose-500/25" />לא זמין</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-100 dark:bg-emerald-500/15 ring-1 ring-emerald-300 dark:ring-emerald-500/25" />זמין</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-300 dark:ring-amber-500/25" />מעדיף לא</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-rose-100 dark:bg-rose-500/15 ring-1 ring-rose-300 dark:ring-rose-500/25" />לא זמין</span>
             </div>
 
             {/* Overview table */}
@@ -1220,10 +1220,10 @@ export default function DashboardPage() {
                             {employees.filter(e => empFilter === null || e.id === empFilter).map(emp => {
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                               const chipStyle = av === "available"
-                                ? "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-500/25"
+                                ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-300 dark:ring-emerald-500/25"
                                 : av === "prefer_not"
-                                ? "bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-200 ring-1 ring-amber-200 dark:ring-amber-500/25"
-                                : "bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 ring-1 ring-rose-200 dark:ring-rose-500/25";
+                                ? "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 ring-1 ring-amber-300 dark:ring-amber-500/25"
+                                : "bg-rose-100 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300 ring-1 ring-rose-300 dark:ring-rose-500/25";
                               return (
                                 <div
                                   key={emp.id}
