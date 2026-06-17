@@ -40,7 +40,7 @@ function DeadlineBanner({ deadline }: { deadline: Date | null }) {
 
   if (timeLeft <= 0) {
     return (
-      <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+      <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300">
         <span className="font-medium">⏰ מועד ההגשה עבר.</span>
       </div>
     );
@@ -57,7 +57,7 @@ function DeadlineBanner({ deadline }: { deadline: Date | null }) {
   return (
     <div className={cn(
       "p-3 rounded-lg border text-sm",
-      urgent ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-700"
+      urgent ? "bg-red-50 border-red-200 text-red-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-300" : "bg-blue-50 border-blue-200 text-blue-700 dark:bg-brand-500/10 dark:border-brand-500/20 dark:text-brand-300"
     )}>
       <p className="font-medium">⏰ יש להגיש זמינות עד {deadlineDateStr} בשעה {deadlineTimeStr}</p>
       <div className="mt-1 flex items-baseline gap-2">
@@ -171,27 +171,32 @@ export default function AvailabilityPage() {
   return (
     <div className="space-y-4 max-w-2xl mx-auto" style={{ fontFamily: "Arial, sans-serif" }}>
       <div>
-        <h1 className="text-xl font-bold text-navy">הגשת זמינות</h1>
-        <p className="text-sm text-navy-muted mt-0.5">שבוע {weekLabel}</p>
+        <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגשת זמינות</h1>
+        <p className="text-sm text-navy-muted dark:text-slate-400 mt-0.5">שבוע {weekLabel}</p>
       </div>
 
       <DeadlineBanner deadline={deadline} />
 
       {alreadySubmitted && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300">
           <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
           <span>
-            זמינות הוגשה{lastSaved ? ` · נשמר ב-${format(lastSaved, "d/M 'בשעה' HH:mm")}` : ""}. ניתן לעדכן בכל עת עד לזמן תום ההגשה.
+            זמינות הוגשה{lastSaved ? ` · נשמר ב-${format(lastSaved, "d/M 'בשעה' HH:mm")}` : ""}.{isPastDeadline ? " מועד ההגשה נעול." : " ניתן לעדכן בכל עת עד לזמן תום ההגשה."}
           </span>
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <p className="font-semibold text-navy">שלום, {session?.user.name?.split(" ")[0] ?? ""}!</p>
-          <p className="text-xs text-navy-muted mt-0.5">לחץ על כל משבצת כדי לשנות את הסטטוס שלה 👆</p>
+          <p className="font-semibold text-navy dark:text-slate-100">שלום, {session?.user.name?.split(" ")[0] ?? ""}!</p>
+          <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">לחץ על כל משבצת כדי לעבור בין המצבים 👆</p>
+          <div className="flex items-center gap-3 mt-2 text-[11px] text-navy-muted dark:text-slate-400 flex-wrap">
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-green-100 dark:bg-emerald-500/15 ring-1 ring-green-400/60 dark:ring-emerald-500/40" />זמין</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-400/60 dark:ring-amber-500/40" />מעדיף לא</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-100 dark:bg-rose-500/15 ring-1 ring-red-400/60 dark:ring-rose-500/40" />חסום</span>
+          </div>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {availableCount > 0 && <Badge variant="success">{availableCount} זמין</Badge>}
             {preferNotCount > 0 && <Badge variant="warning">{preferNotCount} מעדיף לא</Badge>}
@@ -213,7 +218,7 @@ export default function AvailabilityPage() {
           <button
             type="button"
             onClick={() => setConstraints(defaultConstraintData(shifts))}
-            className="text-sm text-navy-muted/70 hover:text-navy-muted"
+            className="text-sm text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300"
             disabled={status === "loading"}
           >
             איפוס לזמין
@@ -234,7 +239,7 @@ export default function AvailabilityPage() {
         </CardFooter>
       </Card>
 
-      <p className="text-xs text-navy-muted/70 text-center">
+      <p className="text-xs text-navy-muted/70 dark:text-slate-500 text-center">
         המנהל יצור את לוח המשמרות לאחר שכולם ישלחו.
       </p>
 

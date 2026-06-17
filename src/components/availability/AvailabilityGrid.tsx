@@ -6,9 +6,9 @@ import { DAYS, DAY_LABELS_HE, DEFAULT_SHIFTS, type Day, type AvailabilityOption,
 export type ConstraintData = Record<Day, Record<string, AvailabilityOption>>;
 
 const OPTION_STYLES: Record<AvailabilityOption, { bg: string; label: string; shortLabel: string; icon: string }> = {
-  available: { bg: "bg-green-100 border-green-400 text-green-800", label: "זמין", shortLabel: "זמין", icon: "✓" },
-  prefer_not: { bg: "bg-amber-100 border-amber-400 text-amber-800", label: "מעדיף לא", shortLabel: "לא מעדיף", icon: "~" },
-  unavailable: { bg: "bg-red-100 border-red-400 text-red-800", label: "לא זמין", shortLabel: "חסום", icon: "✗" },
+  available: { bg: "bg-green-100 border-green-400 text-green-800 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-300", label: "זמין", shortLabel: "זמין", icon: "✓" },
+  prefer_not: { bg: "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-500/15 dark:border-amber-500/40 dark:text-amber-300", label: "מעדיף לא", shortLabel: "מעדיף לא", icon: "~" },
+  unavailable: { bg: "bg-red-100 border-red-400 text-red-800 dark:bg-rose-500/15 dark:border-rose-500/40 dark:text-rose-300", label: "לא זמין", shortLabel: "חסום", icon: "✗" },
 };
 
 const SHIFT_DOT_DEFAULTS = ["bg-yellow-400", "bg-orange-400", "bg-indigo-400", "bg-blue-400", "bg-pink-400"];
@@ -50,10 +50,10 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
       <table className="w-full border-collapse table-fixed">
         <thead>
           <tr>
-            <th className="text-right text-xs font-medium text-navy-muted/70 pb-2 ps-1 w-16 sm:w-24">משמרת</th>
+            <th className="text-right text-xs font-medium text-navy-muted/70 dark:text-slate-500 pb-2 ps-1 w-16 sm:w-24">משמרת</th>
             {DAYS.map(day => (
               <th key={day} className="text-center pb-2 px-0.5">
-                <div className="text-xs font-semibold text-navy">
+                <div className="text-xs font-semibold text-navy dark:text-slate-100">
                   <span className="sm:hidden">{DAY_LABELS_SHORT[day]}</span>
                   <span className="hidden sm:inline">{DAY_LABELS_HE[day]}</span>
                 </div>
@@ -63,13 +63,13 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
         </thead>
         <tbody>
           {shifts.map((shiftCfg, si) => (
-            <tr key={shiftCfg.id} className="border-t border-surface-high">
+            <tr key={shiftCfg.id} className="border-t border-surface-high dark:border-white/10">
               <td className="py-1 ps-1 pe-1 sm:py-2 sm:ps-2 sm:pe-2 align-middle">
                 <div className="flex items-center gap-1 mb-0.5">
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", SHIFT_DOT_DEFAULTS[si % SHIFT_DOT_DEFAULTS.length])} />
-                  <span className="text-xs font-semibold text-navy truncate">{shiftCfg.label}</span>
+                  <span className="text-xs font-semibold text-navy dark:text-slate-100 truncate">{shiftCfg.label}</span>
                 </div>
-                <div className="text-[10px] text-navy-muted/70 mb-1 sm:ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
+                <div className="text-[10px] text-navy-muted/70 dark:text-slate-500 mb-1 sm:ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
                 <div className="hidden sm:flex gap-0.5 ps-3">
                   {OPTION_CYCLE.map(opt => (
                     <button
