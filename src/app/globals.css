@@ -59,9 +59,11 @@
   ::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
 }
 
-/* Manager dashboard dark canvas — deep navy + accent glow, dark mode only */
-.dark .manager-canvas {
+/* Manager dashboard dark canvas — deep navy + accent glow (the .dark class lives on the shell itself) */
+.manager-canvas.dark {
   background-color: #0a1220;
+  color: #e2e8f0;
+  color-scheme: dark;
   background-image: radial-gradient(55% 55% at 100% 0%, rgba(79, 124, 255, 0.1), transparent 60%);
 }
 

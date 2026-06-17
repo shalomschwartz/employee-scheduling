@@ -26,11 +26,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       "inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-150 ease-out select-none touch-manipulation active:scale-[0.98] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
 
     const variants = {
-      primary:   "bg-navy text-white shadow-xs hover:bg-navy-light hover:shadow-card",
+      primary:   "bg-navy text-white shadow-xs hover:bg-navy-light hover:shadow-card dark:bg-brand-600 dark:hover:bg-brand-500",
       accent:    "bg-brand-600 text-white shadow-xs hover:bg-brand-700 hover:shadow-card",
-      outline:   "bg-surface-white text-navy border border-surface-high hover:bg-surface-low hover:border-surface-highest",
-      secondary: "bg-surface-mid text-navy hover:bg-surface-high",
-      ghost:     "text-navy-muted hover:bg-surface-mid hover:text-navy",
+      outline:   "bg-surface-white text-navy border border-surface-high hover:bg-surface-low hover:border-surface-highest dark:bg-white/[0.05] dark:text-slate-100 dark:border-white/10 dark:hover:bg-white/[0.08] dark:hover:border-white/20",
+      secondary: "bg-surface-mid text-navy hover:bg-surface-high dark:bg-white/[0.07] dark:text-slate-100 dark:hover:bg-white/[0.12]",
+      ghost:     "text-navy-muted hover:bg-surface-mid hover:text-navy dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white",
       danger:    "bg-danger-600 text-white shadow-xs hover:bg-danger-700",
     };
 

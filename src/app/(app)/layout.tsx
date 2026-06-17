@@ -11,13 +11,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div
+      id="app-shell"
+      suppressHydrationWarning
       className={cn(
         "min-h-screen flex flex-col",
-        isManager
-          ? "manager-canvas bg-surface-low text-navy dark:text-slate-200"
-          : "bg-surface-low"
+        isManager ? "manager-canvas dark bg-surface-low text-navy" : "bg-surface-low"
       )}
     >
+      {isManager && (
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('theme')==='light'){var e=document.getElementById('app-shell');if(e)e.classList.remove('dark')}}catch(e){}`,
+          }}
+        />
+      )}
       <AppNav session={session} dark={isManager} />
       <main className={cn("flex-1 w-full px-4 py-6", isManager ? "max-w-[1500px] mx-auto sm:px-8" : "max-w-5xl mx-auto sm:px-6")}>
         {children}

@@ -7,13 +7,15 @@ export function ThemeToggle() {
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
+    const el = document.getElementById("app-shell");
+    setIsDark(el ? el.classList.contains("dark") : true);
   }, []);
 
   function toggle() {
-    const root = document.documentElement;
-    const next = !root.classList.contains("dark");
-    root.classList.toggle("dark", next);
+    const el = document.getElementById("app-shell");
+    if (!el) return;
+    const next = !el.classList.contains("dark");
+    el.classList.toggle("dark", next);
     try {
       localStorage.setItem("theme", next ? "dark" : "light");
     } catch {}
