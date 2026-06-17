@@ -5,7 +5,6 @@ import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangl
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type ConstraintData } from "@/components/availability/AvailabilityGrid";
@@ -857,52 +856,40 @@ export default function DashboardPage() {
 
       {/* Warnings */}
       {Object.keys(warnings).length > 0 && !warningsIgnored && (
-        <Card className="border-amber-500/25 bg-amber-500/10">
-          <CardContent className="py-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-amber-200 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> אזהרות</p>
-              <button onClick={() => setWarningsIgnored(true)} className="text-xs text-amber-400 hover:text-amber-200 font-medium px-2 py-0.5 rounded hover:bg-amber-500/15 transition-colors">התעלם</button>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(warnings).map(([day, msgs]) => (
-                <div key={day} className="bg-amber-500/15 border border-amber-500/25 rounded-lg px-3 py-2 min-w-[120px]">
-                  <p className="text-[11px] font-bold text-amber-200 mb-1">{day}</p>
-                  <ul className="space-y-0.5">
-                    {msgs.map((m, i) => <li key={i} className="text-xs text-amber-200">• {m}</li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-amber-500/20 bg-white/[0.03] px-4 py-3">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-xs font-semibold text-amber-300 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> אזהרות שיבוץ</p>
+            <button onClick={() => setWarningsIgnored(true)} className="text-xs text-slate-500 hover:text-slate-300 font-medium px-2 py-0.5 rounded hover:bg-white/5 transition-colors">התעלם</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(warnings).flatMap(([day, msgs]) => msgs.map((m, i) => (
+              <span key={day + i} className="inline-flex items-center gap-1.5 text-[11px] bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1">
+                <span className="font-semibold text-amber-300">{day}</span><span className="text-amber-200/75">{m}</span>
+              </span>
+            )))}
+          </div>
+        </div>
       )}
 
       {/* Conflicts */}
       {Object.keys(conflicts).length > 0 && !conflictsIgnored && (
-        <Card className="border-rose-500/25 bg-rose-500/10">
-          <CardContent className="py-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-rose-200 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> התנגשויות זמינות</p>
-              <button onClick={() => setConflictsIgnored(true)} className="text-xs text-rose-400 hover:text-rose-300 font-medium px-2 py-0.5 rounded hover:bg-rose-500/15 transition-colors">התעלם</button>
-            </div>
-            <div className="space-y-2">
-              {Object.entries(conflicts).map(([name, slots]) => {
-                const empIndex = employees.findIndex(e => (e.name ?? e.email) === name);
-                return (
-                  <div key={name}>
-                    <span
-                      className="inline-block text-xs font-semibold px-2 py-0.5 rounded-md text-white"
-                      style={{ backgroundColor: empIndex >= 0 ? empHex(empIndex) : "#6b7280" }}
-                    >{name}</span>
-                    <ul className="mt-0.5 space-y-0.5 ps-3">
-                      {slots.map((s, i) => <li key={i} className="text-xs text-rose-300">• {s}</li>)}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-rose-500/20 bg-white/[0.03] px-4 py-3">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-xs font-semibold text-rose-300 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> התנגשויות זמינות</p>
+            <button onClick={() => setConflictsIgnored(true)} className="text-xs text-slate-500 hover:text-slate-300 font-medium px-2 py-0.5 rounded hover:bg-white/5 transition-colors">התעלם</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(conflicts).flatMap(([name, slots]) => {
+              const empIndex = employees.findIndex(e => (e.name ?? e.email) === name);
+              return slots.map((s, i) => (
+                <span key={name + i} className="inline-flex items-center gap-1.5 text-[11px] bg-rose-500/10 border border-rose-500/20 rounded-lg px-2.5 py-1">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: empIndex >= 0 ? empHex(empIndex) : "#6b7280" }} />
+                  <span className="font-semibold text-rose-200">{name.split(" ")[0]}</span><span className="text-rose-200/75">{s}</span>
+                </span>
+              ));
+            })}
+          </div>
+        </div>
       )}
 
       {/* Schedule grid */}
