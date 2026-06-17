@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const Schema = z.object({
@@ -23,14 +24,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid data" }, { status: 400 });
   }
 
-  const org = await prisma.organization.create({
-    data: { name: parsed.data.orgName },
-  });
-
-  // Promote user to MANAGER and link to org
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { organizationId: org.id, role: "MANAGER" },
+  // Create the org and promote the user atomically so we never end up
+  // with an orphan org or a manager pointing at a non-existent org.
+  const org = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const created = await tx.organization.create({ data: { name: parsed.data.orgName } });
+    await tx.user.update({
+      where: { id: session.user.id },
+      data: { organizationId: created.id, role: "MANAGER" },
+    });
+    return created;
   });
 
   return NextResponse.json({ organizationId: org.id });

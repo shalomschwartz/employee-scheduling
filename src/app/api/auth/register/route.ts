@@ -45,12 +45,5 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Save plaintext credentials for operator reference
-  await prisma.clientRecord.upsert({
-    where: { email: email.toLowerCase() },
-    update: { managerName: name, plainPassword: password },
-    create: { orgName: name, managerName: name, email: email.toLowerCase(), plainPassword: password },
-  });
-
   return NextResponse.json({ ok: true }, { status: 201 });
 }

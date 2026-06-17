@@ -1,22 +1,21 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { startOfWeek, addWeeks } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Returns the Sunday of the current week (UTC midnight). */
+/** Returns the Sunday of the current week at UTC midnight (timezone-independent). */
 export function getCurrentWeekStart(): Date {
   const now = new Date();
-  const sunday = startOfWeek(now, { weekStartsOn: 0 });
-  sunday.setUTCHours(0, 0, 0, 0);
-  return sunday;
+  const day = now.getUTCDay(); // 0 = Sunday
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day));
 }
 
-/** Returns the Sunday of the next week (UTC midnight). */
+/** Returns the Sunday of the next week at UTC midnight. */
 export function getNextWeekStart(): Date {
-  return addWeeks(getCurrentWeekStart(), 1);
+  const d = getCurrentWeekStart();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 7));
 }
 
 export const DAYS = [

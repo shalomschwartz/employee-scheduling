@@ -23,9 +23,13 @@ export async function GET(req: NextRequest) {
   const [employees, org] = await Promise.all([
     prisma.user.findMany({
       where: { organizationId: session.user.organizationId, role: { in: ["EMPLOYEE", "MANAGER"] } },
-      include: weekStart
-        ? { constraints: { where: { weekStart: new Date(weekStart) }, take: 1 } }
-        : { constraints: { orderBy: { weekStart: "desc" }, take: 1 } },
+      include: {
+        constraints: {
+          where: weekStart ? { weekStart: new Date(weekStart) } : undefined,
+          orderBy: { weekStart: "desc" },
+          take: 1,
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.organization.findUnique({ where: { id: session.user.organizationId } }),
@@ -33,11 +37,16 @@ export async function GET(req: NextRequest) {
 
   const empSettings = ((org?.settings as Record<string, unknown>)?.employeeSettings ?? {}) as Record<string, { roles?: string[]; contractShifts?: number | null }>;
 
-  const result = employees.map(e => ({
-    ...e,
-    roles: empSettings[e.id]?.roles ?? [],
-    contractShifts: empSettings[e.id]?.contractShifts ?? null,
-  }));
+  // Strip the password hash before returning users to the client.
+  const result = employees.map((e: { id: string; password: string } & Record<string, unknown>) => {
+    const { password, ...safe } = e;
+    void password;
+    return {
+      ...safe,
+      roles: empSettings[e.id]?.roles ?? [],
+      contractShifts: empSettings[e.id]?.contractShifts ?? null,
+    };
+  });
 
   return NextResponse.json(result);
 }
