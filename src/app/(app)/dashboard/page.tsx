@@ -812,9 +812,9 @@ export default function DashboardPage() {
             const name = emp.name ?? emp.email;
             const hours = hoursMap[emp.id] ?? 0;
             return (
-              <Card key={emp.id} className="overflow-hidden">
+              <div key={emp.id} className="rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden">
                 <div className="h-1.5 w-full" style={{ backgroundColor: empHex(i) }} />
-                <CardContent className="py-3">
+                <div className="px-4 py-3">
                   <p className="text-xs font-semibold text-slate-100 truncate">{name}</p>
                   <p className="text-2xl font-bold text-slate-100 mt-1">{hours}<span className="text-xs font-normal text-slate-500 mr-1">שעות</span></p>
 
@@ -846,8 +846,8 @@ export default function DashboardPage() {
                       </>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             );
           })}
           </div>
@@ -1185,8 +1185,8 @@ export default function DashboardPage() {
 
       {/* Employee constraints overview */}
       {!loading && employees.length > 0 && (
-        <Card>
-          <CardContent className="pt-4">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03]">
+          <div className="p-4">
             <button onClick={() => setShowAvailDetail(v => !v)} className="w-full flex items-center justify-between">
               <h2 className="font-semibold text-sm text-slate-100 flex items-center gap-2"><LayoutGrid className="w-4 h-4 text-brand-400" /> זמינות עובדים</h2>
               <ChevronDown className={cn("w-5 h-5 text-slate-400 transition-transform", showAvailDetail && "rotate-180")} />
@@ -1260,8 +1260,8 @@ export default function DashboardPage() {
             </div>
             </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Hidden print calendar — captured by html2canvas for PDF download */}
