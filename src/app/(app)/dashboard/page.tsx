@@ -774,9 +774,9 @@ export default function DashboardPage() {
                 <stop offset="1" stopColor="#a78bfa" />
               </linearGradient>
             </defs>
-            <circle cx="62" cy="62" r="52" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="11" />
+            <circle cx="62" cy="62" r="52" fill="none" strokeWidth="11" className="stroke-surface-high dark:stroke-white/[0.07]" />
             <circle cx="62" cy="62" r="52" fill="none" stroke="url(#cov)" strokeWidth="11" strokeLinecap="round" strokeDasharray={326.7} strokeDashoffset={326.7 * (1 - (stats.fillPct ?? 0) / 100)} transform="rotate(-90 62 62)" />
-            <text x="62" y="58" textAnchor="middle" fill="#fff" fontSize="28" fontWeight="600">{stats.fillPct != null ? `${stats.fillPct}%` : "—"}</text>
+            <text x="62" y="58" textAnchor="middle" fontSize="28" fontWeight="600" className="fill-navy dark:fill-white">{stats.fillPct != null ? `${stats.fillPct}%` : "—"}</text>
             <text x="62" y="78" textAnchor="middle" fill="#64748b" fontSize="11">מאויש</text>
           </svg>
           <div className="flex-1 min-w-[220px]">
