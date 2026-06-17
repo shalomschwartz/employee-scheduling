@@ -49,14 +49,17 @@ export const authOptions: NextAuthOptions = {
           });
           if (!org) return null;
           if ((org.settings as Record<string, unknown>)?.blocked === true) return null;
-          const user = await prisma.user.findFirst({
+          // Normalize phones so formatting (dashes, spaces, +972) doesn't block login
+          const normPhone = (p: string) => p.replace(/\D/g, "").replace(/^972/, "0");
+          const enteredPhone = normPhone(credentials.phone);
+          const candidates = await prisma.user.findMany({
             where: {
               name: { equals: credentials.username, mode: "insensitive" },
-              phone: credentials.phone,
               role: "EMPLOYEE",
               organizationId: org.id,
             },
           });
+          const user = candidates.find(u => u.phone && normPhone(u.phone) === enteredPhone);
           if (!user) return null;
           return { id: user.id, name: user.name, email: user.email };
         }

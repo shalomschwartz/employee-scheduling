@@ -47,7 +47,7 @@ function LoginForm() {
     setLoading(false);
 
     if (result?.error) {
-      setError(isManager ? "אימייל או סיסמה שגויים." : "שם או טלפון שגויים. פנה למנהל.");
+      setError(isManager ? "אימייל או סיסמה שגויים." : "שם, טלפון או קוד ארגון שגויים. ודא את הפרטים מול המנהל.");
     } else {
       router.push(isManager ? "/dashboard?welcome=1" : "/availability?welcome=1");
       router.refresh();
@@ -128,7 +128,7 @@ function LoginForm() {
               onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
               required
               autoComplete="off"
-              maxLength={8}
+              maxLength={6}
               className="uppercase tracking-widest"
             />
           </>

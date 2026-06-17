@@ -89,6 +89,8 @@ export default function AvailabilityPage() {
   const [isPastDeadline, setIsPastDeadline] = useState(false);
   const [showDeadlinePopup, setShowDeadlinePopup] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [initLoading, setInitLoading] = useState(true);
+  const [confirmAllAvail, setConfirmAllAvail] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("welcome") === "1") {
@@ -111,31 +113,37 @@ export default function AvailabilityPage() {
 
   useEffect(() => {
     async function load() {
-      const [shiftsRes, availRes, deadlineRes] = await Promise.all([
-        fetch("/api/shifts"),
-        fetch(`/api/availability?weekStart=${weekStart.toISOString()}`),
-        fetch("/api/deadline"),
-      ]);
-      if (shiftsRes.ok) {
-        const s = await shiftsRes.json();
-        const arr = Array.isArray(s) ? s : s?.shifts;
-        if (Array.isArray(arr)) { setShifts(arr); setConstraints(defaultConstraintData(arr)); }
-      }
-      if (availRes.ok) {
-        const data = await availRes.json();
-        if (data?.data) {
-          setConstraints(data.data as ConstraintData);
-          setAlreadySubmitted(true);
-          setLastSaved(new Date(data.updatedAt));
+      try {
+        const [shiftsRes, availRes, deadlineRes] = await Promise.all([
+          fetch("/api/shifts"),
+          fetch(`/api/availability?weekStart=${weekStart.toISOString()}`),
+          fetch("/api/deadline"),
+        ]);
+        if (shiftsRes.ok) {
+          const s = await shiftsRes.json();
+          const arr = Array.isArray(s) ? s : s?.shifts;
+          if (Array.isArray(arr)) { setShifts(arr); setConstraints(defaultConstraintData(arr)); }
         }
-      }
-      if (deadlineRes.ok) {
-        const d = await deadlineRes.json();
-        if (d.deadline) {
-          const dl = new Date(d.deadline);
-          setDeadline(dl);
-          setIsPastDeadline(Date.now() >= dl.getTime());
+        if (availRes.ok) {
+          const data = await availRes.json();
+          if (data?.data) {
+            setConstraints(data.data as ConstraintData);
+            setAlreadySubmitted(true);
+            setLastSaved(new Date(data.updatedAt));
+          }
         }
+        if (deadlineRes.ok) {
+          const d = await deadlineRes.json();
+          if (d.deadline) {
+            const dl = new Date(d.deadline);
+            setDeadline(dl);
+            setIsPastDeadline(Date.now() >= dl.getTime());
+          }
+        }
+      } catch {
+        // keep defaults on failure
+      } finally {
+        setInitLoading(false);
       }
     }
     load();
@@ -143,6 +151,11 @@ export default function AvailabilityPage() {
   }, []);
 
   async function handleSubmit() {
+    if (preferNotCount === 0 && unavailableCount === 0 && !confirmAllAvail) {
+      setConfirmAllAvail(true);
+      return;
+    }
+    setConfirmAllAvail(false);
     setStatus("loading");
     try {
       const res = await fetch("/api/availability", {
@@ -208,7 +221,7 @@ export default function AvailabilityPage() {
           <AvailabilityGrid
             value={constraints}
             onChange={setConstraints}
-            disabled={status === "loading" || isPastDeadline}
+            disabled={status === "loading" || isPastDeadline || initLoading}
             onBlockedClick={isPastDeadline ? () => setShowDeadlinePopup(true) : undefined}
             shifts={shifts}
           />
@@ -272,6 +285,19 @@ export default function AvailabilityPage() {
             </div>
             <p className="text-2xl font-bold text-navy">נשמר!</p>
             <p className="text-sm text-navy-muted text-center">ניתן לסגור את האפליקציה</p>
+          </div>
+        </div>
+      )}
+
+      {confirmAllAvail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setConfirmAllAvail(false)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl" onClick={e => e.stopPropagation()}>
+            <p className="font-bold text-navy text-base mb-1">זמין לכל המשמרות?</p>
+            <p className="text-sm text-navy-muted mb-5">לא סימנת אף משמרת כ&quot;מעדיף לא&quot; או &quot;חסום&quot;. לשלוח זמינות מלאה?</p>
+            <div className="flex gap-2 justify-center">
+              <button onClick={handleSubmit} className="flex-1 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors">כן, שלח</button>
+              <button onClick={() => setConfirmAllAvail(false)} className="flex-1 py-2 rounded-lg border border-surface-high text-navy text-sm font-semibold hover:bg-surface-low transition-colors">חזור לערוך</button>
+            </div>
           </div>
         </div>
       )}
