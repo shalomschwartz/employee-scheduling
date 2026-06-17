@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound } from "lucide-react";
+import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound, Copy, Check } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
@@ -135,6 +135,10 @@ export default function DashboardPage() {
   const [dragOver, setDragOver] = useState<{ day: string; shift: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [undoSnap, setUndoSnap] = useState<{ data: ScheduleData; label: string } | null>(null);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [orgCodeCopied, setOrgCodeCopied] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("welcome") === "1") {
@@ -143,6 +147,12 @@ export default function DashboardPage() {
       router.replace("/dashboard");
     }
   }, [searchParams, router]);
+
+  useEffect(() => {
+    if (!undoSnap) return;
+    const id = setTimeout(() => setUndoSnap(null), 6000);
+    return () => clearTimeout(id);
+  }, [undoSnap]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const weekStart = useMemo(() => getNextWeekStart(), []);
@@ -172,7 +182,7 @@ export default function DashboardPage() {
       if (typeof shiftsCfg?.orgCode === "string") setOrgCode(shiftsCfg.orgCode);
       if (typeof restCfg?.minRestHours === "number") setMinRestHours(restCfg.minRestHours);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => { setLoadError(true); setLoading(false); });
 
     // Poll for employee constraint updates every 30 seconds
     const interval = setInterval(fetchEmployees, 30_000);
@@ -341,6 +351,7 @@ export default function DashboardPage() {
 
   function clearShiftCell(day: string, shift: string) {
     if (!scheduleData) return;
+    const snap = scheduleData;
     const updated = {
       ...scheduleData,
       [day]: {
@@ -349,10 +360,12 @@ export default function DashboardPage() {
       },
     };
     persistSchedule(updated);
+    setUndoSnap({ data: snap, label: "המשמרת נוקתה" });
   }
 
   function removeFromSlot(day: string, shift: string, idx: number) {
     if (!scheduleData) return;
+    const snap = scheduleData;
     const slot = scheduleData[day]?.[shift];
     if (!slot || idx < 0 || idx >= slot.employeeIds.length) return;
     const removedId = slot.employeeIds[idx];
@@ -369,6 +382,7 @@ export default function DashboardPage() {
       },
     };
     persistSchedule(updated);
+    setUndoSnap({ data: snap, label: "העובד הוסר" });
   }
 
   // Returns the shift IDs the employee is already in on that day (excluding the target shift)
@@ -641,6 +655,24 @@ export default function DashboardPage() {
     setGenerating(false);
   }
 
+  function requestGenerate() {
+    if (scheduleData) setConfirmRegen(true);
+    else generate();
+  }
+
+  function doUndo() {
+    if (!undoSnap) return;
+    persistSchedule(undoSnap.data);
+    setUndoSnap(null);
+  }
+
+  function copyOrgCode() {
+    if (!orgCode) return;
+    navigator.clipboard?.writeText(orgCode).then(() => {
+      setOrgCodeCopied(true);
+      setTimeout(() => setOrgCodeCopied(false), 1800);
+    }).catch(() => {});
+  }
 
   const shiftKeys = shifts.map(s => s.id);
 
@@ -740,15 +772,25 @@ export default function DashboardPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-navy dark:text-slate-100 tracking-tight">לוח בקרה</h1>
           <p className="text-sm text-navy-muted dark:text-slate-400 mt-0.5">שבוע {weekLabel}</p>
           {orgCode && (
-            <span className="inline-flex items-center gap-2 mt-3 rounded-xl bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-400/20 px-3 py-1.5">
+            <button
+              type="button"
+              onClick={copyOrgCode}
+              title="העתק קוד"
+              className="inline-flex items-center gap-2 mt-3 rounded-xl bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-400/20 px-3 py-1.5 hover:bg-brand-100 dark:hover:bg-brand-500/15 transition-colors"
+            >
               <KeyRound className="w-4 h-4 text-brand-600 dark:text-brand-400" />
               <span className="text-xs text-navy-muted dark:text-slate-400">קוד עובדים</span>
-              <span className="font-mono font-bold tracking-[0.2em] text-brand-700 dark:text-brand-300 select-all">{orgCode}</span>
-            </span>
+              <span className="font-mono font-bold tracking-[0.2em] text-brand-700 dark:text-brand-300">{orgCode}</span>
+              {orgCodeCopied ? (
+                <Check className="w-3.5 h-3.5 text-success-600 dark:text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-navy-muted/70 dark:text-slate-500" />
+              )}
+            </button>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={generate} loading={generating} size="lg" className="bg-gradient-to-l from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 shadow-card">
+          <Button onClick={requestGenerate} loading={generating} disabled={employees.length === 0} size="lg" className="bg-gradient-to-l from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 shadow-card">
             <Sparkles className="w-[18px] h-[18px]" /> צור שיבוץ
           </Button>
           {scheduleData && (
@@ -895,6 +937,20 @@ export default function DashboardPage() {
       {/* Schedule grid */}
       {loading ? (
         <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-xl bg-surface-mid dark:bg-white/[0.07] animate-pulse" />)}</div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-white dark:bg-white/[0.04] py-16 text-center px-6">
+          <p className="text-sm text-navy-muted dark:text-slate-400 mb-4">לא ניתן לטעון את הנתונים.</p>
+          <Button onClick={() => window.location.reload()} variant="outline" size="md">נסה שוב</Button>
+        </div>
+      ) : employees.length === 0 ? (
+        <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-white dark:bg-white/[0.04] py-16 text-center px-6">
+          <div className="mx-auto w-12 h-12 rounded-full bg-brand-50 dark:bg-brand-500/15 grid place-items-center mb-4">
+            <Users className="w-6 h-6 text-brand-600 dark:text-brand-400" />
+          </div>
+          <p className="font-semibold text-navy dark:text-slate-100 mb-1">עדיין אין עובדים</p>
+          <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">הוסף את הצוות שלך כדי להתחיל לשבץ.</p>
+          <Button onClick={() => router.push("/settings")} size="md"><Users className="w-4 h-4" /> הוסף עובדים</Button>
+        </div>
       ) : !scheduleData ? (
         <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-low dark:bg-white/[0.03] py-16 text-center">
           <p className="text-sm text-navy-muted/70 dark:text-slate-500 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
@@ -903,7 +959,7 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-400/60 flex items-center gap-1.5"><GripVertical className="w-3.5 h-3.5" /> גרור עובדים בין משמרות · הוסף או הסר בכל תא</p>
+            <p className="text-xs text-navy-muted/70 dark:text-slate-500 flex items-center gap-1.5"><GripVertical className="w-3.5 h-3.5" /> גרור עובדים בין משמרות · הוסף או הסר בכל תא</p>
             {existing && <p className="text-xs text-navy-muted/70 dark:text-slate-500">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
           {filterBar}
@@ -1113,6 +1169,38 @@ export default function DashboardPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
           {errorToast}
+        </div>
+      )}
+
+      {/* Undo toast — bottom center */}
+      {undoSnap && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-navy dark:bg-[#1b2942] text-white text-sm font-medium px-4 py-3 rounded-xl shadow-xl ring-1 ring-white/10">
+          <span>{undoSnap.label}</span>
+          <button onClick={doUndo} className="font-bold text-brand-300 hover:text-brand-200 transition-colors">בטל</button>
+        </div>
+      )}
+
+      {/* Confirm regenerate dialog */}
+      {confirmRegen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#131f33] rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
+            <p className="font-bold text-navy dark:text-slate-100 text-base mb-1">יצירת שיבוץ חדש</p>
+            <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">פעולה זו תחליף את השיבוץ הנוכחי (פרט למשובצים נעוצים). להמשיך?</p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => { setConfirmRegen(false); generate(); }}
+                className="flex-1 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors"
+              >
+                צור מחדש
+              </button>
+              <button
+                onClick={() => setConfirmRegen(false)}
+                className="flex-1 py-2 rounded-lg border border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03] text-navy dark:text-slate-100 text-sm font-semibold transition-colors"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
