@@ -61,19 +61,19 @@ export default function ConstraintsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">זמינות עובדים</h1>
-        <p className="text-sm text-gray-500">שבוע {weekLabel}</p>
+        <h1 className="text-xl font-bold text-navy">זמינות עובדים</h1>
+        <p className="text-sm text-navy-muted">שבוע {weekLabel}</p>
       </div>
 
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 rounded-xl bg-gray-100 animate-pulse" />
+            <div key={i} className="h-24 rounded-xl bg-surface-mid animate-pulse" />
           ))}
         </div>
       ) : employees.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-gray-400">לא נמצאו עובדים.</CardContent>
+          <CardContent className="py-12 text-center text-sm text-navy-muted/70">לא נמצאו עובדים.</CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
@@ -86,7 +86,7 @@ export default function ConstraintsPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-sm text-gray-900">{emp.name ?? emp.email}</p>
+                      <p className="font-semibold text-sm text-navy">{emp.name ?? emp.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={hasConstraints ? "success" : "warning"}>
@@ -97,7 +97,7 @@ export default function ConstraintsPage() {
                         className={cn(
                           "text-xs px-2.5 py-1 rounded-md border font-medium transition-colors",
                           isEditing
-                            ? "border-gray-300 text-gray-500 hover:bg-gray-50"
+                            ? "border-surface-high text-navy-muted hover:bg-surface-low"
                             : "border-brand-300 text-brand-600 hover:bg-brand-50"
                         )}
                       >
@@ -120,13 +120,13 @@ export default function ConstraintsPage() {
                   </>
                 ) : hasConstraints ? (
                   <CardContent>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-navy-muted/70">
                       עודכן: {format(new Date(emp.constraints[0].updatedAt), "d/M 'בשעה' HH:mm")}
                     </p>
                   </CardContent>
                 ) : (
                   <CardContent>
-                    <p className="text-sm text-gray-400">טרם הוגש. לחץ עריכה להגדרה ידנית.</p>
+                    <p className="text-sm text-navy-muted/70">טרם הוגש. לחץ עריכה להגדרה ידנית.</p>
                   </CardContent>
                 )}
               </Card>

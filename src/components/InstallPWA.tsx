@@ -66,13 +66,13 @@ export function InstallPWA() {
             dir="rtl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-bold text-gray-900 text-base mb-4">הוסף למסך הבית</h3>
-            <ol className="space-y-4 text-sm text-gray-700">
+            <h3 className="font-bold text-navy text-base mb-4">הוסף למסך הבית</h3>
+            <ol className="space-y-4 text-sm text-navy">
               <li className="flex items-start gap-3">
                 <span className="font-bold text-brand-600 shrink-0 w-5">1.</span>
                 <span>
                   לחץ על כפתור השיתוף{" "}
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-100 rounded text-gray-700 text-sm font-bold">
+                  <span className="inline-flex items-center justify-center w-6 h-6 bg-surface-mid rounded text-navy text-sm font-bold">
                     ↑
                   </span>{" "}
                   בתחתית הדפדפן
