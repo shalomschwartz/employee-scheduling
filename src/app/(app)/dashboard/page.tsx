@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { type ConstraintData } from "@/components/availability/AvailabilityGrid";
-import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, toMins, gapMins, cn, type Day, type ShiftConfig } from "@/lib/utils";
+import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, toMins, cn, type Day, type ShiftConfig } from "@/lib/utils";
 
 interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; pinnedIds?: string[]; }
 type ScheduleData = Record<string, Record<string, ShiftSlot>>;
@@ -36,6 +36,14 @@ function empHex(index: number): string {
 /** Tailwind-compatible chip class for a given employee index. Uses inline bg since arbitrary hsl isn't purgeable. */
 function empChipClass(_index: number): string {
   return "text-white"; // bg set via style prop for generated colors
+}
+
+/** Absolute same-day minute range [start, end) for a shift; overnight shifts wrap past midnight. */
+function shiftMinRange(cfg: ShiftConfig): [number, number] {
+  const s = toMins(cfg.start);
+  let e = toMins(cfg.end);
+  if (e <= s) e += 1440;
+  return [s, e];
 }
 
 const ROLE_COLORS = [
@@ -105,9 +113,14 @@ export default function DashboardPage() {
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
   async function fetchEmployees() {
-    const res = await fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`);
-    const emps = await res.json();
-    if (Array.isArray(emps)) setEmployees(emps);
+    try {
+      const res = await fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`);
+      if (!res.ok) return;
+      const emps = await res.json();
+      if (Array.isArray(emps)) setEmployees(emps);
+    } catch {
+      // ignore transient polling errors
+    }
   }
 
   useEffect(() => {
@@ -196,7 +209,7 @@ export default function DashboardPage() {
   const colorMap = useMemo(() => {
     const map: Record<string, string> = {};
     employees.forEach((emp, i) => {
-      map[emp.name ?? emp.email] = empHex(i);
+      map[emp.id] = empHex(i);
     });
     return map;
   }, [employees]);
@@ -282,11 +295,10 @@ export default function DashboardPage() {
     persistSchedule(updated);
   }
 
-  function removeFromSlot(name: string, day: string, shift: string) {
+  function removeFromSlot(day: string, shift: string, idx: number) {
     if (!scheduleData) return;
-    const slot = scheduleData[day][shift];
-    const idx = slot.employeeNames.indexOf(name);
-    if (idx === -1) return;
+    const slot = scheduleData[day]?.[shift];
+    if (!slot || idx < 0 || idx >= slot.employeeIds.length) return;
     const removedId = slot.employeeIds[idx];
     const updated = {
       ...scheduleData,
@@ -312,30 +324,35 @@ export default function DashboardPage() {
   function hasOverlapConflict(empId: string, day: string, shift: string): boolean {
     const cfg = shifts.find(s => s.id === shift);
     if (!cfg) return false;
+    const [cs, ce] = shiftMinRange(cfg);
     return empShiftsOnDay(empId, day, shift).some(sid => {
       const other = shifts.find(s => s.id === sid);
       if (!other) return false;
-      // Two shifts overlap if neither ends before the other starts
-      const gap1 = gapMins(cfg.end, other.start);   // gap from cfg→other
-      const gap2 = gapMins(other.end, cfg.start);    // gap from other→cfg
-      return Math.min(gap1, gap2) === 0;
+      const [os, oe] = shiftMinRange(other);
+      // True interior overlap — touching boundaries (e.g. 07–15 & 15–23) are adjacent, not overlapping
+      return cs < oe && os < ce;
     });
   }
 
   function hasRestViolation(empId: string, day: string, shift: string): boolean {
     const cfg = shifts.find(s => s.id === shift);
     if (!cfg) return false;
+    const [cs, ce] = shiftMinRange(cfg);
     return empShiftsOnDay(empId, day, shift).some(sid => {
       const other = shifts.find(s => s.id === sid);
       if (!other) return false;
-      return Math.min(gapMins(cfg.end, other.start), gapMins(other.end, cfg.start)) < minRestHours * 60;
+      const [os, oe] = shiftMinRange(other);
+      if (cs < oe && os < ce) return false; // overlap is reported separately
+      const gap = cs >= oe ? cs - oe : os - ce;
+      return gap < minRestHours * 60;
     });
   }
 
   function addToSlot(emp: Employee, day: string, shift: string) {
     if (!scheduleData) return;
     setEditingCell(null);
-    const slot = scheduleData[day][shift];
+    const slot = scheduleData[day]?.[shift];
+    if (!slot) return;
     if (slot.employeeIds.includes(emp.id)) return;
     const minW = shifts.find(s => s.id === shift)?.minWorkers ?? 2;
     if (slot.employeeIds.length >= minW) {
@@ -390,7 +407,8 @@ export default function DashboardPage() {
     if (dragging.fromDay === toDay && dragging.fromShift === toShift) { setDragging(null); return; }
 
     const emp = empMap[dragging.empId];
-    const toSlot = scheduleData[toDay][toShift];
+    const toSlot = scheduleData[toDay]?.[toShift];
+    if (!toSlot) { setDragging(null); return; }
     if (toSlot.employeeIds.includes(dragging.empId)) {
       setErrorToast(`${dragging.name} כבר משובץ/ת במשמרת זו`);
       setTimeout(() => setErrorToast(null), 3000);
@@ -405,7 +423,8 @@ export default function DashboardPage() {
       return;
     }
     const doMove = () => {
-      const fromSlot = scheduleData[dragging.fromDay][dragging.fromShift];
+      const fromSlot = scheduleData[dragging.fromDay]?.[dragging.fromShift];
+      if (!fromSlot) { setDragging(null); return; }
       const idx = fromSlot.employeeIds.indexOf(dragging.empId);
       const updated = {
         ...scheduleData,
@@ -576,7 +595,7 @@ export default function DashboardPage() {
         onClick={() => setEmpFilter(null)}
         className={cn(
           "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-          empFilter === null ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+          empFilter === null ? "bg-navy text-white border-navy" : "bg-white text-navy-muted border-surface-high hover:bg-surface-low"
         )}
       >
         הכל
@@ -591,7 +610,7 @@ export default function DashboardPage() {
             onClick={() => setEmpFilter(id)}
             className={cn(
               "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
-              selected ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              selected ? "text-white border-transparent" : "bg-white text-navy-muted border-surface-high hover:bg-surface-low"
             )}
             style={selected ? { backgroundColor: empHex(i) } : undefined}
           >
@@ -614,13 +633,13 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowWelcome(false)}>
           <div className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
             <p className="text-3xl">👋</p>
-            <p className="text-2xl font-bold text-gray-900">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
+            <p className="text-2xl font-bold text-navy">ברוך הבא{session?.user.name ? `, ${session.user.name.split(" ")[0]}` : ""}!</p>
           </div>
         </div>
       )}
 
       {/* Guide */}
-      <div className="rounded-xl border-2 border-blue-200 bg-blue-50 text-sm text-gray-700">
+      <div className="rounded-xl border-2 border-blue-200 bg-blue-50 text-sm text-navy">
         <button
           onClick={() => {
             const next = !showGuide;
@@ -663,8 +682,8 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">לוח בקרה</h1>
-          <p className="text-sm text-gray-500">שבוע {weekLabel}</p>
+          <h1 className="text-xl font-bold text-navy">לוח בקרה</h1>
+          <p className="text-sm text-navy-muted">שבוע {weekLabel}</p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
@@ -696,8 +715,8 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="py-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-700">הגשת זמינות</p>
-              <p className="text-xs text-gray-400">{submitted}/{employees.length} הגישו</p>
+              <p className="text-xs font-semibold text-navy">הגשת זמינות</p>
+              <p className="text-xs text-navy-muted/70">{submitted}/{employees.length} הגישו</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {employees.map(emp => {
@@ -730,22 +749,22 @@ export default function DashboardPage() {
               <Card key={emp.id} className="overflow-hidden">
                 <div className="h-1.5 w-full" style={{ backgroundColor: empHex(i) }} />
                 <CardContent className="py-3">
-                  <p className="text-xs font-semibold text-gray-700 truncate">{name}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{hours}<span className="text-xs font-normal text-gray-400 mr-1">שעות</span></p>
+                  <p className="text-xs font-semibold text-navy truncate">{name}</p>
+                  <p className="text-2xl font-bold text-navy mt-1">{hours}<span className="text-xs font-normal text-navy-muted/70 mr-1">שעות</span></p>
 
                   {/* Profile summary */}
-                  <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+                  <div className="mt-2 space-y-1 border-t border-surface-high pt-2">
                     {/* Contract */}
                     {emp.contractShifts != null && emp.contractShifts > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <span className="font-medium text-gray-600">חוזה:</span>
+                      <div className="flex items-center gap-1 text-xs text-navy-muted">
+                        <span className="font-medium text-navy-muted">חוזה:</span>
                         <span>{emp.contractShifts} משמרות/שבוע</span>
                       </div>
                     )}
                     {/* Roles */}
                     {emp.roles.length > 0 && (
-                      <div className="flex items-start gap-1 text-xs text-gray-500">
-                        <span className="font-medium text-gray-600 shrink-0">תפקידים:</span>
+                      <div className="flex items-start gap-1 text-xs text-navy-muted">
+                        <span className="font-medium text-navy-muted shrink-0">תפקידים:</span>
                         <span>{emp.roles.join(", ")}</span>
                       </div>
                     )}
@@ -753,8 +772,8 @@ export default function DashboardPage() {
                     {(shiftsPerEmployeeMap[emp.id]?.length ?? 0) > 0 && (
                       <>
                         {shiftsPerEmployeeMap[emp.id].map(({ shiftLabel, days }) => (
-                          <div key={shiftLabel} className="flex items-center gap-1 text-xs text-gray-500">
-                            <span className="font-medium text-gray-600">{shiftLabel}:</span>
+                          <div key={shiftLabel} className="flex items-center gap-1 text-xs text-navy-muted">
+                            <span className="font-medium text-navy-muted">{shiftLabel}:</span>
                             <span>{days.map(d => DAY_SHORT[d]).join(" ")}</span>
                           </div>
                         ))}
@@ -820,28 +839,28 @@ export default function DashboardPage() {
 
       {/* Schedule grid */}
       {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />)}</div>
+        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-xl bg-surface-mid animate-pulse" />)}</div>
       ) : !scheduleData ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <p className="text-sm text-gray-400 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
+            <p className="text-sm text-navy-muted/70 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
             <Button onClick={generate} loading={generating} size="md">צור סידור אוטומטי</Button>
           </CardContent>
         </Card>
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-400">X להסרה • + להוספה ידנית 📌</p>
-            {existing && <p className="text-xs text-gray-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
+            <p className="text-xs text-navy-muted/70">X להסרה • + להוספה ידנית 📌</p>
+            {existing && <p className="text-xs text-navy-muted/70">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
           {filterBar}
-          <div className="overflow-x-auto rounded-xl border-2 border-gray-300 shadow-sm">
+          <div className="overflow-x-auto rounded-xl border-2 border-surface-high shadow-sm">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b-2 border-gray-400">
-                  <th className="text-right py-3 ps-4 pe-3 text-xs font-semibold text-gray-500 w-28 whitespace-nowrap border-e-2 border-gray-300">משמרת</th>
+                <tr className="bg-surface-low border-b-2 border-surface-highest">
+                  <th className="text-right py-3 ps-4 pe-3 text-xs font-semibold text-navy-muted w-28 whitespace-nowrap border-e-2 border-surface-high">משמרת</th>
                   {DAYS.map(day => (
-                    <th key={day} className="py-3 px-3 text-center text-xs font-semibold text-gray-700 min-w-[90px] border-e-2 border-gray-300 last:border-e-0">
+                    <th key={day} className="py-3 px-3 text-center text-xs font-semibold text-navy min-w-[90px] border-e-2 border-surface-high last:border-e-0">
                       {DAY_LABELS_HE[day as Day]}
                     </th>
                   ))}
@@ -854,7 +873,7 @@ export default function DashboardPage() {
                   return (
                   <tr
                     key={shift}
-                    className={cn("border-b-2 border-gray-300 last:border-0 transition-opacity", draggingRow === shift && "opacity-40")}
+                    className={cn("border-b-2 border-surface-high last:border-0 transition-opacity", draggingRow === shift && "opacity-40")}
                     draggable
                     onDragStart={() => setDraggingRow(shift)}
                     onDragEnd={() => { setDraggingRow(null); setDragOverRow(null); }}
@@ -863,13 +882,13 @@ export default function DashboardPage() {
                     onDrop={() => handleRowDrop(shift)}
                     style={dragOverRow === shift && draggingRow !== shift ? { outline: "2px solid #6366f1", outlineOffset: "-2px" } : undefined}
                   >
-                    <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-gray-300">
+                    <td className="py-3 ps-4 pe-3 align-middle border-e-2 border-surface-high">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-300 cursor-grab active:cursor-grabbing select-none text-base leading-none" title="גרור לסידור מחדש">⠿</span>
+                        <span className="text-navy-muted/40 cursor-grab active:cursor-grabbing select-none text-base leading-none" title="גרור לסידור מחדש">⠿</span>
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
+                            <span className="text-xs font-semibold text-navy whitespace-nowrap">{shiftCfg?.label ?? shift}</span>
                           </div>
                           {shiftCfg?.role && (() => {
                             const rc = roleColorMap[shiftCfg.role];
@@ -882,7 +901,7 @@ export default function DashboardPage() {
                               </span>
                             );
                           })()}
-                          <span className="block text-[10px] text-gray-400 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
+                          <span className="block text-[10px] text-navy-muted/70 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
                         </div>
                       </div>
                     </td>
@@ -910,7 +929,7 @@ export default function DashboardPage() {
                         ? (empMap[dragging.empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available")
                         : null;
                       // Ambient bg shown for all cells while dragging
-                      const dragBg = alreadyInSlot ? "bg-gray-100"
+                      const dragBg = alreadyInSlot ? "bg-surface-mid"
                         : cellAv === "available" ? "bg-green-50"
                         : cellAv === "prefer_not" ? "bg-yellow-50"
                         : cellAv === "unavailable" ? "bg-red-50"
@@ -925,7 +944,7 @@ export default function DashboardPage() {
                       return (
                         <td
                           key={day}
-                          className={cn("py-2 px-2 align-top transition-colors border-e-2 border-gray-300 last:border-e-0", dragging && dragBg, dropOutline)}
+                          className={cn("py-2 px-2 align-top transition-colors border-e-2 border-surface-high last:border-e-0", dragging && dragBg, dropOutline)}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
@@ -939,7 +958,7 @@ export default function DashboardPage() {
                               const avBorder = av === "available" ? "ring-[3px] ring-green-400" : av === "prefer_not" ? "ring-[3px] ring-yellow-400" : "ring-[3px] ring-red-500";
                               return (
                               <div
-                                key={name}
+                                key={empId ?? name}
                                 className="group relative"
                                 draggable
                                 onDragStart={() => setDragging({ empId: empId!, name, fromDay: day, fromShift: shift })}
@@ -950,7 +969,7 @@ export default function DashboardPage() {
                                     "text-xs px-2 py-1 rounded-lg font-medium text-center leading-tight w-full cursor-grab active:cursor-grabbing text-white",
                                     avBorder
                                   )}
-                                  style={{ backgroundColor: colorMap[name] ?? "#6b7280" }}
+                                  style={{ backgroundColor: (empId && colorMap[empId]) || "#6b7280" }}
                                 >
                                   <span className="flex items-center justify-center gap-1">
                                     {isPinned && <span className="text-[9px]">📌</span>}
@@ -959,8 +978,8 @@ export default function DashboardPage() {
                                 </div>
                                 {/* Remove button */}
                                 <button
-                                  onClick={e => { e.stopPropagation(); removeFromSlot(name, day, shift); }}
-                                  className="absolute -top-1 -start-1 w-4 h-4 rounded-full bg-gray-300 hover:bg-red-500 text-white text-[9px] font-bold flex items-center justify-center z-10 transition-colors opacity-50 group-hover:opacity-100"
+                                  onClick={e => { e.stopPropagation(); removeFromSlot(day, shift, ni); }}
+                                  className="absolute -top-1 -start-1 w-4 h-4 rounded-full bg-surface-highest hover:bg-red-500 text-white text-[9px] font-bold flex items-center justify-center z-10 transition-colors opacity-50 group-hover:opacity-100"
                                   title="הסר ממשמרת"
                                 >
                                   ×
@@ -971,9 +990,9 @@ export default function DashboardPage() {
 
                             {/* Add employee picker */}
                             {isEditingThis ? (
-                              <div ref={pickerRef} className="rounded-lg border border-gray-200 bg-white shadow-md overflow-hidden z-20 relative">
+                              <div ref={pickerRef} className="rounded-lg border border-surface-high bg-white shadow-md overflow-hidden z-20 relative">
                                 {availableToAdd.length === 0 ? (
-                                  <p className="px-2 py-1.5 text-xs text-gray-400">{shiftRole ? `אין עובדים מוסמכים ל"${shiftRole}"` : "כולם כבר מוקצים"}</p>
+                                  <p className="px-2 py-1.5 text-xs text-navy-muted/70">{shiftRole ? `אין עובדים מוסמכים ל"${shiftRole}"` : "כולם כבר מוקצים"}</p>
                                 ) : availableToAdd.map(emp => {
                                   const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                                   const dot = av === "available" ? "bg-green-500" : av === "prefer_not" ? "bg-yellow-400" : "bg-red-600";
@@ -982,12 +1001,12 @@ export default function DashboardPage() {
                                     <button
                                       key={emp.id}
                                       onClick={() => addToSlot(emp, day, shift)}
-                                      className="flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs transition-colors border-b border-gray-50 last:border-0 hover:bg-gray-50"
+                                      className="flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs transition-colors border-b border-surface-high last:border-0 hover:bg-surface-low"
                                     >
                                       <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
                                       <span className="flex-1">
                                         <span className="block">{emp.name ?? emp.email}</span>
-                                        <span className="text-[10px] text-gray-400">
+                                        <span className="text-[10px] text-navy-muted/70">
                                           {emp.roles.length > 0 ? emp.roles.join(", ") : "ללא תפקיד"}{" · "}{avLabel}
                                         </span>
                                       </span>
@@ -998,7 +1017,7 @@ export default function DashboardPage() {
                             ) : (slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2) && (
                               <button
                                 onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
-                                className="w-full text-center text-gray-300 hover:text-gray-500 text-sm py-0.5 rounded hover:bg-gray-50 transition-colors leading-none"
+                                className="w-full text-center text-navy-muted/40 hover:text-navy-muted text-sm py-0.5 rounded hover:bg-surface-low transition-colors leading-none"
                                 title="הוסף עובד"
                               >
                                 +
@@ -1052,12 +1071,12 @@ export default function DashboardPage() {
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full relative" dir="rtl">
             <button
               onClick={() => setConflictDialog(null)}
-              className="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-xl leading-none"
+              className="absolute top-4 left-4 text-navy-muted/70 hover:text-navy-muted text-xl leading-none"
             >
               ×
             </button>
-            <h3 className="font-bold text-gray-900 text-base mb-1">התנגשות בזמינות</h3>
-            <p className="text-xs text-gray-500 mb-3">העובדים הבאים ציינו שאינם זמינים:</p>
+            <h3 className="font-bold text-navy text-base mb-1">התנגשות בזמינות</h3>
+            <p className="text-xs text-navy-muted mb-3">העובדים הבאים ציינו שאינם זמינים:</p>
             <ul className="space-y-1 mb-5">
               {conflictDialog.lines.map((line, i) => (
                 <li key={i} className="text-sm text-red-600 font-medium">• {line}</li>
@@ -1080,8 +1099,8 @@ export default function DashboardPage() {
       {confirmClear && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
-            <p className="font-bold text-gray-900 text-base mb-1">מחיקת משמרת</p>
-            <p className="text-sm text-gray-500 mb-5">האם אתה בטוח שברצונך להסיר את כל העובדים מהמשמרת?</p>
+            <p className="font-bold text-navy text-base mb-1">מחיקת משמרת</p>
+            <p className="text-sm text-navy-muted mb-5">האם אתה בטוח שברצונך להסיר את כל העובדים מהמשמרת?</p>
             <div className="flex gap-2 justify-center">
               <button
                 onClick={() => { clearShiftCell(confirmClear.day, confirmClear.shift); setConfirmClear(null); }}
@@ -1091,7 +1110,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setConfirmClear(null)}
-                className="flex-1 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold transition-colors"
+                className="flex-1 py-2 rounded-lg border border-surface-high hover:bg-surface-low text-navy text-sm font-semibold transition-colors"
               >
                 ביטול
               </button>
@@ -1105,25 +1124,25 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-1">
-              <h2 className="font-semibold text-sm text-gray-900">זמינות עובדים</h2>
+              <h2 className="font-semibold text-sm text-navy">זמינות עובדים</h2>
               {filterBar}
             </div>
 
             {/* Legend */}
-            <div className="flex gap-3 mb-3 text-xs text-gray-600">
+            <div className="flex gap-3 mb-3 text-xs text-navy-muted">
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-green-100 ring-1 ring-green-200" />זמין</span>
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-100 ring-1 ring-yellow-200" />מעדיף לא</span>
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-red-100 ring-1 ring-red-200" />לא זמין</span>
             </div>
 
             {/* Overview table */}
-            <div className="overflow-x-auto rounded-xl border-2 border-gray-300 shadow-sm">
+            <div className="overflow-x-auto rounded-xl border-2 border-surface-high shadow-sm">
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-right py-2 ps-3 pe-2 font-semibold text-gray-500 w-24 whitespace-nowrap">משמרת</th>
+                  <tr className="bg-surface-low border-b border-surface-high">
+                    <th className="text-right py-2 ps-3 pe-2 font-semibold text-navy-muted w-24 whitespace-nowrap">משמרת</th>
                     {DAYS.map(day => (
-                      <th key={day} className="py-2 px-1 text-center font-semibold text-gray-700 min-w-[72px]">
+                      <th key={day} className="py-2 px-1 text-center font-semibold text-navy min-w-[72px]">
                         {DAY_LABELS_HE[day as Day]}
                       </th>
                     ))}
@@ -1134,11 +1153,11 @@ export default function DashboardPage() {
                     const shiftCfg = shifts.find(s => s.id === shift);
                     const dotColors = ["bg-yellow-400","bg-orange-400","bg-indigo-400","bg-blue-400","bg-pink-400"];
                     return (
-                    <tr key={shift} className="border-b border-gray-100 last:border-0">
+                    <tr key={shift} className="border-b border-surface-high last:border-0">
                       <td className="py-2 ps-3 pe-2 align-middle">
                         <div className="flex items-center gap-1.5">
                           <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
-                          <span className="font-semibold text-gray-700">{shiftCfg?.label ?? shift}</span>
+                          <span className="font-semibold text-navy">{shiftCfg?.label ?? shift}</span>
                         </div>
                       </td>
                       {DAYS.map(day => (
