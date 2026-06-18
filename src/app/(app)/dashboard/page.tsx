@@ -1087,7 +1087,7 @@ export default function DashboardPage() {
                       return (
                         <td
                           key={day}
-                          className={cn("py-2 px-2 align-top transition-colors border-e border-surface-high/60 dark:border-white/[0.06] last:border-e-0", dragging && dragBg, dropOutline)}
+                          className={cn("group/cell py-2 px-2 align-top transition-colors border-e border-surface-high/60 dark:border-white/[0.06] last:border-e-0", dragging && dragBg, dropOutline)}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
@@ -1098,7 +1098,7 @@ export default function DashboardPage() {
                               if (empFilter !== null && empId !== empFilter) return null;
                               const isPinned = !!empId && pinnedIds.includes(empId);
                               const av = empId ? (empMap[empId]?.constraints[0]?.data?.[day as Day]?.[shift] ?? "available") : "available";
-                              const avBorder = av === "available" ? "border-success-500/50" : av === "prefer_not" ? "border-warning-500/60" : "border-danger-500/70";
+                              const avBorder = av === "available" ? "border-surface-high dark:border-white/10" : av === "prefer_not" ? "border-warning-500/60" : "border-danger-500/70";
                               return (
                               <div
                                 key={empId ?? name}
@@ -1158,7 +1158,7 @@ export default function DashboardPage() {
                             ) : (slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2) && (
                               <button
                                 onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
-                                className="w-full flex items-center justify-center gap-1 text-slate-400/60 hover:text-brand-600 dark:hover:text-brand-400 text-[11px] font-medium py-1 rounded-lg border border-dashed border-surface-highest dark:border-white/[0.12] hover:border-brand-300 dark:hover:border-brand-400/40 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
+                                className="w-full flex items-center justify-center gap-1 text-navy-muted/50 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400 text-[11px] font-medium py-1 rounded-lg border border-dashed border-surface-high/70 dark:border-white/[0.08] hover:border-brand-300 dark:hover:border-brand-400/40 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
                                 title="הוסף עובד"
                               >
                                 <Plus className="w-3.5 h-3.5" /> הוסף
@@ -1167,7 +1167,7 @@ export default function DashboardPage() {
                             {(slot?.employeeIds ?? []).length > 0 && (
                               <button
                                 onClick={e => { e.stopPropagation(); setConfirmClear({ day, shift }); }}
-                                className="w-full text-center text-[10px] font-normal py-0.5 rounded text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                                className="w-full text-center text-[10px] font-normal py-0.5 rounded text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all opacity-100 sm:opacity-0 sm:group-hover/cell:opacity-100 focus:opacity-100"
                               >
                                 מחק משמרת
                               </button>
