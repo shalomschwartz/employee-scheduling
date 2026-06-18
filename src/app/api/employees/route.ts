@@ -14,7 +14,7 @@ export async function GET() {
   const [employees, org] = await Promise.all([
     prisma.user.findMany({
       where: { organizationId: session.user.organizationId, role: { in: ["EMPLOYEE", "MANAGER"] } },
-      select: { id: true, name: true, phone: true },
+      select: { id: true, name: true, phone: true, isShiftLead: true },
       orderBy: { createdAt: "asc" },
     }),
     prisma.organization.findUnique({ where: { id: session.user.organizationId } }),
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     select: { id: true, name: true, phone: true },
   });
 
-  return NextResponse.json({ ...employee, roles: [], contractShifts: null }, { status: 201 });
+  return NextResponse.json({ ...employee, roles: [], contractShifts: null, isShiftLead: false }, { status: 201 });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest) {
   if (!session || session.user.role !== "MANAGER" || !session.user.organizationId)
     return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
 
-  const { id, roles, contractShifts } = await req.json();
+  const { id, roles, contractShifts, isShiftLead } = await req.json();
   if (!id) return NextResponse.json({ error: "נדרש מזהה" }, { status: 400 });
   if (contractShifts !== undefined && contractShifts !== null && (typeof contractShifts !== "number" || !Number.isInteger(contractShifts) || contractShifts < 0))
     return NextResponse.json({ error: "ערך חוזה לא תקין" }, { status: 400 });
@@ -99,6 +99,10 @@ export async function PATCH(req: NextRequest) {
       data: { settings: { ...current, employeeSettings: empSettings } },
     });
   });
+
+  if (isShiftLead !== undefined) {
+    await prisma.user.update({ where: { id }, data: { isShiftLead: !!isShiftLead } });
+  }
 
   return NextResponse.json({ ok: true });
 }

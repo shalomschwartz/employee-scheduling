@@ -14,6 +14,7 @@ interface Employee {
   phone?: string | null;
   roles: string[];
   contractShifts: number | null;
+  isShiftLead?: boolean;
 }
 
 function RoleChipSelector({ roles, selected, onChange, showAll = false }: {
@@ -125,6 +126,12 @@ export default function SettingsPage() {
   const [restSaving, setRestSaving] = useState(false);
   const [restSaved, setRestSaved] = useState(false);
 
+  // ── Scheduling rules ────────────────────────────────────────────────────────
+  const [maxConsecutiveDays, setMaxConsecutiveDays] = useState(0);
+  const [requireShiftLead, setRequireShiftLead] = useState(false);
+  const [rulesSaving, setRulesSaving] = useState(false);
+  const [rulesSaved, setRulesSaved] = useState(false);
+
   useEffect(() => {
     fetch("/api/deadline")
       .then(r => r.json())
@@ -134,6 +141,12 @@ export default function SettingsPage() {
     fetch("/api/min-rest-hours")
       .then(r => r.json())
       .then(d => { if (typeof d.minRestHours === "number") setMinRestHours(d.minRestHours); });
+    fetch("/api/scheduling-rules")
+      .then(r => r.json())
+      .then(d => {
+        if (typeof d.maxConsecutiveDays === "number") setMaxConsecutiveDays(d.maxConsecutiveDays);
+        if (typeof d.requireShiftLead === "boolean") setRequireShiftLead(d.requireShiftLead);
+      });
   }, []);
 
   async function saveRestHours() {
@@ -146,6 +159,18 @@ export default function SettingsPage() {
     setRestSaving(false);
     setRestSaved(true);
     setTimeout(() => setRestSaved(false), 2000);
+  }
+
+  async function saveRules() {
+    setRulesSaving(true);
+    await fetch("/api/scheduling-rules", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ maxConsecutiveDays, requireShiftLead }),
+    });
+    setRulesSaving(false);
+    setRulesSaved(true);
+    setTimeout(() => setRulesSaved(false), 2000);
   }
 
   function toDatetimeLocal(iso: string): string {
@@ -218,7 +243,7 @@ export default function SettingsPage() {
     if (res.ok) setEmployees(prev => prev.filter(e => e.id !== id));
   }
 
-  function updateEmpLocal(id: string, patch: { roles?: string[]; contractShifts?: number | null }) {
+  function updateEmpLocal(id: string, patch: { roles?: string[]; contractShifts?: number | null; isShiftLead?: boolean }) {
     setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
     setDirtyEmps(prev => new Set(prev).add(id));
   }
@@ -230,7 +255,7 @@ export default function SettingsPage() {
     await fetch("/api/employees", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts }),
+      body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts, isShiftLead: emp.isShiftLead ?? false }),
     });
     setSavingEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
     setDirtyEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
@@ -564,6 +589,32 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Scheduling rules ── */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-navy dark:text-slate-100">כללי שיבוץ</h2>
+            <p className="text-xs text-navy-muted dark:text-slate-400 mt-1">
+              כללים שהאלגוריתם מנסה לכבד בעת יצירת הסידור.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-navy-muted dark:text-slate-400">מקסימום ימים רצופים:</span>
+            <button onClick={() => setMaxConsecutiveDays(d => Math.max(0, d - 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">−</button>
+            <span className="text-base font-bold text-navy dark:text-slate-100 w-16 text-center">{maxConsecutiveDays === 0 ? "ללא" : maxConsecutiveDays}</span>
+            <button onClick={() => setMaxConsecutiveDays(d => Math.min(7, d + 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">+</button>
+          </div>
+          <label className="flex items-center gap-2.5 cursor-pointer w-fit">
+            <input type="checkbox" checked={requireShiftLead} onChange={e => setRequireShiftLead(e.target.checked)} className="w-4 h-4 accent-brand-600" />
+            <span className="text-sm text-navy dark:text-slate-100">דרוש ראש משמרת בכל משמרת</span>
+          </label>
+          <div className="flex items-center gap-3">
+            <Button onClick={saveRules} loading={rulesSaving} size="md">שמור</Button>
+            {rulesSaved && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">נשמר!</span>}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ── Employees ── */}
       <Card>
         <CardContent className="pt-5 space-y-4">
@@ -685,6 +736,17 @@ export default function SettingsPage() {
                       ) : (
                         <p className="text-xs text-navy-muted/70 dark:text-slate-500">הגדר תפקידים בכרטיס "סוגי תפקידים" כדי להציג כאן.</p>
                       )}
+
+                      {/* Shift lead */}
+                      <label className="flex items-center gap-2 cursor-pointer w-fit">
+                        <input
+                          type="checkbox"
+                          checked={!!emp.isShiftLead}
+                          onChange={e => updateEmpLocal(emp.id, { isShiftLead: e.target.checked })}
+                          className="w-4 h-4 accent-brand-600"
+                        />
+                        <span className="text-xs text-navy dark:text-slate-100">ראש משמרת</span>
+                      </label>
 
                       {/* Save button */}
                       {dirtyEmps.has(emp.id) && (
