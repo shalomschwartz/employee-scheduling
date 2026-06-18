@@ -53,9 +53,10 @@ export async function PATCH(req: NextRequest) {
   const weekStart = new Date(parsed.data.weekStart);
   if (isNaN(weekStart.getTime())) return NextResponse.json({ error: "תאריך לא תקין" }, { status: 400 });
 
-  const updated = await prisma.generatedSchedule.update({
+  const updated = await prisma.generatedSchedule.upsert({
     where: { organizationId_weekStart: { organizationId: session.user.organizationId, weekStart } },
-    data: { schedule: parsed.data.schedule as Prisma.InputJsonValue, updatedAt: new Date() },
+    create: { organizationId: session.user.organizationId, weekStart, schedule: parsed.data.schedule as Prisma.InputJsonValue, status: "DRAFT" },
+    update: { schedule: parsed.data.schedule as Prisma.InputJsonValue, updatedAt: new Date() },
   });
 
   return NextResponse.json(updated);

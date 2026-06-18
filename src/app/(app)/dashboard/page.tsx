@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound, Copy, Check, Send } from "lucide-react";
+import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound, Copy, Check, Send, ChevronRight, ChevronLeft } from "lucide-react";
 import { useEscapeClose } from "@/lib/useEscapeClose";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -139,6 +139,7 @@ export default function DashboardPage() {
   const [undoSnap, setUndoSnap] = useState<{ data: ScheduleData; label: string } | null>(null);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [orgCodeCopied, setOrgCodeCopied] = useState(false);
 
@@ -160,8 +161,7 @@ export default function DashboardPage() {
   useEscapeClose(!!conflictDialog, () => setConflictDialog(null));
   useEscapeClose(confirmRegen, () => setConfirmRegen(false));
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const weekStart = useMemo(() => getNextWeekStart(), []);
+  const [weekStart, setWeekStart] = useState(() => getNextWeekStart());
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
 
   async function fetchEmployees() {
@@ -176,6 +176,10 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    setLoading(true);
+    setLoadError(false);
+    setConflictsIgnored(false);
+    setWarningsIgnored(false);
     Promise.all([
       fetch(`/api/schedule?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
@@ -183,6 +187,7 @@ export default function DashboardPage() {
       fetch("/api/min-rest-hours").then(r => r.json()),
     ]).then(([sched, emps, shiftsCfg, restCfg]) => {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
+      else { setExisting(null); setScheduleData(null); }
       if (Array.isArray(emps)) setEmployees(emps);
       if (shiftsCfg?.shifts) setShifts(shiftsCfg.shifts);
       if (typeof shiftsCfg?.orgCode === "string") setOrgCode(shiftsCfg.orgCode);
@@ -194,7 +199,7 @@ export default function DashboardPage() {
     const interval = setInterval(fetchEmployees, 30_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [weekStart]);
 
   // Close picker when clicking outside
   useEffect(() => {
@@ -690,6 +695,27 @@ export default function DashboardPage() {
     setPublishing(false);
   }
 
+  async function copyLastWeek() {
+    setCopying(true);
+    try {
+      const prev = addDays(weekStart, -7);
+      const res = await fetch(`/api/schedule?weekStart=${prev.toISOString()}`);
+      const data = res.ok ? await res.json() : null;
+      if (!data?.schedule) {
+        setErrorToast("אין סידור בשבוע הקודם להעתקה");
+        setTimeout(() => setErrorToast(null), 3000);
+      } else {
+        await persistSchedule(data.schedule as ScheduleData);
+        setToast("הסידור הועתק מהשבוע הקודם");
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch {
+      setErrorToast("שגיאה בהעתקה");
+      setTimeout(() => setErrorToast(null), 4000);
+    }
+    setCopying(false);
+  }
+
   function doUndo() {
     if (!undoSnap) return;
     persistSchedule(undoSnap.data);
@@ -800,7 +826,15 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-navy dark:text-slate-100 tracking-tight">לוח בקרה</h1>
-          <p className="text-sm text-navy-muted dark:text-slate-400 mt-0.5">שבוע {weekLabel}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <button onClick={() => setWeekStart(w => addDays(w, -7))} aria-label="שבוע קודם" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <p className="text-sm font-medium text-navy dark:text-slate-300 min-w-[150px] text-center tnum">{weekLabel}</p>
+            <button onClick={() => setWeekStart(w => addDays(w, 7))} aria-label="שבוע הבא" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
           {orgCode && (
             <button
               type="button"
@@ -987,9 +1021,12 @@ export default function DashboardPage() {
           <Button onClick={() => router.push("/settings")} size="md"><Users className="w-4 h-4" /> הוסף עובדים</Button>
         </div>
       ) : !scheduleData ? (
-        <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-low dark:bg-white/[0.03] py-16 text-center">
+        <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-low dark:bg-white/[0.03] py-16 text-center px-6">
           <p className="text-sm text-navy-muted/70 dark:text-slate-500 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
-          <Button onClick={generate} loading={generating} size="md">צור סידור אוטומטי</Button>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <Button onClick={generate} loading={generating} size="md">צור סידור אוטומטי</Button>
+            <Button onClick={copyLastWeek} loading={copying} variant="outline" size="md"><Copy className="w-4 h-4" /> העתק מהשבוע שעבר</Button>
+          </div>
         </div>
       ) : (
         <>
