@@ -502,25 +502,26 @@ export default function DashboardPage() {
       const fromSlot = scheduleData[dragging.fromDay]?.[dragging.fromShift];
       if (!fromSlot) { setDragging(null); return; }
       const idx = fromSlot.employeeIds.indexOf(dragging.empId);
-      const updated = {
-        ...scheduleData,
-        [dragging.fromDay]: {
-          ...scheduleData[dragging.fromDay],
-          [dragging.fromShift]: {
-            ...fromSlot,
-            employeeIds: fromSlot.employeeIds.filter((_, i) => i !== idx),
-            employeeNames: fromSlot.employeeNames.filter((_, i) => i !== idx),
-            pinnedIds: (fromSlot.pinnedIds ?? []).filter(id => id !== dragging.empId),
-          },
+      // Apply the removal first, then the add — sequentially on one object — so a
+      // same-day move (fromDay === toDay) can't drop the removal via a duplicate key.
+      const updated: ScheduleData = { ...scheduleData };
+      updated[dragging.fromDay] = {
+        ...updated[dragging.fromDay],
+        [dragging.fromShift]: {
+          ...fromSlot,
+          employeeIds: fromSlot.employeeIds.filter((_, i) => i !== idx),
+          employeeNames: fromSlot.employeeNames.filter((_, i) => i !== idx),
+          pinnedIds: (fromSlot.pinnedIds ?? []).filter(id => id !== dragging.empId),
         },
-        [toDay]: {
-          ...scheduleData[toDay],
-          [toShift]: {
-            ...toSlot,
-            employeeIds: [...toSlot.employeeIds, dragging.empId],
-            employeeNames: [...toSlot.employeeNames, dragging.name],
-            pinnedIds: [...(toSlot.pinnedIds ?? []), dragging.empId],
-          },
+      };
+      const curToSlot = updated[toDay]?.[toShift] ?? toSlot;
+      updated[toDay] = {
+        ...updated[toDay],
+        [toShift]: {
+          ...curToSlot,
+          employeeIds: [...curToSlot.employeeIds, dragging.empId],
+          employeeNames: [...curToSlot.employeeNames, dragging.name],
+          pinnedIds: [...(curToSlot.pinnedIds ?? []), dragging.empId],
         },
       };
       persistSchedule(updated);
