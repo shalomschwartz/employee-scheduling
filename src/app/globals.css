@@ -22,7 +22,7 @@
   }
 
   h1, h2, h3 {
-    font-family: "Manrope", "Heebo", sans-serif;
+    font-family: var(--font-headline), var(--font-sans), sans-serif;
     font-weight: 800;
     letter-spacing: -0.018em;
   }

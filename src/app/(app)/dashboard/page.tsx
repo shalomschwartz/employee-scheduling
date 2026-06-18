@@ -1380,7 +1380,7 @@ export default function DashboardPage() {
           style={{
             position: "absolute", left: "-9999px", top: 0,
             width: "860px", backgroundColor: "#eff6ff",
-            padding: "30px 36px", fontFamily: "'Heebo', Arial, sans-serif", direction: "rtl",
+            padding: "30px 36px", fontFamily: "var(--font-sans), Arial, sans-serif", direction: "rtl",
           }}
         >
           {/* Logo + Title */}

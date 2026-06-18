@@ -44,8 +44,8 @@ const config: Config = {
         danger:  { 50: "#fef2f2", 100: "#fee2e2", 500: "#ef4444", 600: "#dc2626", 700: "#b91c1c" },
       },
       fontFamily: {
-        sans:     ["Heebo", "system-ui", "sans-serif"],
-        headline: ["Manrope", "Heebo", "system-ui", "sans-serif"],
+        sans:     ["var(--font-sans)", "system-ui", "sans-serif"],
+        headline: ["var(--font-headline)", "var(--font-sans)", "system-ui", "sans-serif"],
       },
       borderRadius: {
         DEFAULT: "0.5rem",
