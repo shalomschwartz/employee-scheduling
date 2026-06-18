@@ -17,11 +17,27 @@ export interface ShiftSlot {
 
 export type ScheduleData = Record<Day, Record<ShiftKey, ShiftSlot>>;
 
+export interface SchedulerOptions {
+  maxConsecutiveDays?: number; // 0 / undefined = no limit
+  requireShiftLead?: boolean;  // prefer >=1 shift lead per staffed shift
+}
+
 interface Interval { start: number; end: number }
 
-// Absolute [start, end) in minutes within the week (day 0 = Sunday) for a shift
-// on a given day. Overnight shifts (end <= start, e.g. 23:00–07:00) wrap past
-// midnight into the next day, so rest can be checked across day boundaries.
+// Soft-cost weights — strictly ordered so coverage dominates everything, then
+// role qualification, then preferences/lead/consecutive, then contract & fairness.
+const W_UNDER = 1000; // each missing worker in a slot
+const W_ROLE = 200;   // each off-role assignment
+const W_PREFER = 40;  // each "prefer not" assignment
+const W_LEAD = 60;    // each staffed shift with no shift-lead (when required)
+const W_CONSEC = 50;  // each worked day beyond the consecutive-day cap
+const W_OVER = 30;    // each shift over an employee's contract target
+const W_UNDERC = 25;  // each shift under an employee's contract target
+const W_FAIR = 8;     // load imbalance among employees with no contract
+
+// Absolute [start, end) in minutes within the week (day 0 = Sunday). Overnight
+// shifts (end <= start, e.g. 23:00–07:00) wrap into the next day so rest is
+// checked correctly across day boundaries.
 function shiftInterval(dayIdx: number, cfg: ShiftConfig): Interval {
   const start = dayIdx * 1440 + toMins(cfg.start);
   let dur = toMins(cfg.end) - toMins(cfg.start);
@@ -29,9 +45,8 @@ function shiftInterval(dayIdx: number, cfg: ShiftConfig): Interval {
   return { start, end: start + dur };
 }
 
-// Two shifts can coexist for one employee only if they do not overlap and are at
-// least minRestMins apart on the absolute weekly timeline (this is what makes
-// overnight EVENING -> next-day MORNING correctly count as 0 minutes of rest).
+// Two shifts can coexist for one employee only if they don't overlap and are at
+// least minRestMins apart on the absolute weekly timeline.
 function restOk(a: Interval, b: Interval, minRestMins: number): boolean {
   if (a.start < b.end && b.start < a.end) return false; // overlap
   const gap = a.start >= b.end ? a.start - b.end : b.start - a.end;
@@ -47,179 +62,244 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-// Shuffle only contiguous runs that share the same tie key, so randomness never
-// reorders candidates across a meaningful ranking boundary.
-function shuffleTied<T>(arr: T[], keyOf: (item: T) => string): T[] {
-  let i = 0;
-  while (i < arr.length) {
-    let j = i + 1;
-    while (j < arr.length && keyOf(arr[j]) === keyOf(arr[i])) j++;
-    for (let k = j - 1; k > i; k--) {
-      const r = i + Math.floor(Math.random() * (k - i + 1));
-      [arr[k], arr[r]] = [arr[r], arr[k]];
-    }
-    i = j;
+// Longest run of consecutive day indices in a sorted, de-duplicated list.
+function longestRun(days: number[]): number {
+  if (days.length === 0) return 0;
+  let best = 1, run = 1;
+  for (let i = 1; i < days.length; i++) {
+    if (days[i] === days[i - 1] + 1) { run++; if (run > best) best = run; }
+    else run = 1;
   }
-  return arr;
+  return best;
+}
+
+interface Slot {
+  day: Day;
+  dayIdx: number;
+  cfg: ShiftConfig;
+  shift: ShiftKey;
+  role?: string;
+  minWorkers: number;
+  interval: Interval;
+  ids: string[];
+  pinned: Set<string>;
 }
 
 export function runScheduler(
   employees: EmployeeForScheduling[],
   pinnedSlots: Record<string, Record<string, string[]>> = {},
   shifts: ShiftConfig[] = DEFAULT_SHIFTS,
-  minRestHours: number = 7
+  minRestHours: number = 7,
+  options: SchedulerOptions = {}
 ): { schedule: ScheduleData; warnings: string[] } {
-  const pool = shuffle(employees);
-  const shiftCounts: Record<string, number> = {};
-  for (const emp of pool) shiftCounts[emp.id] = 0;
-
-  const schedule = {} as ScheduleData;
-  const warnings: string[] = [];
   const minRestMins = minRestHours * 60;
+  const maxConsec = options.maxConsecutiveDays && options.maxConsecutiveDays > 0 ? options.maxConsecutiveDays : Infinity;
+  const empById = new Map(employees.map(e => [e.id, e]));
+  const wantLead = !!options.requireShiftLead && employees.some(e => e.isShiftLead);
 
-  // empIntervals[empId] = absolute weekly time intervals already assigned to that
-  // employee, used for overlap + minimum-rest checks across the whole week
-  // (including overnight rollovers between days).
-  const empIntervals: Record<string, Interval[]> = {};
-
-  // ── Seed pinned slots ──────────────────────────────────────────────────────
+  // ── Build every (day, shift) slot, seeded with valid pins ──────────────────
+  const slots: Slot[] = [];
   for (let dayIdx = 0; dayIdx < DAYS.length; dayIdx++) {
     const day = DAYS[dayIdx];
-    schedule[day] = {} as Record<ShiftKey, ShiftSlot>;
-
-    for (const shiftCfg of shifts) {
-      const shift = shiftCfg.id as ShiftKey;
-      const pinnedIds = pinnedSlots[day]?.[shift] ?? [];
-      const pinned = pinnedIds
-        .map(id => pool.find(e => e.id === id))
-        .filter(Boolean) as EmployeeForScheduling[];
-      for (const emp of pinned) {
-        shiftCounts[emp.id] += 1;
-        (empIntervals[emp.id] ??= []).push(shiftInterval(dayIdx, shiftCfg));
-      }
-      schedule[day][shift] = { employeeIds: pinned.map(e => e.id), understaffed: true };
-    }
-  }
-
-  // ── Build flat list of all (day, shift) pairs ──────────────────────────────
-  const allPairs: Array<{ day: Day; dayIdx: number; shiftCfg: ShiftConfig }> = [];
-  for (let dayIdx = 0; dayIdx < DAYS.length; dayIdx++) {
-    const day = DAYS[dayIdx];
-    for (const shiftCfg of shifts) {
-      allPairs.push({ day, dayIdx, shiftCfg });
-    }
-  }
-
-  const maxPos = Math.max(...shifts.map(s => s.minWorkers ?? 2));
-
-  // ── findCandidates ─────────────────────────────────────────────────────────
-  // Returns ranked candidates for a slot. Options control fallback levels.
-  const findCandidates = (
-    day: Day,
-    dayIdx: number,
-    shiftCfg: ShiftConfig,
-    excludeIds: Set<string>,
-    opts: { ignoreContract: boolean; ignoreRole: boolean; includeUnavailable: boolean }
-  ): EmployeeForScheduling[] => {
-    const shift = shiftCfg.id as ShiftKey;
-    const shiftRole = shiftCfg.role?.trim() || undefined;
-    const cand = shiftInterval(dayIdx, shiftCfg);
-
-    const candidates: EmployeeForScheduling[] = [];
-    for (const emp of pool) {
-      if (excludeIds.has(emp.id)) continue;
-      if (!opts.ignoreContract && emp.contractShifts != null && shiftCounts[emp.id] >= emp.contractShifts) continue;
-      const existing = empIntervals[emp.id];
-      if (existing && existing.some(iv => !restOk(cand, iv, minRestMins))) continue;
-      if (!opts.ignoreRole && shiftRole && !emp.roles.includes(shiftRole)) continue;
-
-      const val: AvailabilityOption = emp.constraints?.[day]?.[shift] ?? "available";
-      if (val === "unavailable" && !opts.includeUnavailable) continue;
-
-      candidates.push(emp);
-    }
-
-    // Rank: prefer available > prefer_not, then fewest shifts assigned.
-    const AVAIL_ORDER: Record<AvailabilityOption, number> = { available: 0, prefer_not: 1, unavailable: 2 };
-    const availRank = (e: EmployeeForScheduling) => AVAIL_ORDER[e.constraints?.[day]?.[shift] ?? "available"];
-
-    // Employees below their contract target are placed first.
-    const underContract = candidates.filter(e =>
-      e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts
-    );
-    const rest = candidates.filter(e =>
-      !(e.contractShifts != null && e.contractShifts > 0 && shiftCounts[e.id] < e.contractShifts)
-    );
-
-    const sortGroup = (arr: EmployeeForScheduling[]) => {
-      arr.sort((a, b) => {
-        const availDiff = availRank(a) - availRank(b);
-        if (availDiff !== 0) return availDiff;
-        return shiftCounts[a.id] - shiftCounts[b.id];
+    for (const cfg of shifts) {
+      const shift = cfg.id as ShiftKey;
+      const pinnedIds = (pinnedSlots[day]?.[shift] ?? []).filter(id => empById.has(id));
+      slots.push({
+        day, dayIdx, cfg, shift,
+        role: cfg.role?.trim() || undefined,
+        minWorkers: cfg.minWorkers ?? 2,
+        interval: shiftInterval(dayIdx, cfg),
+        ids: [...pinnedIds],
+        pinned: new Set(pinnedIds),
       });
-      // Only shuffle runs equal in BOTH availability rank AND shift count, so a
-      // less-available employee is never randomly promoted over a more-available one.
-      return shuffleTied(arr, e => `${availRank(e)}:${shiftCounts[e.id]}`);
-    };
+    }
+  }
 
-    return [...sortGroup(underContract), ...sortGroup(rest)];
-  };
+  const avail = (emp: EmployeeForScheduling, slot: Slot): AvailabilityOption =>
+    emp.constraints?.[slot.day]?.[slot.shift] ?? "available";
+  const countOf = (empId: string): number => slots.reduce((n, s) => n + (s.ids.includes(empId) ? 1 : 0), 0);
+  const daysOf = (empId: string): number[] =>
+    Array.from(new Set(slots.filter(s => s.ids.includes(empId)).map(s => s.dayIdx))).sort((a, b) => a - b);
 
-  const assign = (emp: EmployeeForScheduling, day: Day, dayIdx: number, shiftCfg: ShiftConfig) => {
-    const shift = shiftCfg.id as ShiftKey;
-    schedule[day][shift].employeeIds.push(emp.id);
-    shiftCounts[emp.id] += 1;
-    (empIntervals[emp.id] ??= []).push(shiftInterval(dayIdx, shiftCfg));
-  };
+  // Hard feasibility: can this employee occupy this slot? (not already there, not
+  // marked unavailable, and rest/overlap OK against their OTHER current slots.)
+  function canPlace(empId: string, slot: Slot): boolean {
+    if (slot.ids.includes(empId)) return false;
+    const emp = empById.get(empId)!;
+    if (avail(emp, slot) === "unavailable") return false;
+    for (const s of slots) {
+      if (s === slot || !s.ids.includes(empId)) continue;
+      if (!restOk(slot.interval, s.interval, minRestMins)) return false;
+    }
+    return true;
+  }
 
-  // ── Position-by-position fill ──────────────────────────────────────────────
-  // Fill position 0 for all slots before filling position 1, etc., so every slot
-  // gets its 1st employee before any slot gets its 2nd.
-  for (let pos = 0; pos < maxPos; pos++) {
-    for (const { day, dayIdx, shiftCfg } of shuffle(allPairs)) {
-      const shift = shiftCfg.id as ShiftKey;
-      const minWorkers = shiftCfg.minWorkers ?? 2;
-      const currentCount = schedule[day][shift].employeeIds.length;
-      if (currentCount >= minWorkers) continue; // already fully staffed — never over-fill
-      if (currentCount > pos) continue;          // already ahead of this position
+  // ── Construction: tiered, most-constrained-slot-first (fail-first) ─────────
+  // tier 0: role-qualified AND within contract; tier 1: + over contract; tier 2: + off-role.
+  // "unavailable" is never relaxed.
+  const AVAIL_ORDER: Record<AvailabilityOption, number> = { available: 0, prefer_not: 1, unavailable: 2 };
+  function eligible(slot: Slot, tier: number): EmployeeForScheduling[] {
+    const out: EmployeeForScheduling[] = [];
+    for (const emp of employees) {
+      if (!canPlace(emp.id, slot)) continue;
+      const roleOk = !slot.role || emp.roles.includes(slot.role);
+      if (tier < 2 && !roleOk) continue;
+      const withinContract = emp.contractShifts == null || countOf(emp.id) < emp.contractShifts;
+      if (tier < 1 && !withinContract) continue;
+      out.push(emp);
+    }
+    return out;
+  }
+  function rankBest(cands: EmployeeForScheduling[], slot: Slot): EmployeeForScheduling {
+    const slotHasLead = slot.ids.some(id => empById.get(id)?.isShiftLead);
+    const key = (e: EmployeeForScheduling): number[] => [
+      slot.role && !e.roles.includes(slot.role) ? 1 : 0,                 // role-qualified first
+      wantLead && !slotHasLead && e.isShiftLead ? 0 : 1,                 // a needed lead first
+      AVAIL_ORDER[avail(e, slot)],                                       // available before prefer_not
+      e.contractShifts != null && countOf(e.id) < e.contractShifts ? 0 : 1, // under-contract first
+      countOf(e.id),                                                     // fewest shifts first
+    ];
+    return [...cands].sort((a, b) => {
+      const ka = key(a), kb = key(b);
+      for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+      return Math.random() - 0.5;
+    })[0];
+  }
 
-      const excludeIds = new Set(schedule[day][shift].employeeIds);
-      const emitWarning = pos === 0; // only warn on first position to avoid duplicates
+  for (const tier of [0, 1, 2]) {
+    for (;;) {
+      let target: Slot | null = null;
+      let fewest = Infinity;
+      for (const slot of shuffle(slots)) {
+        if (slot.ids.length >= slot.minWorkers) continue;
+        const n = eligible(slot, tier).length;
+        if (n === 0) continue;
+        if (n < fewest) { target = slot; fewest = n; if (n === 1) break; }
+      }
+      if (!target) break;
+      target.ids.push(rankBest(eligible(target, tier), target).id);
+    }
+  }
 
-      const shiftRole = shiftCfg.role?.trim() || undefined;
+  // ── Total soft cost (hard constraints are always satisfied by construction) ─
+  function cost(): number {
+    let c = 0;
+    const nonContractCounts: number[] = [];
+    for (const s of slots) {
+      c += W_UNDER * Math.max(0, s.minWorkers - s.ids.length);
+      let hasLead = false;
+      for (const id of s.ids) {
+        const e = empById.get(id)!;
+        if (avail(e, s) === "prefer_not") c += W_PREFER;
+        if (s.role && !e.roles.includes(s.role)) c += W_ROLE;
+        if (e.isShiftLead) hasLead = true;
+      }
+      if (wantLead && s.ids.length > 0 && !hasLead) c += W_LEAD;
+    }
+    for (const e of employees) {
+      const cnt = countOf(e.id);
+      if (e.contractShifts != null && e.contractShifts > 0) {
+        if (cnt < e.contractShifts) c += W_UNDERC * (e.contractShifts - cnt);
+        else if (cnt > e.contractShifts) c += W_OVER * (cnt - e.contractShifts);
+      } else {
+        nonContractCounts.push(cnt);
+      }
+      if (maxConsec !== Infinity) {
+        const run = longestRun(daysOf(e.id));
+        if (run > maxConsec) c += W_CONSEC * (run - maxConsec);
+      }
+    }
+    if (nonContractCounts.length > 1) {
+      const mean = nonContractCounts.reduce((a, b) => a + b, 0) / nonContractCounts.length;
+      c += W_FAIR * nonContractCounts.reduce((a, x) => a + Math.abs(x - mean), 0);
+    }
+    return c;
+  }
 
-      // Try role-qualified candidates (within contract) first.
-      let ranked = findCandidates(day, dayIdx, shiftCfg, excludeIds, { ignoreContract: false, ignoreRole: false, includeUnavailable: false });
+  // ── Local search: hill-climb with relocate + swap moves ────────────────────
+  let best = cost();
+  let evals = 0;
+  const EVAL_CAP = 200_000;
+  for (let pass = 0; pass < 40 && evals < EVAL_CAP; pass++) {
+    let improved = false;
 
-      if (ranked.length === 0 && shiftRole) {
-        // Only fall back to ignoring role if NO employee in the org has this role at all.
-        const anyoneWithRole = pool.some(e => e.roles.includes(shiftRole));
-        if (!anyoneWithRole) {
-          if (emitWarning) {
-            warnings.push(`${DAY_LABELS_HE[day]} ${shiftCfg.label}: אין עובדים עם תפקיד "${shiftRole}"`);
+    // Relocate one employee into a slot that still has room.
+    for (const from of slots) {
+      for (const empId of [...from.ids]) {
+        if (from.pinned.has(empId)) continue;
+        for (const to of slots) {
+          if (to === from || to.ids.length >= to.minWorkers || !canPlace(empId, to)) continue;
+          const fi = from.ids.indexOf(empId);
+          from.ids.splice(fi, 1);
+          to.ids.push(empId);
+          evals++;
+          const c = cost();
+          if (c < best) { best = c; improved = true; }
+          else { to.ids.pop(); from.ids.splice(fi, 0, empId); }
+          if (evals >= EVAL_CAP) break;
+        }
+        if (evals >= EVAL_CAP) break;
+      }
+      if (evals >= EVAL_CAP) break;
+    }
+
+    // Swap two employees between different slots.
+    for (let i = 0; i < slots.length && evals < EVAL_CAP; i++) {
+      for (let j = i + 1; j < slots.length && evals < EVAL_CAP; j++) {
+        const A = slots[i], B = slots[j];
+        for (const a of [...A.ids]) {
+          if (A.pinned.has(a)) continue;
+          for (const b of [...B.ids]) {
+            if (B.pinned.has(b) || a === b) continue;
+            const ai = A.ids.indexOf(a), bi = B.ids.indexOf(b);
+            A.ids.splice(ai, 1); B.ids.splice(bi, 1);
+            if (canPlace(a, B) && canPlace(b, A)) {
+              A.ids.push(b); B.ids.push(a);
+              evals++;
+              const c = cost();
+              if (c < best) { best = c; improved = true; }
+              else {
+                A.ids.splice(A.ids.indexOf(b), 1); B.ids.splice(B.ids.indexOf(a), 1);
+                A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
+              }
+            } else {
+              A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
+            }
+            if (evals >= EVAL_CAP) break;
           }
-          ranked = findCandidates(day, dayIdx, shiftCfg, excludeIds, { ignoreContract: false, ignoreRole: true, includeUnavailable: false });
+          if (evals >= EVAL_CAP) break;
         }
       }
-
-      if (ranked.length > 0) assign(ranked[0], day, dayIdx, shiftCfg);
     }
+
+    if (!improved) break;
   }
 
-  // ── Finalise understaffed flags + warnings ─────────────────────────────────
-  for (const day of DAYS) {
-    for (const shiftCfg of shifts) {
-      const shift = shiftCfg.id as ShiftKey;
-      const minWorkers = shiftCfg.minWorkers ?? 2;
-      const ids = schedule[day][shift].employeeIds;
-      const understaffed = ids.length < minWorkers;
-      schedule[day][shift] = { employeeIds: ids, understaffed };
-
-      if (ids.length === 0) {
-        warnings.push(`${DAY_LABELS_HE[day]} ${shiftCfg.label}: אין עובדים זמינים`);
-      } else if (understaffed) {
-        warnings.push(`${DAY_LABELS_HE[day]} ${shiftCfg.label}: רק ${ids.length}/${minWorkers} עובדים שובצו`);
-      }
+  // ── Build result + warnings ────────────────────────────────────────────────
+  const schedule = {} as ScheduleData;
+  const warnings: string[] = [];
+  for (const s of slots) {
+    (schedule[s.day] ??= {} as Record<ShiftKey, ShiftSlot>)[s.shift] = {
+      employeeIds: s.ids,
+      understaffed: s.ids.length < s.minWorkers,
+    };
+  }
+  for (const s of slots) {
+    if (s.ids.length === 0) warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: אין עובדים זמינים`);
+    else if (s.ids.length < s.minWorkers) warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: רק ${s.ids.length}/${s.minWorkers} עובדים שובצו`);
+    if (s.role && s.ids.some(id => !empById.get(id)!.roles.includes(s.role!)))
+      warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: שובצו עובדים ללא תפקיד "${s.role}"`);
+    if (wantLead && s.ids.length > 0 && !s.ids.some(id => empById.get(id)!.isShiftLead))
+      warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: אין ראש משמרת`);
+  }
+  for (const e of employees) {
+    if (e.contractShifts != null && e.contractShifts > 0) {
+      const cnt = countOf(e.id);
+      if (cnt < e.contractShifts) warnings.push(`${e.name ?? e.email}: ${cnt}/${e.contractShifts} משמרות (פחות מהחוזה)`);
+    }
+    if (maxConsec !== Infinity) {
+      const run = longestRun(daysOf(e.id));
+      if (run > maxConsec) warnings.push(`${e.name ?? e.email}: ${run} ימים רצופים (מעל המקסימום ${maxConsec})`);
     }
   }
 

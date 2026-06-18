@@ -67,7 +67,9 @@ export async function POST(req: NextRequest) {
     .sort((a, b) => toMins(a.start) - toMins(b.start));
 
   const minRestHours = typeof orgSettings.minRestHours === "number" ? orgSettings.minRestHours : 7;
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts, minRestHours);
+  const maxConsecutiveDays = typeof orgSettings.maxConsecutiveDays === "number" ? orgSettings.maxConsecutiveDays : undefined;
+  const requireShiftLead = orgSettings.requireShiftLead === true;
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts, minRestHours, { maxConsecutiveDays, requireShiftLead });
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};
