@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Assistant, Manrope } from "next/font/google";
+import { Rubik, Manrope } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const assistant = Assistant({ subsets: ["latin", "hebrew"], variable: "--font-sans" });
+const rubik = Rubik({ subsets: ["latin", "hebrew"], variable: "--font-sans" });
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-headline", weight: ["400","600","700","800"] });
 
 export const metadata: Metadata = {
@@ -37,7 +37,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="he" dir="rtl" className="h-full">
-      <body className={`${assistant.variable} ${manrope.variable} font-sans h-full`}>
+      <body className={`${rubik.variable} ${manrope.variable} font-sans h-full`}>
         <Providers>{children}</Providers>
       </body>
     </html>
