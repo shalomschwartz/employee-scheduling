@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -35,7 +36,7 @@ export async function PUT(req: NextRequest) {
   const current = (org?.settings ?? {}) as Record<string, unknown>;
   await prisma.organization.update({
     where: { id: session.user.organizationId },
-    data: { settings: { ...current, ...update } },
+    data: { settings: { ...current, ...update } as unknown as Prisma.InputJsonValue },
   });
 
   return NextResponse.json({ ok: true });
