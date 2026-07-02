@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { KeyRound, Copy, Check } from "lucide-react";
+import { KeyRound, Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { DEFAULT_SHIFTS, getNextWeekStart, type ShiftConfig } from "@/lib/utils";
+import { DEFAULT_SHIFTS, type ShiftConfig } from "@/lib/utils";
 import { useEscapeClose } from "@/lib/useEscapeClose";
 
 interface Employee {
@@ -63,11 +63,27 @@ function RoleChipSelector({ roles, selected, onChange, showAll = false }: {
   );
 }
 
+/** Transient "נשמר ✓" line shown after an auto-save completes. */
+function SavedTick({ show, hint }: { show: boolean; hint?: string }) {
+  if (!show) return null;
+  return (
+    <p className="text-xs text-green-600 dark:text-emerald-400 font-medium" role="status">
+      נשמר ✓{hint ? <span className="text-navy-muted/70 dark:text-slate-500 font-normal"> — {hint}</span> : null}
+    </p>
+  );
+}
+
 export default function SettingsPage() {
-  // ── Shift role types ────────────────────────────────────────────────────────
+  // One debounce registry for every auto-saving control on the page
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  function debounced(key: string, fn: () => void, ms = 800) {
+    if (timers.current[key]) clearTimeout(timers.current[key]);
+    timers.current[key] = setTimeout(fn, ms);
+  }
+
+  // ── Shift role types (already auto-saving) ─────────────────────────────────
   const [shiftRoles, setShiftRoles] = useState<string[]>([]);
   const [newRole, setNewRole] = useState("");
-  const [rolesSaving, setRolesSaving] = useState(false);
   const [rolesSaved, setRolesSaved] = useState(false);
 
   useEffect(() => {
@@ -77,13 +93,11 @@ export default function SettingsPage() {
   }, []);
 
   async function saveRoles(updated: string[]) {
-    setRolesSaving(true);
     await fetch("/api/shift-roles", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roles: updated }),
     });
-    setRolesSaving(false);
     setRolesSaved(true);
     setTimeout(() => setRolesSaved(false), 2000);
   }
@@ -105,6 +119,8 @@ export default function SettingsPage() {
 
   // ── Employees ──────────────────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const empsRef = useRef(employees);
+  empsRef.current = employees;
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [newRoles, setNewRoles] = useState<string[]>([]);
@@ -114,92 +130,7 @@ export default function SettingsPage() {
   const [expandedEmp, setExpandedEmp] = useState<string | null>(null);
   const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<string | null>(null);
   const [confirmDeleteShift, setConfirmDeleteShift] = useState<string | null>(null);
-  const [dirtyEmps, setDirtyEmps] = useState<Set<string>>(new Set());
-  const [savingEmps, setSavingEmps] = useState<Set<string>>(new Set());
-
-  // ── Deadline ────────────────────────────────────────────────────────────────
-  const [deadlineInput, setDeadlineInput] = useState("");
-  const [deadlineSaving, setDeadlineSaving] = useState(false);
-  const [deadlineSaved, setDeadlineSaved] = useState(false);
-
-  // ── Min rest hours (global) ─────────────────────────────────────────────────
-  const [minRestHours, setMinRestHours] = useState(8);
-  const [restSaving, setRestSaving] = useState(false);
-  const [restSaved, setRestSaved] = useState(false);
-
-  // ── Scheduling rules ────────────────────────────────────────────────────────
-  const [maxConsecutiveDays, setMaxConsecutiveDays] = useState(0);
-  const [requireShiftLead, setRequireShiftLead] = useState(false);
-  const [managerPhone, setManagerPhone] = useState("");
-  const [rulesSaving, setRulesSaving] = useState(false);
-  const [rulesSaved, setRulesSaved] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/deadline")
-      .then(r => r.json())
-      .then(d => {
-        if (d.deadline) setDeadlineInput(toDatetimeLocal(d.deadline));
-      });
-    fetch("/api/min-rest-hours")
-      .then(r => r.json())
-      .then(d => { if (typeof d.minRestHours === "number") setMinRestHours(d.minRestHours); });
-    fetch("/api/scheduling-rules")
-      .then(r => r.json())
-      .then(d => {
-        if (typeof d.maxConsecutiveDays === "number") setMaxConsecutiveDays(d.maxConsecutiveDays);
-        if (typeof d.requireShiftLead === "boolean") setRequireShiftLead(d.requireShiftLead);
-        if (typeof d.managerPhone === "string") setManagerPhone(d.managerPhone);
-      });
-  }, []);
-
-  async function saveRestHours() {
-    setRestSaving(true);
-    await fetch("/api/min-rest-hours", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ minRestHours }),
-    });
-    setRestSaving(false);
-    setRestSaved(true);
-    setTimeout(() => setRestSaved(false), 2000);
-  }
-
-  async function saveRules() {
-    setRulesSaving(true);
-    await fetch("/api/scheduling-rules", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ maxConsecutiveDays, requireShiftLead, managerPhone }),
-    });
-    setRulesSaving(false);
-    setRulesSaved(true);
-    setTimeout(() => setRulesSaved(false), 2000);
-  }
-
-  function toDatetimeLocal(iso: string): string {
-    const d = new Date(iso);
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Jerusalem",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hour12: false,
-    }).formatToParts(d);
-    const p = (type: string) => parts.find(x => x.type === type)?.value ?? "00";
-    return `${p("year")}-${p("month")}-${p("day")}T${p("hour")}:${p("minute")}`;
-  }
-
-  async function saveDeadline() {
-    if (!deadlineInput) return;
-    setDeadlineSaving(true);
-    const utcIso = new Date(deadlineInput).toISOString();
-    await fetch("/api/deadline", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deadline: utcIso }),
-    });
-    setDeadlineSaving(false);
-    setDeadlineSaved(true);
-    setTimeout(() => setDeadlineSaved(false), 3000);
-  }
+  const [empSaved, setEmpSaved] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/employees")
@@ -244,35 +175,32 @@ export default function SettingsPage() {
       body: JSON.stringify({ id }),
     });
     if (res.ok) setEmployees(prev => prev.filter(e => e.id !== id));
+    else { setEmpError("שגיאה בהסרת העובד — נסה שנית"); setTimeout(() => setEmpError(""), 4000); }
   }
 
+  /** Local update + debounced auto-save — no save button, no dirty tracking. */
   function updateEmpLocal(id: string, patch: { roles?: string[]; contractShifts?: number | null; isShiftLead?: boolean }) {
     setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
-    setDirtyEmps(prev => new Set(prev).add(id));
-  }
-
-  async function saveEmployee(id: string) {
-    const emp = employees.find(e => e.id === id);
-    if (!emp) return;
-    setSavingEmps(prev => new Set(prev).add(id));
-    await fetch("/api/employees", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts, isShiftLead: emp.isShiftLead ?? false }),
+    debounced(`emp-${id}`, async () => {
+      const emp = empsRef.current.find(e => e.id === id);
+      if (!emp) return;
+      await fetch("/api/employees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts, isShiftLead: emp.isShiftLead ?? false }),
+      });
+      setEmpSaved(id);
+      setTimeout(() => setEmpSaved(cur => (cur === id ? null : cur)), 2000);
     });
-    setSavingEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
-    setDirtyEmps(prev => { const s = new Set(prev); s.delete(id); return s; });
   }
 
-  // ── Shifts ─────────────────────────────────────────────────────────────────
+  // ── Shifts (auto-saving) ────────────────────────────────────────────────────
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
-  const [shiftSaving, setShiftSaving] = useState(false);
+  const shiftsRef = useRef(shifts);
+  shiftsRef.current = shifts;
   const [shiftSaved, setShiftSaved] = useState(false);
   const [shiftError, setShiftError] = useState("");
   const [overlapIgnored, setOverlapIgnored] = useState(false);
-  const savedShifts = useRef<ShiftConfig[]>([]);
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenerated, setRegenerated] = useState(false);
 
   // ── Invite employees (org code) ─────────────────────────────────────────────
   const [orgCode, setOrgCode] = useState<string | null>(null);
@@ -283,7 +211,7 @@ export default function SettingsPage() {
       .then(r => r.json())
       .then(data => {
         const arr = Array.isArray(data) ? data : data?.shifts;
-        if (Array.isArray(arr)) { setShifts(arr); savedShifts.current = arr; }
+        if (Array.isArray(arr)) setShifts(arr);
         if (typeof data?.orgCode === "string") setOrgCode(data.orgCode);
       });
   }, []);
@@ -302,40 +230,40 @@ export default function SettingsPage() {
     return `https://wa.me/?text=${encodeURIComponent(msg)}`;
   }
 
-  function updateShift(id: string, field: keyof ShiftConfig, value: string | number) {
-    setShifts(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
-    setShiftSaved(false);
-    setOverlapIgnored(false);
+  function queueSaveShifts() {
+    debounced("shifts", async () => {
+      setShiftError("");
+      const res = await fetch("/api/shifts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shifts: shiftsRef.current }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setShiftError(data?.error ?? "שגיאה בשמירה");
+        return;
+      }
+      setShiftSaved(true);
+      setTimeout(() => setShiftSaved(false), 3500);
+    });
   }
 
-  async function handleRegenerate() {
-    setRegenerating(true);
-    await fetch("/api/shifts", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shifts }),
-    });
-    await fetch("/api/schedule/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weekStart: getNextWeekStart().toISOString() }),
-    });
-    savedShifts.current = shifts;
-    setRegenerating(false);
-    setRegenerated(true);
-    setTimeout(() => setRegenerated(false), 3000);
+  function updateShift(id: string, field: keyof ShiftConfig, value: string | number) {
+    setShifts(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+    setOverlapIgnored(false);
+    queueSaveShifts();
   }
 
   function addShift() {
     const newId = `SHIFT_${crypto.randomUUID().slice(0, 8)}`;
     setShifts(prev => [...prev, { id: newId, label: "משמרת חדשה", start: "08:00", end: "16:00", minWorkers: 2 }]);
-    setShiftSaved(false);
+    queueSaveShifts();
   }
 
   function removeShift(id: string) {
     if (shifts.length <= 1) return;
     setShifts(prev => prev.filter(s => s.id !== id));
-    setShiftSaved(false);
+    queueSaveShifts();
   }
 
   function duplicateShift(id: string) {
@@ -349,39 +277,110 @@ export default function SettingsPage() {
       next.splice(idx + 1, 0, copy);
       return next;
     });
-    setShiftSaved(false);
+    queueSaveShifts();
   }
 
-  async function saveShifts() {
-    setShiftSaving(true);
-    setShiftError("");
-    const res = await fetch("/api/shifts", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shifts }),
+  /** Reorder via arrows (row drag was removed from the dashboard grid). */
+  function moveShift(index: number, dir: -1 | 1) {
+    setShifts(prev => {
+      const next = [...prev];
+      const j = index + dir;
+      if (j < 0 || j >= next.length) return prev;
+      [next[index], next[j]] = [next[j], next[index]];
+      return next;
     });
-    setShiftSaving(false);
-    if (!res.ok) { setShiftError("שגיאה בשמירה"); return; }
-    savedShifts.current = shifts;
-    setShiftSaved(true);
-    setTimeout(() => setShiftSaved(false), 3000);
+    queueSaveShifts();
   }
 
-  const shiftsChanged =
-    shifts.length !== savedShifts.current.length ||
-    shifts.some(s => {
-      const orig = savedShifts.current.find(o => o.id === s.id);
-      return !orig || orig.minWorkers !== s.minWorkers || orig.start !== s.start || orig.end !== s.end || orig.label !== s.label || orig.role !== s.role;
-    });
+  // ── Advanced settings (deadline / rest / rules) — collapsed by default ─────
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const dirtyShiftIds = new Set(
-    shifts
-      .filter(s => {
-        const orig = savedShifts.current.find(o => o.id === s.id);
-        return !orig || orig.label !== s.label || orig.start !== s.start || orig.end !== s.end || orig.minWorkers !== s.minWorkers || orig.role !== s.role;
-      })
-      .map(s => s.id)
-  );
+  const [deadlineInput, setDeadlineInput] = useState("");
+  const [deadlineSaved, setDeadlineSaved] = useState(false);
+  const [minRestHours, setMinRestHours] = useState(8);
+  const [restSaved, setRestSaved] = useState(false);
+  const [maxConsecutiveDays, setMaxConsecutiveDays] = useState(0);
+  const [requireShiftLead, setRequireShiftLead] = useState(false);
+  const [managerPhone, setManagerPhone] = useState("");
+  const [rulesSaved, setRulesSaved] = useState(false);
+  const rulesRef = useRef({ maxConsecutiveDays, requireShiftLead, managerPhone });
+  rulesRef.current = { maxConsecutiveDays, requireShiftLead, managerPhone };
+  const restRef = useRef(minRestHours);
+  restRef.current = minRestHours;
+  const deadlineRef = useRef(deadlineInput);
+  deadlineRef.current = deadlineInput;
+
+  useEffect(() => {
+    fetch("/api/deadline")
+      .then(r => r.json())
+      .then(d => {
+        if (d.deadline) setDeadlineInput(toDatetimeLocal(d.deadline));
+      });
+    fetch("/api/min-rest-hours")
+      .then(r => r.json())
+      .then(d => { if (typeof d.minRestHours === "number") setMinRestHours(d.minRestHours); });
+    fetch("/api/scheduling-rules")
+      .then(r => r.json())
+      .then(d => {
+        if (typeof d.maxConsecutiveDays === "number") setMaxConsecutiveDays(d.maxConsecutiveDays);
+        if (typeof d.requireShiftLead === "boolean") setRequireShiftLead(d.requireShiftLead);
+        if (typeof d.managerPhone === "string") setManagerPhone(d.managerPhone);
+      });
+  }, []);
+
+  function toDatetimeLocal(iso: string): string {
+    const d = new Date(iso);
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jerusalem",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(d);
+    const p = (type: string) => parts.find(x => x.type === type)?.value ?? "00";
+    return `${p("year")}-${p("month")}-${p("day")}T${p("hour")}:${p("minute")}`;
+  }
+
+  function queueSaveDeadline(value: string) {
+    setDeadlineInput(value);
+    debounced("deadline", async () => {
+      const v = deadlineRef.current;
+      if (!v || isNaN(new Date(v).getTime())) return;
+      await fetch("/api/deadline", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deadline: new Date(v).toISOString() }),
+      });
+      setDeadlineSaved(true);
+      setTimeout(() => setDeadlineSaved(false), 2000);
+    });
+  }
+
+  function queueSaveRest(value: number) {
+    setMinRestHours(value);
+    debounced("rest", async () => {
+      await fetch("/api/min-rest-hours", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minRestHours: restRef.current }),
+      });
+      setRestSaved(true);
+      setTimeout(() => setRestSaved(false), 2000);
+    });
+  }
+
+  function queueSaveRules(patch: Partial<{ maxConsecutiveDays: number; requireShiftLead: boolean; managerPhone: string }>) {
+    if (patch.maxConsecutiveDays !== undefined) setMaxConsecutiveDays(patch.maxConsecutiveDays);
+    if (patch.requireShiftLead !== undefined) setRequireShiftLead(patch.requireShiftLead);
+    if (patch.managerPhone !== undefined) setManagerPhone(patch.managerPhone);
+    debounced("rules", async () => {
+      await fetch("/api/scheduling-rules", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rulesRef.current),
+      });
+      setRulesSaved(true);
+      setTimeout(() => setRulesSaved(false), 2000);
+    });
+  }
 
   // Live overlap detection
   const toM = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
@@ -398,258 +397,16 @@ export default function SettingsPage() {
   useEscapeClose(!!confirmDeleteShift, () => setConfirmDeleteShift(null));
   useEscapeClose(!!confirmDeleteEmp, () => setConfirmDeleteEmp(null));
 
+  const stepperCls = "w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none";
+
   return (
     <div className="space-y-6 max-w-lg">
-      <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגדרות</h1>
+      <div>
+        <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגדרות</h1>
+        <p className="text-xs text-navy-muted/70 dark:text-slate-500 mt-0.5">כל שינוי נשמר אוטומטית.</p>
+      </div>
 
-      {/* ── Shift role types ── */}
-      <Card>
-        <CardContent className="pt-5 space-y-4">
-          <div>
-            <h2 className="font-semibold text-navy dark:text-slate-100">סוגי תפקידים</h2>
-            <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">הגדר את התפקידים האפשריים (למשל: מלצר, ברמן, הוסטס). ניתן לשייך תפקיד לכל משמרת ועובד.</p>
-          </div>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newRole}
-              onChange={e => setNewRole(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addRole())}
-              placeholder="שם תפקיד חדש"
-              className="flex-1 text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-            />
-            <Button onClick={addRole} size="md" disabled={!newRole.trim()}>הוסף</Button>
-          </div>
-
-          {shiftRoles.length === 0 ? (
-            <p className="text-sm text-navy-muted/70 dark:text-slate-500 text-center py-2">אין תפקידים מוגדרים עדיין.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {shiftRoles.map(role => (
-                <span key={role} className="flex items-center gap-1.5 bg-purple-50 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 text-purple-700 dark:text-purple-300 text-xs font-medium px-3 py-1.5 rounded-full">
-                  {role}
-                  <button
-                    onClick={() => removeRole(role)}
-                    className="text-purple-400 dark:text-purple-300 hover:text-purple-700 dark:hover:text-purple-300 font-bold leading-none"
-                    title="הסר תפקיד"
-                  >×</button>
-                </span>
-              ))}
-            </div>
-          )}
-          {rolesSaving && <p className="text-xs text-navy-muted/70 dark:text-slate-500">שומר...</p>}
-          {rolesSaved && <p className="text-xs text-green-600 dark:text-emerald-400 font-medium">נשמר!</p>}
-        </CardContent>
-      </Card>
-
-      {/* ── Shifts ── */}
-      <Card>
-        <CardContent className="pt-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-navy dark:text-slate-100">משמרות</h2>
-              <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">ניתן לשנות שעות, שם, תפקיד, להוסיף או למחוק משמרות.</p>
-            </div>
-            <button
-              onClick={addShift}
-              className="flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-brand-300 hover:text-blue-800 dark:hover:text-brand-200 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-brand-500/15 transition-colors"
-            >
-              + הוסף משמרת
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {shifts.map((shift, i) => (
-              <div key={shift.id} className={cn(
-                "flex flex-col gap-2 p-3 rounded-lg border bg-surface-low dark:bg-white/[0.03] transition-all",
-                overlappingIds.has(shift.id) && !overlapIgnored ? "border-red-400 dark:border-rose-500/40 ring-2 ring-red-200" : "border-surface-high dark:border-white/10"
-              )}>
-                {/* Row 1: number + name + dirty badge */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-navy-muted/70 dark:text-slate-500 w-4 text-center font-bold shrink-0">{i + 1}</span>
-                  <input
-                    type="text"
-                    value={shift.label}
-                    onChange={e => updateShift(shift.id, "label", e.target.value)}
-                    className="flex-1 text-base sm:text-sm font-medium bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                    placeholder="שם המשמרת"
-                  />
-                  {dirtyShiftIds.has(shift.id) && (
-                    <span className="text-[10px] font-medium text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0">
-                      לא שמור
-                    </span>
-                  )}
-                </div>
-                {/* Row 2: time range + workers + delete */}
-                <div className="flex items-center gap-2 ps-6 flex-wrap">
-                  <div className="flex items-center gap-1 shrink-0" dir="ltr">
-                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">מ</span>
-                    <input
-                      type="time"
-                      value={shift.start}
-                      onChange={e => updateShift(shift.id, "start", e.target.value)}
-                      className="text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
-                    />
-                    <span className="text-navy-muted/70 dark:text-slate-500 text-xs">—</span>
-                    <input
-                      type="time"
-                      value={shift.end}
-                      onChange={e => updateShift(shift.id, "end", e.target.value)}
-                      className="text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
-                    />
-                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עד</span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עובדים נדרשים:</span>
-                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">−</button>
-                    <span className="w-5 text-center text-xs font-semibold text-navy dark:text-slate-100">{shift.minWorkers ?? 2}</span>
-                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">+</button>
-                  </div>
-                  <button
-                    onClick={() => duplicateShift(shift.id)}
-                    className="text-blue-500 dark:text-brand-300 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-brand-500/15 border border-blue-300 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none"
-                  >
-                    שכפול
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteShift(shift.id)}
-                    disabled={shifts.length <= 1}
-                    className={cn(
-                      "text-red-500 dark:text-rose-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-rose-500/10 border border-red-300 dark:border-rose-500/30 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none",
-                      shifts.length <= 1 && "opacity-30 cursor-not-allowed"
-                    )}
-                  >
-                    הסר
-                  </button>
-                </div>
-                {/* Row 3: role */}
-                <div className="flex items-center gap-2 ps-6">
-                  <span className="text-[10px] text-navy-muted/70 dark:text-slate-500 shrink-0">תפקיד:</span>
-                  <select
-                    value={shift.role ?? ""}
-                    onChange={e => updateShift(shift.id, "role", e.target.value)}
-                    className="flex-1 text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                  >
-                    <option value="">כללי</option>
-                    {shiftRoles.map(r => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {overlappingIds.size > 0 && !overlapIgnored && (
-            <div className="flex items-center justify-between gap-3 p-2 rounded-lg bg-red-50 dark:bg-rose-500/10 border border-red-200 dark:border-rose-500/20">
-              <p className="text-sm text-red-600 dark:text-rose-300 font-medium">
-                ⚠ משמרות חופפות: {shifts.filter(s => overlappingIds.has(s.id)).map(s => s.label).join(", ")}
-              </p>
-              <button onClick={() => setOverlapIgnored(true)} className="text-xs text-red-400 dark:text-rose-400 hover:text-red-600 dark:hover:text-rose-300 font-medium whitespace-nowrap px-2 py-0.5 rounded hover:bg-red-100 transition-colors flex-shrink-0">התעלם</button>
-            </div>
-          )}
-          {shiftError && <p className="text-sm text-red-600 dark:text-rose-300">{shiftError}</p>}
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button onClick={saveShifts} loading={shiftSaving} size="md">
-              שמור הגדרות
-            </Button>
-            {shiftsChanged && (
-              <Button onClick={handleRegenerate} loading={regenerating} size="md"
-                className="bg-green-500 hover:bg-green-600">
-                צור מחדש
-              </Button>
-            )}
-            {shiftSaved && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">נשמר!</span>}
-            {regenerated && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">לוח נוצר מחדש!</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Deadline ── */}
-      <Card>
-        <CardContent className="pt-5 space-y-4">
-          <div>
-            <h2 className="font-semibold text-navy dark:text-slate-100">מועד הגשת זמינות</h2>
-            <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">
-              הגדר עד מתי העובדים יכולים לשלוח זמינות. ניתן לשנות בכל עת — אם תרצה לתת הארכה, פשוט הזז את התאריך קדימה.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <input
-              type="datetime-local"
-              value={deadlineInput}
-              onChange={e => setDeadlineInput(e.target.value)}
-              className="text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-            />
-            <Button onClick={saveDeadline} loading={deadlineSaving} size="md">
-              שמור
-            </Button>
-            {deadlineSaved && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">נשמר!</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Min rest hours ── */}
-      <Card>
-        <CardContent className="pt-5 space-y-4">
-          <div>
-            <h2 className="font-semibold text-navy dark:text-slate-100">מינימום שעות מנוחה בין משמרות</h2>
-            <p className="text-xs text-navy-muted dark:text-slate-400 mt-1">
-              מספר השעות המינימלי הנדרש בין סיום משמרת לתחילת משמרת הבאה (מינימום חוקי בישראל: 8 שעות).
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setMinRestHours(h => Math.max(0, h - 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">−</button>
-            <span className="text-2xl font-bold text-navy dark:text-slate-100 w-10 text-center">{minRestHours}</span>
-            <button onClick={() => setMinRestHours(h => Math.min(24, h + 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">+</button>
-            <span className="text-sm text-navy-muted dark:text-slate-400">שעות</span>
-            <Button onClick={saveRestHours} loading={restSaving} size="md">שמור</Button>
-            {restSaved && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">נשמר!</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Scheduling rules ── */}
-      <Card>
-        <CardContent className="pt-5 space-y-4">
-          <div>
-            <h2 className="font-semibold text-navy dark:text-slate-100">כללי שיבוץ</h2>
-            <p className="text-xs text-navy-muted dark:text-slate-400 mt-1">
-              כללים שהאלגוריתם מנסה לכבד בעת יצירת הסידור.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm text-navy-muted dark:text-slate-400">מקסימום ימים רצופים:</span>
-            <button onClick={() => setMaxConsecutiveDays(d => Math.max(0, d - 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">−</button>
-            <span className="text-base font-bold text-navy dark:text-slate-100 w-16 text-center">{maxConsecutiveDays === 0 ? "ללא" : maxConsecutiveDays}</span>
-            <button onClick={() => setMaxConsecutiveDays(d => Math.min(7, d + 1))} className="w-10 h-10 sm:w-8 sm:h-8 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-lg leading-none">+</button>
-          </div>
-          <label className="flex items-center gap-2.5 cursor-pointer w-fit">
-            <input type="checkbox" checked={requireShiftLead} onChange={e => setRequireShiftLead(e.target.checked)} className="w-4 h-4 accent-brand-600" />
-            <span className="text-sm text-navy dark:text-slate-100">דרוש ראש משמרת בכל משמרת</span>
-          </label>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-navy-muted dark:text-slate-400 shrink-0">טלפון המנהל (לפניות עובדים):</span>
-            <input
-              type="tel"
-              value={managerPhone}
-              onChange={e => setManagerPhone(e.target.value)}
-              placeholder="050-0000000"
-              maxLength={20}
-              className="text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-40"
-            />
-          </div>
-          <p className="text-[11px] text-navy-muted/70 dark:text-slate-500 -mt-2">מאפשר לעובדים לשלוח לך "לא יכול להגיע" בוואטסאפ ישירות מהמשמרת.</p>
-          <div className="flex items-center gap-3">
-            <Button onClick={saveRules} loading={rulesSaving} size="md">שמור</Button>
-            {rulesSaved && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">נשמר!</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Employees ── */}
+      {/* ── 1. Employees — the first thing a new manager needs ── */}
       <Card>
         <CardContent className="pt-5 space-y-4">
           <h2 className="font-semibold text-navy dark:text-slate-100">עובדים</h2>
@@ -710,9 +467,9 @@ export default function SettingsPage() {
             {/* Contract */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-navy-muted dark:text-slate-400 shrink-0">חוזה (משמרות/שבוע):</span>
-              <button type="button" onClick={() => setNewContract(c => Math.max(0, c - 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">−</button>
+              <button type="button" onClick={() => setNewContract(c => Math.max(0, c - 1))} className={stepperCls}>−</button>
               <span className="w-6 text-center text-sm font-semibold text-navy dark:text-slate-100">{newContract === 0 ? "—" : newContract}</span>
-              <button type="button" onClick={() => setNewContract(c => Math.min(7, c + 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">+</button>
+              <button type="button" onClick={() => setNewContract(c => Math.min(7, c + 1))} className={stepperCls}>+</button>
             </div>
             {/* Roles */}
             {shiftRoles.length > 0 && (
@@ -726,7 +483,7 @@ export default function SettingsPage() {
             </Button>
           </form>
 
-          {empError && <p className="text-sm text-red-600 dark:text-rose-300">{empError}</p>}
+          {empError && <p className="text-sm text-red-600 dark:text-rose-300" role="alert">{empError}</p>}
 
           {employees.length === 0 ? (
             <p className="text-sm text-navy-muted/70 dark:text-slate-500 text-center py-4">אין עובדים עדיין.</p>
@@ -771,17 +528,11 @@ export default function SettingsPage() {
                       {/* Contract shifts */}
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-navy-muted dark:text-slate-400 w-24 shrink-0">משמרות בשבוע:</span>
-                        <button
-                          onClick={() => updateEmpLocal(emp.id, { contractShifts: Math.max(0, (emp.contractShifts ?? 0) - 1) || null })}
-                          className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none"
-                        >−</button>
+                        <button onClick={() => updateEmpLocal(emp.id, { contractShifts: Math.max(0, (emp.contractShifts ?? 0) - 1) || null })} className={stepperCls}>−</button>
                         <span className="w-6 text-center text-xs font-semibold text-navy dark:text-slate-100">
                           {emp.contractShifts ?? 0}
                         </span>
-                        <button
-                          onClick={() => updateEmpLocal(emp.id, { contractShifts: (emp.contractShifts ?? 0) + 1 })}
-                          className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none"
-                        >+</button>
+                        <button onClick={() => updateEmpLocal(emp.id, { contractShifts: (emp.contractShifts ?? 0) + 1 })} className={stepperCls}>+</button>
                         <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">{emp.contractShifts ? "יעד לשבוע" : "ללא חוזה"}</span>
                       </div>
 
@@ -811,18 +562,7 @@ export default function SettingsPage() {
                         <span className="text-xs text-navy dark:text-slate-100">ראש משמרת</span>
                       </label>
 
-                      {/* Save button */}
-                      {dirtyEmps.has(emp.id) && (
-                        <div className="pt-1">
-                          <Button
-                            size="md"
-                            onClick={() => saveEmployee(emp.id)}
-                            loading={savingEmps.has(emp.id)}
-                          >
-                            שמור
-                          </Button>
-                        </div>
-                      )}
+                      <SavedTick show={empSaved === emp.id} />
                     </div>
                   )}
                 </li>
@@ -832,11 +572,248 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── 2. Shifts ── */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-navy dark:text-slate-100">משמרות</h2>
+              <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">שם, שעות, תפקיד ומספר עובדים לכל משמרת. הסדר כאן הוא הסדר בלוח.</p>
+            </div>
+            <button
+              onClick={addShift}
+              className="flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-brand-300 hover:text-blue-800 dark:hover:text-brand-200 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-brand-500/15 transition-colors"
+            >
+              + הוסף משמרת
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {shifts.map((shift, i) => (
+              <div key={shift.id} className={cn(
+                "flex flex-col gap-2 p-3 rounded-lg border bg-surface-low dark:bg-white/[0.03] transition-all",
+                overlappingIds.has(shift.id) && !overlapIgnored ? "border-red-400 dark:border-rose-500/40 ring-2 ring-red-200" : "border-surface-high dark:border-white/10"
+              )}>
+                {/* Row 1: reorder + name */}
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col shrink-0">
+                    <button
+                      onClick={() => moveShift(i, -1)}
+                      disabled={i === 0}
+                      aria-label="הזז למעלה"
+                      className="text-navy-muted/70 dark:text-slate-500 hover:text-navy dark:hover:text-slate-200 disabled:opacity-25 p-0.5"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => moveShift(i, 1)}
+                      disabled={i === shifts.length - 1}
+                      aria-label="הזז למטה"
+                      className="text-navy-muted/70 dark:text-slate-500 hover:text-navy dark:hover:text-slate-200 disabled:opacity-25 p-0.5"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={shift.label}
+                    onChange={e => updateShift(shift.id, "label", e.target.value)}
+                    className="flex-1 text-base sm:text-sm font-medium bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                    placeholder="שם המשמרת"
+                  />
+                </div>
+                {/* Row 2: time range + workers + delete */}
+                <div className="flex items-center gap-2 ps-6 flex-wrap">
+                  <div className="flex items-center gap-1 shrink-0" dir="ltr">
+                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">מ</span>
+                    <input
+                      type="time"
+                      value={shift.start}
+                      onChange={e => updateShift(shift.id, "start", e.target.value)}
+                      className="text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
+                    />
+                    <span className="text-navy-muted/70 dark:text-slate-500 text-xs">—</span>
+                    <input
+                      type="time"
+                      value={shift.end}
+                      onChange={e => updateShift(shift.id, "end", e.target.value)}
+                      className="text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
+                    />
+                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עד</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עובדים נדרשים:</span>
+                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className={stepperCls}>−</button>
+                    <span className="w-5 text-center text-xs font-semibold text-navy dark:text-slate-100">{shift.minWorkers ?? 2}</span>
+                    <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className={stepperCls}>+</button>
+                  </div>
+                  <button
+                    onClick={() => duplicateShift(shift.id)}
+                    className="text-blue-500 dark:text-brand-300 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-brand-500/15 border border-blue-300 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none"
+                  >
+                    שכפול
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteShift(shift.id)}
+                    disabled={shifts.length <= 1}
+                    className={cn(
+                      "text-red-500 dark:text-rose-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-rose-500/10 border border-red-300 dark:border-rose-500/30 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none",
+                      shifts.length <= 1 && "opacity-30 cursor-not-allowed"
+                    )}
+                  >
+                    הסר
+                  </button>
+                </div>
+                {/* Row 3: role */}
+                <div className="flex items-center gap-2 ps-6">
+                  <span className="text-[10px] text-navy-muted/70 dark:text-slate-500 shrink-0">תפקיד:</span>
+                  <select
+                    value={shift.role ?? ""}
+                    onChange={e => updateShift(shift.id, "role", e.target.value)}
+                    className="flex-1 text-base sm:text-xs bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                  >
+                    <option value="">כללי</option>
+                    {shiftRoles.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {overlappingIds.size > 0 && !overlapIgnored && (
+            <div className="flex items-center justify-between gap-3 p-2 rounded-lg bg-red-50 dark:bg-rose-500/10 border border-red-200 dark:border-rose-500/20">
+              <p className="text-sm text-red-600 dark:text-rose-300 font-medium">
+                ⚠ משמרות חופפות: {shifts.filter(s => overlappingIds.has(s.id)).map(s => s.label).join(", ")}
+              </p>
+              <button onClick={() => setOverlapIgnored(true)} className="text-xs text-red-400 dark:text-rose-400 hover:text-red-600 dark:hover:text-rose-300 font-medium whitespace-nowrap px-2 py-0.5 rounded hover:bg-red-100 transition-colors flex-shrink-0">התעלם</button>
+            </div>
+          )}
+          {shiftError && <p className="text-sm text-red-600 dark:text-rose-300" role="alert">{shiftError}</p>}
+          <SavedTick show={shiftSaved} hint="לחץ 'צור מחדש' בלוח הבקרה כדי להחיל על הסידור" />
+        </CardContent>
+      </Card>
+
+      {/* ── 3. Shift role types ── */}
+      <Card>
+        <CardContent className="pt-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-navy dark:text-slate-100">סוגי תפקידים</h2>
+            <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">הגדר את התפקידים האפשריים (למשל: מלצר, ברמן, הוסטס). ניתן לשייך תפקיד לכל משמרת ועובד.</p>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newRole}
+              onChange={e => setNewRole(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addRole())}
+              placeholder="שם תפקיד חדש"
+              className="flex-1 text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            />
+            <Button onClick={addRole} size="md" disabled={!newRole.trim()}>הוסף</Button>
+          </div>
+
+          {shiftRoles.length === 0 ? (
+            <p className="text-sm text-navy-muted/70 dark:text-slate-500 text-center py-2">אין תפקידים מוגדרים עדיין.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {shiftRoles.map(role => (
+                <span key={role} className="flex items-center gap-1.5 bg-purple-50 dark:bg-purple-500/15 border border-purple-200 dark:border-purple-500/30 text-purple-700 dark:text-purple-300 text-xs font-medium px-3 py-1.5 rounded-full">
+                  {role}
+                  <button
+                    onClick={() => removeRole(role)}
+                    aria-label={`הסר תפקיד ${role}`}
+                    className="text-purple-400 dark:text-purple-300 hover:text-purple-700 dark:hover:text-purple-300 font-bold leading-none"
+                  >×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <SavedTick show={rolesSaved} />
+        </CardContent>
+      </Card>
+
+      {/* ── 4. Advanced — set once, then forget ── */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <button onClick={() => setShowAdvanced(v => !v)} className="w-full flex items-center justify-between">
+            <span className="font-semibold text-navy dark:text-slate-100">הגדרות מתקדמות</span>
+            <ChevronDown className={cn("w-5 h-5 text-navy-muted dark:text-slate-400 transition-transform", showAdvanced && "rotate-180")} />
+          </button>
+          {showAdvanced && (
+            <div className="mt-5 space-y-6">
+              {/* Deadline */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-navy dark:text-slate-100">מועד הגשת זמינות</h3>
+                <p className="text-xs text-navy-muted dark:text-slate-400">
+                  עד מתי העובדים יכולים לשלוח זמינות. להארכה — פשוט הזז את התאריך קדימה.
+                </p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input
+                    type="datetime-local"
+                    value={deadlineInput}
+                    onChange={e => queueSaveDeadline(e.target.value)}
+                    className="text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                  />
+                  <SavedTick show={deadlineSaved} />
+                </div>
+              </div>
+
+              {/* Min rest */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-navy dark:text-slate-100">מינימום שעות מנוחה בין משמרות</h3>
+                <p className="text-xs text-navy-muted dark:text-slate-400">מינימום חוקי בישראל: 8 שעות.</p>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => queueSaveRest(Math.max(0, minRestHours - 1))} className={stepperCls}>−</button>
+                  <span className="text-xl font-bold text-navy dark:text-slate-100 w-8 text-center">{minRestHours}</span>
+                  <button onClick={() => queueSaveRest(Math.min(24, minRestHours + 1))} className={stepperCls}>+</button>
+                  <span className="text-sm text-navy-muted dark:text-slate-400">שעות</span>
+                  <SavedTick show={restSaved} />
+                </div>
+                {minRestHours < 8 && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300">שים לב: פחות מ-8 שעות הוא מתחת למינימום החוקי בישראל.</p>
+                )}
+              </div>
+
+              {/* Rules */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-navy dark:text-slate-100">כללי שיבוץ</h3>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm text-navy-muted dark:text-slate-400">מקסימום ימים רצופים:</span>
+                  <button onClick={() => queueSaveRules({ maxConsecutiveDays: Math.max(0, maxConsecutiveDays - 1) })} className={stepperCls}>−</button>
+                  <span className="text-base font-bold text-navy dark:text-slate-100 w-14 text-center">{maxConsecutiveDays === 0 ? "ללא" : maxConsecutiveDays}</span>
+                  <button onClick={() => queueSaveRules({ maxConsecutiveDays: Math.min(7, maxConsecutiveDays + 1) })} className={stepperCls}>+</button>
+                </div>
+                <label className="flex items-center gap-2.5 cursor-pointer w-fit">
+                  <input type="checkbox" checked={requireShiftLead} onChange={e => queueSaveRules({ requireShiftLead: e.target.checked })} className="w-4 h-4 accent-brand-600" />
+                  <span className="text-sm text-navy dark:text-slate-100">דרוש ראש משמרת בכל משמרת</span>
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-navy-muted dark:text-slate-400 shrink-0">טלפון המנהל (לפניות עובדים):</span>
+                  <input
+                    type="tel"
+                    value={managerPhone}
+                    onChange={e => queueSaveRules({ managerPhone: e.target.value })}
+                    placeholder="050-0000000"
+                    maxLength={20}
+                    className="text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-40"
+                  />
+                </div>
+                <p className="text-[11px] text-navy-muted/70 dark:text-slate-500">מאפשר לעובדים לשלוח לך "לא יכול להגיע" בוואטסאפ ישירות מהמשמרת.</p>
+                <SavedTick show={rulesSaved} />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {confirmDeleteShift && (() => {
         const s = shifts.find(s => s.id === confirmDeleteShift);
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-[#131f33] dark:border dark:border-white/10 rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
+            <div role="dialog" aria-modal="true" className="bg-white dark:bg-[#131f33] dark:border dark:border-white/10 rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
               <p className="font-bold text-navy dark:text-slate-100 text-base mb-1">הסרת משמרת</p>
               <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">האם אתה בטוח שברצונך להסיר את <span className="font-semibold text-navy dark:text-slate-100">{s?.label}</span>?</p>
               <div className="flex gap-2 justify-center">
@@ -862,7 +839,7 @@ export default function SettingsPage() {
         const emp = employees.find(e => e.id === confirmDeleteEmp);
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-[#131f33] dark:border dark:border-white/10 rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
+            <div role="dialog" aria-modal="true" className="bg-white dark:bg-[#131f33] dark:border dark:border-white/10 rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
               <p className="font-bold text-navy dark:text-slate-100 text-base mb-1">הסרת עובד</p>
               <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">האם אתה בטוח שברצונך להסיר את <span className="font-semibold text-navy dark:text-slate-100">{emp?.name}</span>?</p>
               <div className="flex gap-2 justify-center">
