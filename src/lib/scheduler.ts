@@ -17,22 +17,31 @@ export interface ShiftSlot {
 
 export type ScheduleData = Record<Day, Record<ShiftKey, ShiftSlot>>;
 
+export interface Interval { start: number; end: number }
+
 export interface SchedulerOptions {
-  maxConsecutiveDays?: number; // 0 / undefined = no limit
+  maxConsecutiveDays?: number; // 0 / undefined = no limit (soft cap)
   requireShiftLead?: boolean;  // prefer >=1 shift lead per staffed shift
+  /** Rest context from the PREVIOUS week: absolute weekly-minute intervals shifted
+   *  negative (last Saturday night ends just above 0). Checked by canPlace so
+   *  Motzei-Shabbat -> Sunday-morning rest violations are caught across weeks. */
+  prevIntervals?: Record<string, Interval[]>;
+  /** Negative day indices worked at the tail of the previous week (-1 = last Saturday),
+   *  so consecutive-day runs are counted across the boundary. */
+  prevWorkedDayIdxs?: Record<string, number[]>;
+  /** Independent randomized restarts; the best-scoring schedule wins. */
+  restarts?: number;
 }
 
-interface Interval { start: number; end: number }
-
-// Soft-cost weights — strictly ordered so coverage dominates everything, then
-// role qualification, then preferences/lead/consecutive, then contract & fairness.
+// Soft-cost weights — strictly ordered so coverage dominates everything, then role
+// qualification, then lead/consecutive/preferences, then contract & fairness.
 const W_UNDER = 1000; // each missing worker in a slot
 const W_ROLE = 200;   // each off-role assignment
-const W_PREFER = 40;  // each "prefer not" assignment
-const W_LEAD = 60;    // each staffed shift with no shift-lead (when required)
-const W_CONSEC = 50;  // each worked day beyond the consecutive-day cap
+const W_LEAD = 150;   // each staffed shift with no shift-lead (when required)
+const W_CONSEC = 120; // each worked day beyond the manager-set consecutive cap
+const W_PREFER = 40;  // k-th "prefer not" for the same employee costs 40*k (escalates)
+const W_UNDERC = 60;  // each shift under an employee's contract target (promised income)
 const W_OVER = 30;    // each shift over an employee's contract target
-const W_UNDERC = 25;  // each shift under an employee's contract target
 const W_FAIR = 8;     // load imbalance among employees with no contract
 
 // Absolute [start, end) in minutes within the week (day 0 = Sunday). Overnight
@@ -95,34 +104,53 @@ export function runScheduler(
   const minRestMins = minRestHours * 60;
   const maxConsec = options.maxConsecutiveDays && options.maxConsecutiveDays > 0 ? options.maxConsecutiveDays : Infinity;
   const empById = new Map(employees.map(e => [e.id, e]));
-  const wantLead = !!options.requireShiftLead && employees.some(e => e.isShiftLead);
+  const anyLeadExists = employees.some(e => e.isShiftLead);
+  const wantLead = !!options.requireShiftLead && anyLeadExists;
+  const prevIntervals = options.prevIntervals ?? {};
+  const prevDays = options.prevWorkedDayIdxs ?? {};
+  const RESTARTS = Math.max(1, options.restarts ?? 4);
+  const EVAL_CAP = 100_000; // per restart; measured never binding in realistic orgs
 
-  // ── Build every (day, shift) slot, seeded with valid pins ──────────────────
-  const slots: Slot[] = [];
-  for (let dayIdx = 0; dayIdx < DAYS.length; dayIdx++) {
-    const day = DAYS[dayIdx];
-    for (const cfg of shifts) {
-      const shift = cfg.id as ShiftKey;
-      const pinnedIds = (pinnedSlots[day]?.[shift] ?? []).filter(id => empById.has(id));
-      slots.push({
-        day, dayIdx, cfg, shift,
-        role: cfg.role?.trim() || undefined,
-        minWorkers: cfg.minWorkers ?? 2,
-        interval: shiftInterval(dayIdx, cfg),
-        ids: [...pinnedIds],
-        pinned: new Set(pinnedIds),
-      });
+  const empName = (id: string) => { const e = empById.get(id); return e ? (e.name ?? e.email) : id; };
+
+  function buildSlots(): Slot[] {
+    const out: Slot[] = [];
+    for (let dayIdx = 0; dayIdx < DAYS.length; dayIdx++) {
+      const day = DAYS[dayIdx];
+      for (const cfg of shifts) {
+        const shift = cfg.id as ShiftKey;
+        // Dedupe pins and drop ids for employees no longer in the org
+        const pinnedIds = Array.from(new Set((pinnedSlots[day]?.[shift] ?? []).filter(id => empById.has(id))));
+        out.push({
+          day, dayIdx, cfg, shift,
+          role: cfg.role?.trim() || undefined,
+          minWorkers: cfg.minWorkers ?? 2,
+          interval: shiftInterval(dayIdx, cfg),
+          ids: [...pinnedIds],
+          pinned: new Set(pinnedIds),
+        });
+      }
     }
+    return out;
   }
+
+  // slots is reassigned per restart; all helpers close over it.
+  let slots: Slot[] = buildSlots();
 
   const avail = (emp: EmployeeForScheduling, slot: Slot): AvailabilityOption =>
     emp.constraints?.[slot.day]?.[slot.shift] ?? "available";
   const countOf = (empId: string): number => slots.reduce((n, s) => n + (s.ids.includes(empId) ? 1 : 0), 0);
-  const daysOf = (empId: string): number[] =>
+  const workedDayIdxs = (empId: string): number[] =>
     Array.from(new Set(slots.filter(s => s.ids.includes(empId)).map(s => s.dayIdx))).sort((a, b) => a - b);
+  // Consecutive-day run including the tail of the previous week (ghost days)
+  const longestRunWithGhost = (empId: string): number => {
+    const merged = Array.from(new Set([...(prevDays[empId] ?? []), ...workedDayIdxs(empId)])).sort((a, b) => a - b);
+    return longestRun(merged);
+  };
 
-  // Hard feasibility: can this employee occupy this slot? (not already there, not
-  // marked unavailable, and rest/overlap OK against their OTHER current slots.)
+  // Hard feasibility: not already in slot, not "unavailable", rest/overlap OK vs the
+  // employee's other slots this week AND last week's ghost intervals, and never a
+  // 7th distinct workday (Israeli weekly-rest law — one assignment-free day minimum).
   function canPlace(empId: string, slot: Slot): boolean {
     if (slot.ids.includes(empId)) return false;
     const emp = empById.get(empId)!;
@@ -131,6 +159,11 @@ export function runScheduler(
       if (s === slot || !s.ids.includes(empId)) continue;
       if (!restOk(slot.interval, s.interval, minRestMins)) return false;
     }
+    for (const iv of prevIntervals[empId] ?? []) {
+      if (!restOk(slot.interval, iv, minRestMins)) return false;
+    }
+    const days = workedDayIdxs(empId);
+    if (days.indexOf(slot.dayIdx) === -1 && days.length >= 6) return false;
     return true;
   }
 
@@ -166,35 +199,48 @@ export function runScheduler(
     })[0];
   }
 
-  for (const tier of [0, 1, 2]) {
-    for (;;) {
-      let target: Slot | null = null;
-      let fewest = Infinity;
-      for (const slot of shuffle(slots)) {
-        if (slot.ids.length >= slot.minWorkers) continue;
-        const n = eligible(slot, tier).length;
-        if (n === 0) continue;
-        if (n < fewest) { target = slot; fewest = n; if (n === 1) break; }
+  /** Tiered fill pass. Returns how many assignments were added. */
+  function fill(): number {
+    let added = 0;
+    for (const tier of [0, 1, 2]) {
+      for (;;) {
+        let target: Slot | null = null;
+        let fewest = Infinity;
+        for (const slot of shuffle(slots)) {
+          if (slot.ids.length >= slot.minWorkers) continue;
+          const n = eligible(slot, tier).length;
+          if (n === 0) continue;
+          if (n < fewest) { target = slot; fewest = n; if (n === 1) break; }
+        }
+        if (!target) break;
+        target.ids.push(rankBest(eligible(target, tier), target).id);
+        added++;
       }
-      if (!target) break;
-      target.ids.push(rankBest(eligible(target, tier), target).id);
     }
+    return added;
   }
 
-  // ── Total soft cost (hard constraints are always satisfied by construction) ─
+  // ── Total soft cost (hard constraints always hold by construction) ─────────
   function cost(): number {
     let c = 0;
     const nonContractCounts: number[] = [];
+    const preferCount: Record<string, number> = {};
     for (const s of slots) {
       c += W_UNDER * Math.max(0, s.minWorkers - s.ids.length);
       let hasLead = false;
       for (const id of s.ids) {
         const e = empById.get(id)!;
-        if (avail(e, s) === "prefer_not") c += W_PREFER;
+        if (avail(e, s) === "prefer_not") preferCount[id] = (preferCount[id] ?? 0) + 1;
         if (s.role && !e.roles.includes(s.role)) c += W_ROLE;
         if (e.isShiftLead) hasLead = true;
       }
       if (wantLead && s.ids.length > 0 && !hasLead) c += W_LEAD;
+    }
+    // Escalating prefer_not: the k-th violation for the SAME employee costs 40*k,
+    // so pain is spread instead of dumped on one person.
+    for (const id of Object.keys(preferCount)) {
+      const k = preferCount[id];
+      c += W_PREFER * ((k * (k + 1)) / 2);
     }
     for (const e of employees) {
       const cnt = countOf(e.id);
@@ -205,7 +251,7 @@ export function runScheduler(
         nonContractCounts.push(cnt);
       }
       if (maxConsec !== Infinity) {
-        const run = longestRun(daysOf(e.id));
+        const run = longestRunWithGhost(e.id);
         if (run > maxConsec) c += W_CONSEC * (run - maxConsec);
       }
     }
@@ -217,72 +263,100 @@ export function runScheduler(
   }
 
   // ── Local search: hill-climb with relocate + swap moves ────────────────────
-  let best = cost();
-  let evals = 0;
-  const EVAL_CAP = 200_000;
-  for (let pass = 0; pass < 40 && evals < EVAL_CAP; pass++) {
-    let improved = false;
+  function hillClimb(startBest: number): number {
+    let best = startBest;
+    let evals = 0;
+    for (let pass = 0; pass < 40 && evals < EVAL_CAP; pass++) {
+      let improved = false;
 
-    // Relocate one employee into a slot that still has room.
-    for (const from of slots) {
-      for (const empId of [...from.ids]) {
-        if (from.pinned.has(empId)) continue;
-        const fi = from.ids.indexOf(empId);
-        if (fi === -1) continue; // moved by an earlier accepted move this pass
-        for (const to of slots) {
-          if (to === from || to.ids.length >= to.minWorkers) continue;
-          // Remove BEFORE canPlace so feasibility is judged on the true end state
-          // (otherwise rest-vs-`from` blocks legal same-day relocations).
-          from.ids.splice(fi, 1);
-          if (!canPlace(empId, to)) { from.ids.splice(fi, 0, empId); continue; }
-          to.ids.push(empId);
-          evals++;
-          const c = cost();
-          // On accept, STOP iterating this employee: the snapshots and index are stale.
-          if (c < best) { best = c; improved = true; break; }
-          to.ids.pop(); from.ids.splice(fi, 0, empId);
-          if (evals >= EVAL_CAP) break;
-        }
-        if (evals >= EVAL_CAP) break;
-      }
-      if (evals >= EVAL_CAP) break;
-    }
-
-    // Swap two employees between different slots.
-    for (let i = 0; i < slots.length && evals < EVAL_CAP; i++) {
-      for (let j = i + 1; j < slots.length && evals < EVAL_CAP; j++) {
-        const A = slots[i], B = slots[j];
-        let swapped = false;
-        for (const a of [...A.ids]) {
-          if (swapped) break;
-          if (A.pinned.has(a)) continue;
-          for (const b of [...B.ids]) {
-            if (B.pinned.has(b) || a === b) continue;
-            const ai = A.ids.indexOf(a), bi = B.ids.indexOf(b);
-            if (ai === -1 || bi === -1) continue; // stale snapshot after an accepted move
-            A.ids.splice(ai, 1); B.ids.splice(bi, 1);
-            if (canPlace(a, B) && canPlace(b, A)) {
-              A.ids.push(b); B.ids.push(a);
-              evals++;
-              const c = cost();
-              // On accept, STOP iterating this slot pair: continuing would splice by
-              // stale indices and re-insert employees into slots they no longer hold —
-              // the source of unvalidated (illegal) assignments.
-              if (c < best) { best = c; improved = true; swapped = true; break; }
-              A.ids.splice(A.ids.indexOf(b), 1); B.ids.splice(B.ids.indexOf(a), 1);
-              A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
-            } else {
-              A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
-            }
+      // Relocate one employee into a slot that still has room.
+      for (const from of slots) {
+        for (const empId of [...from.ids]) {
+          if (from.pinned.has(empId)) continue;
+          const fi = from.ids.indexOf(empId);
+          if (fi === -1) continue; // moved by an earlier accepted move this pass
+          for (const to of slots) {
+            if (to === from || to.ids.length >= to.minWorkers) continue;
+            // Remove BEFORE canPlace so feasibility is judged on the true end state.
+            from.ids.splice(fi, 1);
+            if (!canPlace(empId, to)) { from.ids.splice(fi, 0, empId); continue; }
+            to.ids.push(empId);
+            evals++;
+            const c = cost();
+            // On accept, STOP iterating this employee: the snapshots/index are stale.
+            if (c < best) { best = c; improved = true; break; }
+            to.ids.pop(); from.ids.splice(fi, 0, empId);
             if (evals >= EVAL_CAP) break;
           }
           if (evals >= EVAL_CAP) break;
         }
+        if (evals >= EVAL_CAP) break;
       }
-    }
 
-    if (!improved) break;
+      // Swap two employees between different slots.
+      for (let i = 0; i < slots.length && evals < EVAL_CAP; i++) {
+        for (let j = i + 1; j < slots.length && evals < EVAL_CAP; j++) {
+          const A = slots[i], B = slots[j];
+          let swapped = false;
+          for (const a of [...A.ids]) {
+            if (swapped) break;
+            if (A.pinned.has(a)) continue;
+            for (const b of [...B.ids]) {
+              if (B.pinned.has(b) || a === b) continue;
+              const ai = A.ids.indexOf(a), bi = B.ids.indexOf(b);
+              if (ai === -1 || bi === -1) continue; // stale snapshot after an accepted move
+              A.ids.splice(ai, 1); B.ids.splice(bi, 1);
+              if (canPlace(a, B) && canPlace(b, A)) {
+                A.ids.push(b); B.ids.push(a);
+                evals++;
+                const c = cost();
+                // On accept, STOP iterating this slot pair — stale indices would
+                // otherwise splice the wrong employees (unvalidated assignments).
+                if (c < best) { best = c; improved = true; swapped = true; break; }
+                A.ids.splice(A.ids.indexOf(b), 1); B.ids.splice(B.ids.indexOf(a), 1);
+                A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
+              } else {
+                A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
+              }
+              if (evals >= EVAL_CAP) break;
+            }
+            if (evals >= EVAL_CAP) break;
+          }
+        }
+      }
+
+      if (!improved) break;
+    }
+    return best;
   }
+
+  // ── Optimize: fill -> climb -> refill (relocations can unlock new fills) ────
+  function optimize(): number {
+    fill();
+    let best = cost();
+    for (let round = 0; round < 4; round++) {
+      best = hillClimb(best);
+      const added = fill();
+      if (added === 0) break;
+      best = cost();
+    }
+    return best;
+  }
+
+  // ── Best-of-N restarts: clips unlucky construction, stabilizes quality ─────
+  let bestCost = Infinity;
+  let bestIds: string[][] | null = null;
+  for (let r = 0; r < RESTARTS; r++) {
+    slots = buildSlots();
+    const c = optimize();
+    if (c < bestCost) {
+      bestCost = c;
+      bestIds = slots.map(s => [...s.ids]);
+    }
+    if (bestCost === 0) break;
+  }
+  slots = buildSlots();
+  if (bestIds) slots.forEach((s, i) => { s.ids = bestIds![i]; });
 
   // ── Build result + warnings ────────────────────────────────────────────────
   const schedule = {} as ScheduleData;
@@ -293,24 +367,105 @@ export function runScheduler(
       understaffed: s.ids.length < s.minWorkers,
     };
   }
+
+  // Pins are authoritative (manager intent) but violations must be SAID, not silent.
   for (const s of slots) {
-    if (s.ids.length === 0) warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: אין עובדים זמינים`);
-    else if (s.ids.length < s.minWorkers) warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: רק ${s.ids.length}/${s.minWorkers} עובדים שובצו`);
+    for (const id of Array.from(s.pinned)) {
+      const emp = empById.get(id);
+      if (!emp) continue;
+      if (avail(emp, s) === "unavailable")
+        warnings.push(`${empName(id)}: שובץ ידנית ל${DAY_LABELS_HE[s.day]} ${s.cfg.label} למרות שסימן/ה "לא זמין"`);
+    }
+  }
+  const pinnedIvs: Record<string, { iv: Interval; label: string }[]> = {};
+  for (const s of slots) {
+    for (const id of Array.from(s.pinned)) {
+      (pinnedIvs[id] ??= []).push({ iv: s.interval, label: `${DAY_LABELS_HE[s.day]} ${s.cfg.label}` });
+    }
+  }
+  for (const id of Object.keys(pinnedIvs)) {
+    const list = pinnedIvs[id];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        if (!restOk(list[i].iv, list[j].iv, minRestMins)) {
+          const overlap = list[i].iv.start < list[j].iv.end && list[j].iv.start < list[i].iv.end;
+          warnings.push(`${empName(id)}: שיבוץ ידני ${overlap ? "חופף" : `עם פחות מ-${minRestHours} שעות מנוחה`} — ${list[i].label} + ${list[j].label}`);
+        }
+      }
+    }
+    for (const g of prevIntervals[id] ?? []) {
+      for (const p of list) {
+        if (!restOk(p.iv, g, minRestMins))
+          warnings.push(`${empName(id)}: שיבוץ ידני ${p.label} עם פחות מ-${minRestHours} שעות מנוחה מהמשמרת האחרונה בשבוע שעבר`);
+      }
+    }
+  }
+
+  // Understaffed slots: say WHY, not just how many are missing.
+  function exclusionReasons(slot: Slot): string {
+    let unavailable = 0, restBlocked = 0, noRole = 0, dayCapped = 0;
+    for (const emp of employees) {
+      if (slot.ids.includes(emp.id)) continue;
+      if (avail(emp, slot) === "unavailable") { unavailable++; continue; }
+      const days = workedDayIdxs(emp.id);
+      if (days.indexOf(slot.dayIdx) === -1 && days.length >= 6) { dayCapped++; continue; }
+      let rest = false;
+      for (const s of slots) {
+        if (s === slot || !s.ids.includes(emp.id)) continue;
+        if (!restOk(slot.interval, s.interval, minRestMins)) { rest = true; break; }
+      }
+      if (!rest) for (const iv of prevIntervals[emp.id] ?? []) {
+        if (!restOk(slot.interval, iv, minRestMins)) { rest = true; break; }
+      }
+      if (rest) { restBlocked++; continue; }
+      if (slot.role && !emp.roles.includes(slot.role)) { noRole++; continue; }
+    }
+    const parts: string[] = [];
+    if (unavailable) parts.push(`${unavailable} לא זמינים`);
+    if (restBlocked) parts.push(`${restBlocked} חסומים במנוחה`);
+    if (dayCapped) parts.push(`${dayCapped} מיצו 6 ימי עבודה`);
+    if (noRole) parts.push(`${noRole} ללא התפקיד`);
+    return parts.length ? ` (${parts.join(", ")})` : "";
+  }
+
+  for (const s of slots) {
+    if (s.minWorkers <= 0) continue;
+    if (s.ids.length === 0) warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: אין עובדים זמינים${exclusionReasons(s)}`);
+    else if (s.ids.length < s.minWorkers) warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: רק ${s.ids.length}/${s.minWorkers} עובדים שובצו${exclusionReasons(s)}`);
     if (s.role && s.ids.some(id => !empById.get(id)!.roles.includes(s.role!)))
       warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: שובצו עובדים ללא תפקיד "${s.role}"`);
     if (wantLead && s.ids.length > 0 && !s.ids.some(id => empById.get(id)!.isShiftLead))
       warnings.push(`${DAY_LABELS_HE[s.day]} ${s.cfg.label}: אין ראש משמרת`);
   }
+  if (options.requireShiftLead && !anyLeadExists)
+    warnings.push(`נדרש ראש משמרת בכל משמרת, אך לא הוגדר אף עובד כראש משמרת`);
+
+  let totalPreferNot = 0;
+  for (const s of slots) {
+    for (const id of s.ids) {
+      const e = empById.get(id)!;
+      if (avail(e, s) === "prefer_not") totalPreferNot++;
+    }
+  }
+  if (totalPreferNot > 0) warnings.push(`${totalPreferNot} שיבוצים בניגוד להעדפה ("מעדיף לא")`);
+
   for (const e of employees) {
+    const cnt = countOf(e.id);
     if (e.contractShifts != null && e.contractShifts > 0) {
-      const cnt = countOf(e.id);
       if (cnt < e.contractShifts) warnings.push(`${e.name ?? e.email}: ${cnt}/${e.contractShifts} משמרות (פחות מהחוזה)`);
+      else if (cnt > e.contractShifts) warnings.push(`${e.name ?? e.email}: ${cnt}/${e.contractShifts} משמרות (מעל החוזה)`);
     }
     if (maxConsec !== Infinity) {
-      const run = longestRun(daysOf(e.id));
+      const run = longestRunWithGhost(e.id);
       if (run > maxConsec) warnings.push(`${e.name ?? e.email}: ${run} ימים רצופים (מעל המקסימום ${maxConsec})`);
     }
   }
+
+  // Structural sanity: contracts can't be satisfied if they exceed total capacity.
+  const totalContract = employees.reduce((a, e) => a + (e.contractShifts ?? 0), 0);
+  const totalCapacity = slots.reduce((a, s) => a + s.minWorkers, 0);
+  if (totalContract > totalCapacity)
+    warnings.push(`סך משמרות החוזים (${totalContract}) גדול מסך התקנים בסידור (${totalCapacity}) — לא ניתן לעמוד בכל החוזים`);
 
   return { schedule, warnings };
 }

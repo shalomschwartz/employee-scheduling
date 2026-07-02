@@ -48,6 +48,24 @@ export async function PUT(req: NextRequest) {
   if (!Array.isArray(shifts) || shifts.length === 0)
     return NextResponse.json({ error: "נדרשת לפחות משמרת אחת" }, { status: 400 });
 
+  // Shape validation — a bad shift config silently poisons the whole schedule:
+  // duplicate ids drop assignments from the grid; start===end becomes a 24h shift.
+  const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const seenIds = new Set<string>();
+  for (const s of shifts) {
+    if (!s || typeof s.id !== "string" || !s.id.trim() || typeof s.label !== "string")
+      return NextResponse.json({ error: "משמרת ללא מזהה או שם" }, { status: 400 });
+    if (seenIds.has(s.id))
+      return NextResponse.json({ error: "מזהי משמרות כפולים" }, { status: 400 });
+    seenIds.add(s.id);
+    if (!HHMM.test(s.start ?? "") || !HHMM.test(s.end ?? ""))
+      return NextResponse.json({ error: `שעות לא תקינות במשמרת "${s.label}"` }, { status: 400 });
+    if (s.start === s.end)
+      return NextResponse.json({ error: `שעת התחלה וסיום זהות במשמרת "${s.label}"` }, { status: 400 });
+    if (s.minWorkers != null && (typeof s.minWorkers !== "number" || !Number.isInteger(s.minWorkers) || s.minWorkers < 0 || s.minWorkers > 50))
+      return NextResponse.json({ error: `מספר עובדים לא תקין במשמרת "${s.label}"` }, { status: 400 });
+  }
+
   // Read + merge + write in one transaction so concurrent settings writes don't clobber each other.
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const org = await tx.organization.findUnique({ where: { id: orgId } });

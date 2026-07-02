@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getNextWeekStart, DEFAULT_SHIFTS, toMins, type ShiftConfig } from "@/lib/utils";
+import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, toMins, type ShiftConfig } from "@/lib/utils";
 import { runScheduler, type EmployeeForScheduling } from "@/lib/scheduler";
 import type { ShiftType, Prisma } from "@prisma/client";
 
@@ -69,7 +69,43 @@ export async function POST(req: NextRequest) {
   const minRestHours = typeof orgSettings.minRestHours === "number" ? orgSettings.minRestHours : 8;
   const maxConsecutiveDays = typeof orgSettings.maxConsecutiveDays === "number" ? orgSettings.maxConsecutiveDays : undefined;
   const requireShiftLead = orgSettings.requireShiftLead === true;
-  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts, minRestHours, { maxConsecutiveDays, requireShiftLead });
+
+  // Previous week's assignments become "ghost" rest/consecutive context so
+  // Motzei-Shabbat -> Sunday-morning rest violations are caught across the boundary.
+  const prevWeekStart = new Date(weekStart.getTime() - 7 * 86400000);
+  const prevSched = await prisma.generatedSchedule.findUnique({
+    where: { organizationId_weekStart: { organizationId: session.user.organizationId, weekStart: prevWeekStart } },
+  });
+  const prevIntervals: Record<string, { start: number; end: number }[]> = {};
+  const prevWorkedDayIdxs: Record<string, number[]> = {};
+  if (prevSched?.schedule) {
+    const prev = prevSched.schedule as Record<string, Record<string, { employeeIds?: string[] }>>;
+    DAYS.forEach((day, dayIdx) => {
+      for (const cfg of shifts) {
+        const ids = prev[day]?.[cfg.id]?.employeeIds ?? [];
+        if (ids.length === 0) continue;
+        const start = (dayIdx - 7) * 1440 + toMins(cfg.start);
+        let dur = toMins(cfg.end) - toMins(cfg.start);
+        if (dur <= 0) dur += 1440;
+        for (const id of ids) {
+          if (!validEmpIds.has(id)) continue;
+          (prevIntervals[id] ??= []).push({ start, end: start + dur });
+          if (!(prevWorkedDayIdxs[id] ?? []).includes(dayIdx - 7)) (prevWorkedDayIdxs[id] ??= []).push(dayIdx - 7);
+        }
+      }
+    });
+  }
+
+  const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts, minRestHours, {
+    maxConsecutiveDays, requireShiftLead, prevIntervals, prevWorkedDayIdxs,
+  });
+
+  // Non-submitters were assumed fully available — the manager should know.
+  const scheduledNoSubmission = employeeData.filter(e =>
+    e.constraints == null &&
+    Object.values(rawSchedule).some(d => Object.values(d).some(s => s.employeeIds.includes(e.id))));
+  if (scheduledNoSubmission.length > 0)
+    warnings.push(`שובצו ללא הגשת זמינות (הונחו זמינים בכל המשמרות): ${scheduledNoSubmission.map(e => e.name ?? e.email).join(", ")}`);
 
   // Enrich each slot with display names for the grid
   const schedule: Record<string, Record<string, object>> = {};

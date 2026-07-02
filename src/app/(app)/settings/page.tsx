@@ -327,7 +327,7 @@ export default function SettingsPage() {
   }
 
   function addShift() {
-    const newId = `SHIFT_${Date.now()}`;
+    const newId = `SHIFT_${crypto.randomUUID().slice(0, 8)}`;
     setShifts(prev => [...prev, { id: newId, label: "משמרת חדשה", start: "08:00", end: "16:00", minWorkers: 2 }]);
     setShiftSaved(false);
   }
@@ -341,7 +341,7 @@ export default function SettingsPage() {
   function duplicateShift(id: string) {
     const src = shifts.find(s => s.id === id);
     if (!src) return;
-    const newId = `SHIFT_${Date.now()}`;
+    const newId = `SHIFT_${crypto.randomUUID().slice(0, 8)}`;
     setShifts(prev => {
       const idx = prev.findIndex(s => s.id === id);
       const copy = { ...src, id: newId, label: `${src.label} (עותק)` };
