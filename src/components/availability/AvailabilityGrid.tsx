@@ -62,7 +62,7 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
       <table className="w-full border-collapse table-fixed">
         <thead>
           <tr>
-            <th className="text-right text-xs font-medium text-navy-muted/70 dark:text-slate-500 pb-2 ps-1 w-[76px] sm:w-24">משמרת</th>
+            <th className="text-right text-xs font-medium text-navy-muted dark:text-slate-400 pb-2 ps-1 w-[76px] sm:w-24">משמרת</th>
             {DAYS.map(day => (
               <th key={day} className="text-center pb-2 px-0.5">
                 <button
@@ -86,7 +86,7 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", SHIFT_DOT_DEFAULTS[si % SHIFT_DOT_DEFAULTS.length])} />
                   <span className="text-xs font-semibold text-navy dark:text-slate-100 truncate">{shiftCfg.label}</span>
                 </div>
-                <div className="text-[10px] text-navy-muted/70 dark:text-slate-500 mb-1 sm:ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
+                <div className="text-[11px] text-navy-muted dark:text-slate-400 mb-1 sm:ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
                 <div className="flex gap-0.5 sm:ps-3">
                   {OPTION_CYCLE.map(opt => (
                     <button
@@ -126,7 +126,7 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
                       )}
                     >
                       <span className="text-base sm:text-xl font-bold leading-none">{styles.icon}</span>
-                      <span className="text-[9px] sm:text-[10px] font-semibold leading-none opacity-80">{styles.shortLabel}</span>
+                      <span className="text-[10px] sm:text-[11px] font-semibold leading-none">{styles.shortLabel}</span>
                     </button>
                   </td>
                 );

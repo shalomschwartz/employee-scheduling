@@ -644,7 +644,7 @@ export default function DashboardPage() {
       <button
         onClick={() => setEmpFilter(null)}
         className={cn(
-          "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+          "px-3 py-1.5 sm:py-1 rounded-lg text-xs font-medium border transition-colors",
           empFilter === null ? "bg-navy text-white border-navy" : "bg-surface-mid dark:bg-white/[0.06] text-navy-muted dark:text-slate-400 border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03]"
         )}
       >
@@ -661,7 +661,7 @@ export default function DashboardPage() {
             key={id}
             onClick={() => setEmpFilter(id)}
             className={cn(
-              "px-3 py-1 rounded-lg text-xs font-medium border transition-colors",
+              "px-3 py-1.5 sm:py-1 rounded-lg text-xs font-medium border transition-colors",
               selected ? "text-white border-transparent" : "bg-surface-mid dark:bg-white/[0.06] text-navy-muted dark:text-slate-400 border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03]"
             )}
             style={selected ? { backgroundColor: empHex(i) } : undefined}
@@ -670,7 +670,7 @@ export default function DashboardPage() {
             {scheduleData && contract != null && contract > 0 && (
               <span className={cn(
                 "ms-1.5 tnum font-semibold",
-                selected ? "text-white/85" : assigned < contract ? "text-amber-600 dark:text-amber-400" : assigned > contract ? "text-rose-600 dark:text-rose-400" : "text-navy-muted/70 dark:text-slate-500"
+                selected ? "text-white/85" : assigned < contract ? "text-amber-600 dark:text-amber-400" : assigned > contract ? "text-rose-600 dark:text-rose-400" : "text-navy-muted dark:text-slate-400"
               )}>
                 {assigned}/{contract}
               </span>
@@ -720,7 +720,7 @@ export default function DashboardPage() {
           <button
             onClick={() => { localStorage.setItem("shiftsync_setup_done", "true"); setSetupDone(true); }}
             aria-label="סגור"
-            className="ms-auto text-navy-muted/60 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300"
+            className="ms-auto w-7 h-7 grid place-items-center rounded-lg text-navy-muted/60 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300 hover:bg-surface-mid dark:hover:bg-white/5"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -732,11 +732,11 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-navy dark:text-slate-100 tracking-tight">לוח בקרה</h1>
           <div className="flex items-center gap-1.5 mt-1">
-            <button onClick={() => setWeekStart(w => new Date(w.getTime() - 7 * 86400000))} aria-label="שבוע קודם" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
+            <button onClick={() => setWeekStart(w => new Date(w.getTime() - 7 * 86400000))} aria-label="שבוע קודם" className="w-9 h-9 sm:w-7 sm:h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
             <p className="text-sm font-medium text-navy dark:text-slate-300 min-w-[150px] text-center tnum">{weekLabel}</p>
-            <button onClick={() => setWeekStart(w => new Date(w.getTime() + 7 * 86400000))} aria-label="שבוע הבא" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
+            <button onClick={() => setWeekStart(w => new Date(w.getTime() + 7 * 86400000))} aria-label="שבוע הבא" className="w-9 h-9 sm:w-7 sm:h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
@@ -759,7 +759,7 @@ export default function DashboardPage() {
                   {problems.count > 0 ? (
                     <button
                       onClick={scrollToFirstProblem}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold hover:bg-amber-200 dark:hover:bg-amber-500/25 transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 sm:py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold hover:bg-amber-200 dark:hover:bg-amber-500/25 transition-colors"
                     >
                       <AlertTriangle className="w-3 h-3" /> {problems.count} בעיות
                     </button>
@@ -795,7 +795,7 @@ export default function DashboardPage() {
               <button
                 onClick={requestGenerate}
                 disabled={generating}
-                className="text-xs font-medium text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 underline underline-offset-2 disabled:opacity-50"
+                className="text-xs font-medium text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 underline underline-offset-2 disabled:opacity-50 py-2 sm:py-0"
               >
                 {generating ? "יוצר…" : "צור מחדש"}
               </button>
@@ -832,7 +832,7 @@ export default function DashboardPage() {
         </div>
       ) : !scheduleData ? (
         <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-low dark:bg-white/[0.03] py-16 text-center px-6">
-          <p className="text-sm text-navy-muted/70 dark:text-slate-500 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
+          <p className="text-sm text-navy-muted dark:text-slate-400 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
           <div className="flex items-center justify-center gap-2 flex-wrap">
             <Button onClick={requestGenerate} loading={generating} size="md">צור סידור אוטומטי</Button>
             <Button onClick={copyLastWeek} loading={copying} variant="outline" size="md"><Copy className="w-4 h-4" /> העתק מהשבוע שעבר</Button>
@@ -842,7 +842,7 @@ export default function DashboardPage() {
         <>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             {filterBar}
-            {existing && <p className="text-xs text-navy-muted/70 dark:text-slate-500">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
+            {existing && <p className="text-xs text-navy-muted dark:text-slate-400">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
           <div className="overflow-x-auto rounded-2xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] shadow-card">
             <table className="w-full text-sm border-collapse">
@@ -880,7 +880,7 @@ export default function DashboardPage() {
                               </span>
                             );
                           })()}
-                          <span className="block text-[10px] text-navy-muted/70 dark:text-slate-500 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
+                          <span className="block text-[11px] text-navy-muted dark:text-slate-400 whitespace-nowrap" dir="ltr">{shiftCfg?.start}–{shiftCfg?.end}</span>
                         </div>
                       </div>
                     </td>
@@ -976,7 +976,7 @@ export default function DashboardPage() {
                             {isEditingThis ? (
                               <div ref={pickerRef} className="rounded-lg border border-surface-high dark:border-white/[0.08] bg-surface-mid dark:bg-white/[0.06] shadow-md overflow-hidden z-20 relative">
                                 {availableToAdd.length === 0 ? (
-                                  <p className="px-2 py-1.5 text-xs text-navy-muted/70 dark:text-slate-500">{shiftRole ? `אין עובדים מוסמכים ל"${shiftRole}"` : "כולם כבר מוקצים"}</p>
+                                  <p className="px-2 py-1.5 text-xs text-navy-muted dark:text-slate-400">{shiftRole ? `אין עובדים מוסמכים ל"${shiftRole}"` : "כולם כבר מוקצים"}</p>
                                 ) : availableToAdd.map(emp => {
                                   const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
                                   // The full truth up front: computed blockers, not just submitted availability —
@@ -1016,7 +1016,7 @@ export default function DashboardPage() {
                                         <span className="block">{emp.name ?? emp.email}</span>
                                         <span className={cn(
                                           "text-[10px]",
-                                          blocked ? (av === "unavailable" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400") : "text-navy-muted/70 dark:text-slate-500"
+                                          blocked ? (av === "unavailable" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400") : "text-navy-muted dark:text-slate-400"
                                         )}>
                                           {emp.roles.length > 0 ? `${emp.roles.join(", ")} · ` : ""}{statusText}
                                         </span>
@@ -1031,7 +1031,7 @@ export default function DashboardPage() {
                               <button
                                 onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
                                 className={cn(
-                                  "w-full flex items-center justify-center gap-1 text-[11px] font-medium py-1 rounded-lg transition-all text-navy-muted/50 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400",
+                                  "w-full flex items-center justify-center gap-1 text-[11px] font-medium py-1 rounded-lg transition-all text-navy-muted dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400",
                                   (slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2)
                                     ? "border border-dashed border-surface-high/70 dark:border-white/[0.08] hover:border-brand-300 dark:hover:border-brand-400/40 hover:bg-brand-50 dark:hover:bg-brand-500/10"
                                     : "opacity-100 sm:opacity-0 sm:group-hover/cell:opacity-100 focus:opacity-100"
@@ -1045,7 +1045,7 @@ export default function DashboardPage() {
                             {(slot?.employeeIds ?? []).length > 0 && (
                               <button
                                 onClick={e => { e.stopPropagation(); setConfirmClear({ day, shift }); }}
-                                className="w-full text-center text-[10px] font-normal py-0.5 rounded text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all opacity-100 sm:opacity-0 sm:group-hover/cell:opacity-100 focus:opacity-100"
+                                className="w-full text-center text-[11px] font-normal py-1 sm:py-0.5 rounded text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all opacity-100 sm:opacity-0 sm:group-hover/cell:opacity-100 focus:opacity-100"
                               >
                                 נקה תא
                               </button>
@@ -1164,7 +1164,7 @@ export default function DashboardPage() {
                 <div className="space-y-2">
                   <button
                     onClick={() => window.open(waShareUrl(), "_blank")}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#16a34a] hover:bg-[#15803d] text-white text-sm font-semibold transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#15803d] hover:bg-[#166534] text-white text-sm font-semibold transition-colors"
                   >
                     <WhatsAppIcon className="w-4 h-4" /> שלח בוואטסאפ
                   </button>
@@ -1202,7 +1202,7 @@ export default function DashboardPage() {
                               >
                                 <Avatar name={emp.name} color={colorMap[emp.id] ?? "#6b7280"} size={20} />
                                 <span className="flex-1 text-start font-medium">{first}</span>
-                                <span className="text-xs text-navy-muted/70 dark:text-slate-500">{assignedCountMap[emp.id]} משמרות</span>
+                                <span className="text-xs text-navy-muted dark:text-slate-400">{assignedCountMap[emp.id]} משמרות</span>
                                 {sent
                                   ? <Check className="w-4 h-4 flex-shrink-0" />
                                   : <WhatsAppIcon className="w-4 h-4 text-[#16a34a] flex-shrink-0" />}
@@ -1233,7 +1233,7 @@ export default function DashboardPage() {
             <button
               onClick={() => setConflictDialog(null)}
               aria-label="סגור"
-              className="absolute top-4 left-4 text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-400 text-xl leading-none"
+              className="absolute top-4 left-4 text-navy-muted dark:text-slate-400 hover:text-navy-muted dark:hover:text-slate-400 text-xl leading-none"
             >
               ×
             </button>
@@ -1298,7 +1298,7 @@ export default function DashboardPage() {
             <div className="flex gap-3 mb-3 text-xs text-navy-muted dark:text-slate-400 flex-wrap">
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-300 dark:ring-amber-500/25" />מעדיף לא</span>
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-rose-100 dark:bg-rose-500/15 ring-1 ring-rose-300 dark:ring-rose-500/25" />לא זמין</span>
-              <span className="text-navy-muted/70 dark:text-slate-500">תא ריק = כולם זמינים</span>
+              <span className="text-navy-muted dark:text-slate-400">תא ריק = כולם זמינים</span>
             </div>
 
             {/* Overview table */}
@@ -1365,10 +1365,10 @@ export default function DashboardPage() {
 
       {/* Hidden print calendar — captured by html2canvas for PDF download */}
       {scheduleData && (
+        <div style={{ position: "fixed", left: 0, top: 0, width: 0, height: 0, overflow: "hidden" }} aria-hidden="true">
         <div
           ref={printRef}
           style={{
-            position: "absolute", left: "-9999px", top: 0,
             width: "1050px", backgroundColor: "#ffffff",
             padding: "36px 42px", fontFamily: "var(--font-sans), Arial, sans-serif", direction: "rtl",
           }}
@@ -1514,6 +1514,7 @@ export default function DashboardPage() {
             <span>הופק ב-ShiftSync</span>
             <span dir="ltr">{format(new Date(), "d/M/yyyy HH:mm")}</span>
           </div>
+        </div>
         </div>
       )}
     </div>

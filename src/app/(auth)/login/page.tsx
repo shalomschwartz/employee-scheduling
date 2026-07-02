@@ -195,7 +195,7 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
 
-        <p className="text-center text-xs text-navy-muted/70 mt-6">
+        <p className="text-center text-xs text-navy-muted mt-6">
           בכניסה אתה מסכים לתנאי השימוש.
         </p>
       </div>

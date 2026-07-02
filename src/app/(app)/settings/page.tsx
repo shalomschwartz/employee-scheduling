@@ -71,7 +71,7 @@ function SavedTick({ show, hint }: { show: boolean; hint?: string }) {
   if (!show) return null;
   return (
     <p className="text-sm text-green-600 dark:text-emerald-400 font-medium" role="status">
-      נשמר ✓{hint ? <span className="text-navy-muted/70 dark:text-slate-500 font-normal"> — {hint}</span> : null}
+      נשמר ✓{hint ? <span className="text-navy-muted dark:text-slate-400 font-normal"> — {hint}</span> : null}
     </p>
   );
 }
@@ -479,7 +479,7 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגדרות</h1>
-        <p className="text-sm text-navy-muted/70 dark:text-slate-500 mt-0.5">כל שינוי נשמר אוטומטית.</p>
+        <p className="text-sm text-navy-muted dark:text-slate-400 mt-0.5">כל שינוי נשמר אוטומטית.</p>
         {saveError && <p className="text-sm text-red-600 dark:text-rose-300 mt-2" role="alert">{saveError}</p>}
       </div>
 
@@ -492,7 +492,7 @@ export default function SettingsPage() {
         <CardContent className="pt-5 space-y-4">
           <h2 className="font-semibold text-navy dark:text-slate-100 flex items-center gap-2">
             <Users className="w-4 h-4 text-brand-600 dark:text-brand-400" /> עובדים
-            {employees.length > 0 && <span className="text-xs font-normal text-navy-muted/70 dark:text-slate-500">({employees.length})</span>}
+            {employees.length > 0 && <span className="text-xs font-normal text-navy-muted dark:text-slate-400">({employees.length})</span>}
           </h2>
           <p className="text-sm text-navy-muted dark:text-slate-400">
             הוסף עובדים לפי שם וטלפון. לחץ על שם העובד להגדרת תפקידים וחוזה.
@@ -520,7 +520,7 @@ export default function SettingsPage() {
                 href={inviteWhatsAppUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-semibold text-white bg-[#16a34a] hover:bg-[#15803d] px-3 py-1.5 rounded-lg transition-colors"
+                className="text-xs font-semibold text-white bg-[#15803d] hover:bg-[#166534] px-3 py-1.5 rounded-lg transition-colors"
               >
                 הזמן בוואטסאפ
               </a>
@@ -572,7 +572,7 @@ export default function SettingsPage() {
           {employees.length === 0 ? (
             <div className="text-center py-5">
               <Users className="w-8 h-8 text-navy-muted/30 dark:text-slate-600 mx-auto mb-2" />
-              <p className="text-sm text-navy-muted/70 dark:text-slate-500">אין עובדים עדיין — הוסף את הראשון למעלה.</p>
+              <p className="text-sm text-navy-muted dark:text-slate-400">אין עובדים עדיין — הוסף את הראשון למעלה.</p>
             </div>
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-white/10">
@@ -588,7 +588,7 @@ export default function SettingsPage() {
                       <Avatar name={emp.name} color={empHex(i)} size={24} />
                       <span className="text-[15px] font-medium text-navy dark:text-slate-100">{emp.name}</span>
                       {emp.contractShifts != null && emp.contractShifts > 0 && (
-                        <span className="text-[11px] text-blue-500 dark:text-brand-300 font-medium bg-blue-50 dark:bg-brand-500/15 px-1.5 py-0.5 rounded-full">
+                        <span className="text-[11px] text-blue-700 dark:text-brand-300 font-medium bg-blue-50 dark:bg-brand-500/15 px-1.5 py-0.5 rounded-full">
                           {emp.contractShifts} משמרות
                         </span>
                       )}
@@ -597,13 +597,13 @@ export default function SettingsPage() {
                           {emp.roles.join(", ")}
                         </span>
                       )}
-                      <svg className={cn("w-3.5 h-3.5 text-navy-muted/70 dark:text-slate-500 transition-transform", expandedEmp === emp.id && "rotate-180")} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                      <svg className={cn("w-3.5 h-3.5 text-navy-muted dark:text-slate-400 transition-transform", expandedEmp === emp.id && "rotate-180")} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                     </button>
                     <div className="flex items-center gap-2">
-                      {emp.phone && <span className="text-xs text-navy-muted/70 dark:text-slate-500">{emp.phone}</span>}
+                      {emp.phone && <span className="text-xs text-navy-muted dark:text-slate-400">{emp.phone}</span>}
                       <button
                         onClick={() => setConfirmDeleteEmp(emp.id)}
-                        className="text-xs text-navy-muted/70 dark:text-slate-500 hover:text-red-600 dark:hover:text-rose-300 transition-colors px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-rose-500/10"
+                        className="text-xs text-navy-muted dark:text-slate-400 hover:text-red-600 dark:hover:text-rose-300 transition-colors px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-rose-500/10"
                       >
                         הסר
                       </button>
@@ -621,7 +621,7 @@ export default function SettingsPage() {
                           {emp.contractShifts ?? 0}
                         </span>
                         <button onClick={() => updateEmpLocal(emp.id, { contractShifts: (emp.contractShifts ?? 0) + 1 })} className={stepperCls}>+</button>
-                        <span className="text-xs text-navy-muted/70 dark:text-slate-500">{emp.contractShifts ? "יעד לשבוע" : "ללא חוזה"}</span>
+                        <span className="text-xs text-navy-muted dark:text-slate-400">{emp.contractShifts ? "יעד לשבוע" : "ללא חוזה"}</span>
                       </div>
 
                       {/* Roles */}
@@ -636,7 +636,7 @@ export default function SettingsPage() {
                           />
                         </div>
                       ) : (
-                        <p className="text-xs text-navy-muted/70 dark:text-slate-500">הגדר תפקידים בכרטיס "סוגי תפקידים" כדי להציג כאן.</p>
+                        <p className="text-xs text-navy-muted dark:text-slate-400">הגדר תפקידים בכרטיס "סוגי תפקידים" כדי להציג כאן.</p>
                       )}
 
                       {/* Shift lead */}
@@ -694,7 +694,7 @@ export default function SettingsPage() {
                       onClick={() => moveShift(i, -1)}
                       disabled={i === 0}
                       aria-label="הזז למעלה"
-                      className="text-navy-muted/70 dark:text-slate-500 hover:text-navy dark:hover:text-slate-200 disabled:opacity-25 p-0.5"
+                      className="text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 disabled:opacity-25 p-0.5"
                     >
                       <ChevronUp className="w-3.5 h-3.5" />
                     </button>
@@ -702,7 +702,7 @@ export default function SettingsPage() {
                       onClick={() => moveShift(i, 1)}
                       disabled={i === shifts.length - 1}
                       aria-label="הזז למטה"
-                      className="text-navy-muted/70 dark:text-slate-500 hover:text-navy dark:hover:text-slate-200 disabled:opacity-25 p-0.5"
+                      className="text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 disabled:opacity-25 p-0.5"
                     >
                       <ChevronDown className="w-3.5 h-3.5" />
                     </button>
@@ -719,24 +719,24 @@ export default function SettingsPage() {
                 {/* Row 2: time range + workers + delete */}
                 <div className="flex items-center gap-2 ps-6 flex-wrap">
                   <div className="flex items-center gap-1 shrink-0" dir="ltr">
-                    <span className="text-xs text-navy-muted/70 dark:text-slate-500">מ</span>
+                    <span className="text-xs text-navy-muted dark:text-slate-400">מ</span>
                     <input
                       type="time"
                       value={shift.start}
                       onChange={e => updateShift(shift.id, "start", e.target.value)}
                       className="text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
                     />
-                    <span className="text-navy-muted/70 dark:text-slate-500 text-xs">—</span>
+                    <span className="text-navy-muted dark:text-slate-400 text-xs">—</span>
                     <input
                       type="time"
                       value={shift.end}
                       onChange={e => updateShift(shift.id, "end", e.target.value)}
                       className="text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-[88px]"
                     />
-                    <span className="text-xs text-navy-muted/70 dark:text-slate-500">עד</span>
+                    <span className="text-xs text-navy-muted dark:text-slate-400">עד</span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-navy-muted/70 dark:text-slate-500">עובדים נדרשים:</span>
+                    <span className="text-xs text-navy-muted dark:text-slate-400">עובדים נדרשים:</span>
                     <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className={stepperCls}>−</button>
                     <span className="w-5 text-center text-sm font-semibold text-navy dark:text-slate-100">{shift.minWorkers ?? 2}</span>
                     <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className={stepperCls}>+</button>
@@ -766,7 +766,7 @@ export default function SettingsPage() {
                     themed and open as a jarring white OS menu in dark mode) */}
                 {shiftRoles.length > 0 && (
                   <div className="flex items-center gap-2 ps-6 flex-wrap">
-                    <span className="text-xs text-navy-muted/70 dark:text-slate-500 shrink-0">תפקיד:</span>
+                    <span className="text-xs text-navy-muted dark:text-slate-400 shrink-0">תפקיד:</span>
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
@@ -807,7 +807,7 @@ export default function SettingsPage() {
               <p className="text-sm text-red-600 dark:text-rose-300 font-medium">
                 ⚠ משמרות חופפות: {shifts.filter(s => overlappingIds.has(s.id)).map(s => s.label).join(", ")}
               </p>
-              <button onClick={() => setOverlapIgnored(true)} className="text-xs text-red-400 dark:text-rose-400 hover:text-red-600 dark:hover:text-rose-300 font-medium whitespace-nowrap px-2 py-0.5 rounded hover:bg-red-100 transition-colors flex-shrink-0">התעלם</button>
+              <button onClick={() => setOverlapIgnored(true)} className="text-xs text-red-600 dark:text-rose-300 hover:text-red-700 dark:hover:text-rose-200 font-medium whitespace-nowrap px-2 py-0.5 rounded hover:bg-red-100 transition-colors flex-shrink-0">התעלם</button>
             </div>
           )}
           {shiftError && <p className="text-sm text-red-600 dark:text-rose-300" role="alert">{shiftError}</p>}
@@ -838,7 +838,7 @@ export default function SettingsPage() {
           </div>
 
           {shiftRoles.length === 0 ? (
-            <p className="text-sm text-navy-muted/70 dark:text-slate-500 text-center py-2">אין תפקידים מוגדרים עדיין.</p>
+            <p className="text-sm text-navy-muted dark:text-slate-400 text-center py-2">אין תפקידים מוגדרים עדיין.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {shiftRoles.map(role => (
@@ -867,7 +867,7 @@ export default function SettingsPage() {
             <ChevronDown className={cn("w-5 h-5 text-navy-muted dark:text-slate-400 transition-transform", showAdvanced && "rotate-180")} />
           </button>
           {!showAdvanced && (
-            <p className="mt-1.5 text-sm text-navy-muted/70 dark:text-slate-500 text-right">{advSummary}</p>
+            <p className="mt-1.5 text-sm text-navy-muted dark:text-slate-400 text-right">{advSummary}</p>
           )}
           {showAdvanced && (
             <div className="mt-5 space-y-6">
@@ -928,7 +928,7 @@ export default function SettingsPage() {
                     className="text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-40"
                   />
                 </div>
-                <p className="text-xs text-navy-muted/70 dark:text-slate-500">מאפשר לעובדים לשלוח לך "לא יכול להגיע" בוואטסאפ ישירות מהמשמרת.</p>
+                <p className="text-xs text-navy-muted dark:text-slate-400">מאפשר לעובדים לשלוח לך "לא יכול להגיע" בוואטסאפ ישירות מהמשמרת.</p>
                 <SavedTick show={rulesSaved} />
               </div>
             </div>

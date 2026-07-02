@@ -314,7 +314,7 @@ export default function AvailabilityPage() {
             <button
               type="button"
               onClick={resetToAvailable}
-              className="text-sm text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300 disabled:opacity-40"
+              className="text-sm text-navy-muted dark:text-slate-400 hover:text-navy-muted dark:hover:text-slate-300 disabled:opacity-40"
               disabled={status === "loading" || isPastDeadline}
             >
               איפוס לזמין
@@ -336,7 +336,7 @@ export default function AvailabilityPage() {
         </CardFooter>
       </Card>
 
-      <p className="text-xs text-navy-muted/70 dark:text-slate-500 text-center">
+      <p className="text-xs text-navy-muted dark:text-slate-400 text-center">
         המנהל יצור את לוח המשמרות לאחר שכולם ישלחו.
       </p>
 
