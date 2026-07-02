@@ -762,20 +762,42 @@ export default function SettingsPage() {
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                {/* Row 3: role */}
-                <div className="flex items-center gap-2 ps-6">
-                  <span className="text-xs text-navy-muted/70 dark:text-slate-500 shrink-0">תפקיד:</span>
-                  <select
-                    value={shift.role ?? ""}
-                    onChange={e => updateShift(shift.id, "role", e.target.value)}
-                    className="flex-1 text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                  >
-                    <option value="">כללי</option>
-                    {shiftRoles.map(r => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Row 3: role — one-tap chips (native <select> popups can't be
+                    themed and open as a jarring white OS menu in dark mode) */}
+                {shiftRoles.length > 0 && (
+                  <div className="flex items-center gap-2 ps-6 flex-wrap">
+                    <span className="text-xs text-navy-muted/70 dark:text-slate-500 shrink-0">תפקיד:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => updateShift(shift.id, "role", "")}
+                        className={cn(
+                          "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                          !shift.role?.trim()
+                            ? "bg-navy text-white border-navy dark:bg-brand-600 dark:border-brand-600"
+                            : "bg-white dark:bg-white/[0.06] text-navy-muted dark:text-slate-400 border-surface-high dark:border-white/10 hover:border-brand-300"
+                        )}
+                      >
+                        כללי
+                      </button>
+                      {shiftRoles.map(r => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => updateShift(shift.id, "role", r)}
+                          className={cn(
+                            "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                            shift.role === r
+                              ? "bg-blue-500 text-white border-blue-500"
+                              : "bg-white dark:bg-white/[0.06] text-navy-muted dark:text-slate-400 border-surface-high dark:border-white/10 hover:border-blue-300"
+                          )}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
