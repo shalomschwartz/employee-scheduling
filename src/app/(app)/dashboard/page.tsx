@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
 import { he } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
+import { Avatar, empHex } from "@/components/ui/avatar";
 import { type ConstraintData } from "@/components/availability/AvailabilityGrid";
 import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, toMins, cn, type Day, type ShiftConfig } from "@/lib/utils";
 
@@ -16,43 +17,12 @@ type ScheduleData = Record<string, Record<string, ShiftSlot>>;
 interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; publishedAt?: string | null; }
 interface Employee { id: string; name: string | null; email: string; phone?: string | null; constraints: { data: ConstraintData }[]; roles: string[]; contractShifts: number | null; }
 
-// 24 visually distinct base colors — covers most orgs without repeating
-const EMP_PALETTE_HEX = [
-  "#273c75","#6c5ce7","#e84393","#0984e3",
-  "#e17055","#00cec9","#a29bfe","#2d3436",
-  "#00b894","#d63031","#fdcb6e","#6d4c41",
-  "#0097a7","#ad1457","#558b2f","#4527a0",
-  "#f4511e","#039be5","#43a047","#8e24aa",
-  "#fb8c00","#00838f","#c62828","#37474f",
-];
-
-/** Returns a unique hex color per employee index, generating extras via HSL if palette runs out. */
-function empHex(index: number): string {
-  if (index < EMP_PALETTE_HEX.length) return EMP_PALETTE_HEX[index];
-  // Spread remaining employees evenly around the hue wheel at a different lightness
-  const hue = Math.round((index - EMP_PALETTE_HEX.length) * (360 / 12)) % 360;
-  return `hsl(${hue},65%,38%)`;
-}
-
 /** Absolute same-day minute range [start, end) for a shift; overnight shifts wrap past midnight. */
 function shiftMinRange(cfg: ShiftConfig): [number, number] {
   const s = toMins(cfg.start);
   let e = toMins(cfg.end);
   if (e <= s) e += 1440;
   return [s, e];
-}
-
-/** Colored initial circle for an employee. */
-function Avatar({ name, color, size = 18 }: { name: string | null; color: string; size?: number }) {
-  const ini = (name?.trim()?.charAt(0)) || "?";
-  return (
-    <span
-      className="inline-flex items-center justify-center rounded-full font-bold text-white flex-shrink-0"
-      style={{ width: size, height: size, backgroundColor: color, fontSize: Math.round(size * 0.5) }}
-    >
-      {ini}
-    </span>
-  );
 }
 
 function WhatsAppIcon({ className }: { className?: string }) {

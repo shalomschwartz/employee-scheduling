@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { KeyRound, Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { KeyRound, Copy, Check, ChevronDown, ChevronUp, Users, CalendarClock, Tag, SlidersHorizontal, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { he } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, empHex } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -459,6 +462,18 @@ export default function SettingsPage() {
   useEscapeClose(!!confirmDeleteEmp, () => setConfirmDeleteEmp(null));
 
   const stepperCls = "w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none";
+  // Same shift-dot colors as the dashboard grid — cross-screen identity
+  const shiftDotColors = ["bg-yellow-400", "bg-orange-400", "bg-indigo-400", "bg-blue-400", "bg-pink-400"];
+
+  // Glanceable summary of the advanced settings while the accordion is closed
+  const advSummary = [
+    deadlineInput && !isNaN(new Date(deadlineInput).getTime())
+      ? `דדליין: ${format(new Date(deadlineInput), "EEEE HH:mm", { locale: he })}`
+      : "ללא דדליין",
+    `מנוחה: ${minRestHours} ש׳`,
+    maxConsecutiveDays > 0 ? `עד ${maxConsecutiveDays} ימים רצופים` : null,
+    requireShiftLead ? "ראש משמרת נדרש" : null,
+  ].filter(Boolean).join(" · ");
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -471,7 +486,10 @@ export default function SettingsPage() {
       {/* ── 1. Employees — the first thing a new manager needs ── */}
       <Card>
         <CardContent className="pt-5 space-y-4">
-          <h2 className="font-semibold text-navy dark:text-slate-100">עובדים</h2>
+          <h2 className="font-semibold text-navy dark:text-slate-100 flex items-center gap-2">
+            <Users className="w-4 h-4 text-brand-600 dark:text-brand-400" /> עובדים
+            {employees.length > 0 && <span className="text-xs font-normal text-navy-muted/70 dark:text-slate-500">({employees.length})</span>}
+          </h2>
           <p className="text-xs text-navy-muted dark:text-slate-400">
             הוסף עובדים לפי שם וטלפון. לחץ על שם העובד להגדרת תפקידים וחוזה.
           </p>
@@ -548,18 +566,22 @@ export default function SettingsPage() {
           {empError && <p className="text-sm text-red-600 dark:text-rose-300" role="alert">{empError}</p>}
 
           {employees.length === 0 ? (
-            <p className="text-sm text-navy-muted/70 dark:text-slate-500 text-center py-4">אין עובדים עדיין.</p>
+            <div className="text-center py-5">
+              <Users className="w-8 h-8 text-navy-muted/30 dark:text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-navy-muted/70 dark:text-slate-500">אין עובדים עדיין — הוסף את הראשון למעלה.</p>
+            </div>
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-white/10">
-              {employees.map(emp => (
+              {employees.map((emp, i) => (
                 <li key={emp.id}>
                   {/* Main row */}
                   <div className="flex items-center justify-between py-2.5">
                     <button
                       type="button"
                       onClick={() => setExpandedEmp(expandedEmp === emp.id ? null : emp.id)}
-                      className="flex items-center gap-1.5 text-start"
+                      className="flex items-center gap-2 text-start"
                     >
+                      <Avatar name={emp.name} color={empHex(i)} size={24} />
                       <span className="text-sm font-medium text-navy dark:text-slate-100">{emp.name}</span>
                       {emp.contractShifts != null && emp.contractShifts > 0 && (
                         <span className="text-[10px] text-blue-500 dark:text-brand-300 font-medium bg-blue-50 dark:bg-brand-500/15 px-1.5 py-0.5 rounded-full">
@@ -586,7 +608,7 @@ export default function SettingsPage() {
 
                   {/* Expanded section */}
                   {expandedEmp === emp.id && (
-                    <div className="pb-3 ps-2 space-y-3">
+                    <div className="mb-3 p-3 rounded-xl bg-surface-low dark:bg-white/[0.03] border border-surface-high/60 dark:border-white/[0.06] space-y-3">
                       {/* Contract shifts */}
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-navy-muted dark:text-slate-400 w-24 shrink-0">משמרות בשבוע:</span>
@@ -639,7 +661,9 @@ export default function SettingsPage() {
         <CardContent className="pt-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-navy dark:text-slate-100">משמרות</h2>
+              <h2 className="font-semibold text-navy dark:text-slate-100 flex items-center gap-2">
+                <CalendarClock className="w-4 h-4 text-brand-600 dark:text-brand-400" /> משמרות
+              </h2>
               <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">שם, שעות, תפקיד ומספר עובדים לכל משמרת. הסדר כאן הוא הסדר בלוח.</p>
             </div>
             <button
@@ -676,6 +700,7 @@ export default function SettingsPage() {
                       <ChevronDown className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", shiftDotColors[i % shiftDotColors.length])} />
                   <input
                     type="text"
                     value={shift.label}
@@ -711,19 +736,23 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => duplicateShift(shift.id)}
-                    className="text-blue-500 dark:text-brand-300 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-brand-500/15 border border-blue-300 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none"
+                    aria-label={`שכפל את ${shift.label}`}
+                    title="שכפל משמרת"
+                    className="w-8 h-8 sm:w-7 sm:h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors"
                   >
-                    שכפול
+                    <Copy className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setConfirmDeleteShift(shift.id)}
                     disabled={shifts.length <= 1}
+                    aria-label={`הסר את ${shift.label}`}
+                    title="הסר משמרת"
                     className={cn(
-                      "text-red-500 dark:text-rose-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-rose-500/10 border border-red-300 dark:border-rose-500/30 transition-colors rounded px-2 py-0.5 text-xs font-medium leading-none",
+                      "w-8 h-8 sm:w-7 sm:h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:text-red-600 dark:hover:text-rose-300 hover:bg-red-50 dark:hover:bg-rose-500/10 transition-colors",
                       shifts.length <= 1 && "opacity-30 cursor-not-allowed"
                     )}
                   >
-                    הסר
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
                 {/* Row 3: role */}
@@ -761,7 +790,9 @@ export default function SettingsPage() {
       <Card>
         <CardContent className="pt-5 space-y-4">
           <div>
-            <h2 className="font-semibold text-navy dark:text-slate-100">סוגי תפקידים</h2>
+            <h2 className="font-semibold text-navy dark:text-slate-100 flex items-center gap-2">
+              <Tag className="w-4 h-4 text-brand-600 dark:text-brand-400" /> סוגי תפקידים
+            </h2>
             <p className="text-xs text-navy-muted dark:text-slate-400 mt-0.5">הגדר את התפקידים האפשריים (למשל: מלצר, ברמן, הוסטס). ניתן לשייך תפקיד לכל משמרת ועובד.</p>
           </div>
 
@@ -801,9 +832,14 @@ export default function SettingsPage() {
       <Card>
         <CardContent className="pt-4 pb-4">
           <button onClick={() => setShowAdvanced(v => !v)} className="w-full flex items-center justify-between">
-            <span className="font-semibold text-navy dark:text-slate-100">הגדרות מתקדמות</span>
+            <span className="font-semibold text-navy dark:text-slate-100 flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-brand-600 dark:text-brand-400" /> הגדרות מתקדמות
+            </span>
             <ChevronDown className={cn("w-5 h-5 text-navy-muted dark:text-slate-400 transition-transform", showAdvanced && "rotate-180")} />
           </button>
+          {!showAdvanced && (
+            <p className="mt-1.5 text-xs text-navy-muted/70 dark:text-slate-500 text-right">{advSummary}</p>
+          )}
           {showAdvanced && (
             <div className="mt-5 space-y-6">
               {/* Deadline */}

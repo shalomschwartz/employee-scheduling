@@ -15,7 +15,9 @@ export async function GET() {
     prisma.user.findMany({
       where: { organizationId: session.user.organizationId, role: { in: ["EMPLOYEE", "MANAGER"] } },
       select: { id: true, name: true, phone: true, isShiftLead: true },
-      orderBy: { createdAt: "asc" },
+      // Name order matches the dashboard's employee list, so index-based avatar
+      // colors are identical across screens.
+      orderBy: { name: "asc" },
     }),
     prisma.organization.findUnique({ where: { id: session.user.organizationId } }),
   ]);
