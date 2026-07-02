@@ -123,7 +123,7 @@ export default function SettingsPage() {
   const [deadlineSaved, setDeadlineSaved] = useState(false);
 
   // ── Min rest hours (global) ─────────────────────────────────────────────────
-  const [minRestHours, setMinRestHours] = useState(7);
+  const [minRestHours, setMinRestHours] = useState(8);
   const [restSaving, setRestSaving] = useState(false);
   const [restSaved, setRestSaved] = useState(false);
 
@@ -597,7 +597,7 @@ export default function SettingsPage() {
           <div>
             <h2 className="font-semibold text-navy dark:text-slate-100">מינימום שעות מנוחה בין משמרות</h2>
             <p className="text-xs text-navy-muted dark:text-slate-400 mt-1">
-              מספר השעות המינימלי הנדרש בין סיום משמרת לתחילת משמרת הבאה (ברירת מחדל: 7 שעות).
+              מספר השעות המינימלי הנדרש בין סיום משמרת לתחילת משמרת הבאה (מינימום חוקי בישראל: 8 שעות).
             </p>
           </div>
           <div className="flex items-center gap-3">

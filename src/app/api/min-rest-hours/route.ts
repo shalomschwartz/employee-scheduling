@@ -6,11 +6,11 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.organizationId)
-    return NextResponse.json({ minRestHours: 7 });
+    return NextResponse.json({ minRestHours: 8 });
 
   const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
   const settings = (org?.settings ?? {}) as Record<string, unknown>;
-  const minRestHours = typeof settings.minRestHours === "number" ? settings.minRestHours : 7;
+  const minRestHours = typeof settings.minRestHours === "number" ? settings.minRestHours : 8;
   return NextResponse.json({ minRestHours });
 }
 

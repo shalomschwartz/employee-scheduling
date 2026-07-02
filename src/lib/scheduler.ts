@@ -89,7 +89,7 @@ export function runScheduler(
   employees: EmployeeForScheduling[],
   pinnedSlots: Record<string, Record<string, string[]>> = {},
   shifts: ShiftConfig[] = DEFAULT_SHIFTS,
-  minRestHours: number = 7,
+  minRestHours: number = 8,
   options: SchedulerOptions = {}
 ): { schedule: ScheduleData; warnings: string[] } {
   const minRestMins = minRestHours * 60;
@@ -227,15 +227,20 @@ export function runScheduler(
     for (const from of slots) {
       for (const empId of [...from.ids]) {
         if (from.pinned.has(empId)) continue;
+        const fi = from.ids.indexOf(empId);
+        if (fi === -1) continue; // moved by an earlier accepted move this pass
         for (const to of slots) {
-          if (to === from || to.ids.length >= to.minWorkers || !canPlace(empId, to)) continue;
-          const fi = from.ids.indexOf(empId);
+          if (to === from || to.ids.length >= to.minWorkers) continue;
+          // Remove BEFORE canPlace so feasibility is judged on the true end state
+          // (otherwise rest-vs-`from` blocks legal same-day relocations).
           from.ids.splice(fi, 1);
+          if (!canPlace(empId, to)) { from.ids.splice(fi, 0, empId); continue; }
           to.ids.push(empId);
           evals++;
           const c = cost();
-          if (c < best) { best = c; improved = true; }
-          else { to.ids.pop(); from.ids.splice(fi, 0, empId); }
+          // On accept, STOP iterating this employee: the snapshots and index are stale.
+          if (c < best) { best = c; improved = true; break; }
+          to.ids.pop(); from.ids.splice(fi, 0, empId);
           if (evals >= EVAL_CAP) break;
         }
         if (evals >= EVAL_CAP) break;
@@ -247,21 +252,25 @@ export function runScheduler(
     for (let i = 0; i < slots.length && evals < EVAL_CAP; i++) {
       for (let j = i + 1; j < slots.length && evals < EVAL_CAP; j++) {
         const A = slots[i], B = slots[j];
+        let swapped = false;
         for (const a of [...A.ids]) {
+          if (swapped) break;
           if (A.pinned.has(a)) continue;
           for (const b of [...B.ids]) {
             if (B.pinned.has(b) || a === b) continue;
             const ai = A.ids.indexOf(a), bi = B.ids.indexOf(b);
+            if (ai === -1 || bi === -1) continue; // stale snapshot after an accepted move
             A.ids.splice(ai, 1); B.ids.splice(bi, 1);
             if (canPlace(a, B) && canPlace(b, A)) {
               A.ids.push(b); B.ids.push(a);
               evals++;
               const c = cost();
-              if (c < best) { best = c; improved = true; }
-              else {
-                A.ids.splice(A.ids.indexOf(b), 1); B.ids.splice(B.ids.indexOf(a), 1);
-                A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
-              }
+              // On accept, STOP iterating this slot pair: continuing would splice by
+              // stale indices and re-insert employees into slots they no longer hold —
+              // the source of unvalidated (illegal) assignments.
+              if (c < best) { best = c; improved = true; swapped = true; break; }
+              A.ids.splice(A.ids.indexOf(b), 1); B.ids.splice(B.ids.indexOf(a), 1);
+              A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
             } else {
               A.ids.splice(ai, 0, a); B.ids.splice(bi, 0, b);
             }

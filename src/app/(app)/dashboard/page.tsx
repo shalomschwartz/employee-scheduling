@@ -86,7 +86,7 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
 
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
-  const [minRestHours, setMinRestHours] = useState(7);
+  const [minRestHours, setMinRestHours] = useState(8);
   const [orgCode, setOrgCode] = useState<string | null>(null);
   const [empFilter, setEmpFilter] = useState<string | null>(null);
   const [setupDone, setSetupDone] = useState(() => {

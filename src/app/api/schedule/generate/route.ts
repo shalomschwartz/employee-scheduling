@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     .map(s => ({ ...s, minWorkers: s.minWorkers ?? legacyMin }))
     .sort((a, b) => toMins(a.start) - toMins(b.start));
 
-  const minRestHours = typeof orgSettings.minRestHours === "number" ? orgSettings.minRestHours : 7;
+  const minRestHours = typeof orgSettings.minRestHours === "number" ? orgSettings.minRestHours : 8;
   const maxConsecutiveDays = typeof orgSettings.maxConsecutiveDays === "number" ? orgSettings.maxConsecutiveDays : undefined;
   const requireShiftLead = orgSettings.requireShiftLead === true;
   const { schedule: rawSchedule, warnings } = runScheduler(employeeData, pinnedSlots, shifts, minRestHours, { maxConsecutiveDays, requireShiftLead });
