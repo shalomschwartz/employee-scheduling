@@ -22,24 +22,27 @@ function LoginForm() {
   const [error, setError] = useState(hasError ? "פרטים שגויים." : "");
 
   // Returning employees: prefill the three fields from the last successful login
-  useEffect(() => {
+  function applySavedEmployee() {
     try {
       const saved = JSON.parse(localStorage.getItem("shiftsync_emp_login") ?? "null");
-      if (saved?.name) {
-        setUsername(saved.name);
-        setPhone(saved.phone ?? "");
-        setOrgCode(saved.orgCode ?? "");
-      }
-    } catch { /* ignore */ }
-  }, []);
+      setUsername(saved?.name ?? "");
+      setPhone(saved?.phone ?? "");
+      setOrgCode(saved?.orgCode ?? "");
+    } catch {
+      setUsername(""); setPhone(""); setOrgCode("");
+    }
+  }
+  useEffect(() => { applySavedEmployee(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function switchRole(manager: boolean) {
     setIsManager(manager);
     setError("");
-    setUsername("");
     setPassword("");
-    setPhone("");
-    setOrgCode("");
+    if (manager) {
+      setUsername(""); setPhone(""); setOrgCode("");
+    } else {
+      applySavedEmployee(); // toggling to מנהל and back must not lose the prefill
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

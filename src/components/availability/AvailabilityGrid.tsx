@@ -62,7 +62,7 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
       <table className="w-full border-collapse table-fixed">
         <thead>
           <tr>
-            <th className="text-right text-xs font-medium text-navy-muted/70 dark:text-slate-500 pb-2 ps-1 w-16 sm:w-24">משמרת</th>
+            <th className="text-right text-xs font-medium text-navy-muted/70 dark:text-slate-500 pb-2 ps-1 w-[76px] sm:w-24">משמרת</th>
             {DAYS.map(day => (
               <th key={day} className="text-center pb-2 px-0.5">
                 <button
@@ -87,7 +87,7 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
                   <span className="text-xs font-semibold text-navy dark:text-slate-100 truncate">{shiftCfg.label}</span>
                 </div>
                 <div className="text-[10px] text-navy-muted/70 dark:text-slate-500 mb-1 sm:ps-3" dir="ltr">{shiftCfg.start}–{shiftCfg.end}</div>
-                <div className="flex gap-1 sm:gap-0.5 sm:ps-3">
+                <div className="flex gap-0.5 sm:ps-3">
                   {OPTION_CYCLE.map(opt => (
                     <button
                       key={opt}
@@ -95,7 +95,8 @@ export function AvailabilityGrid({ value, onChange, disabled, onBlockedClick, sh
                       disabled={disabled}
                       onClick={() => handleSetAll(shiftCfg.id, opt)}
                       className={cn(
-                        "w-8 h-8 sm:w-5 sm:h-5 rounded text-xs sm:text-[9px] font-bold border transition-all active:scale-95 touch-manipulation",
+                        // must fit 3-up inside the 76px mobile label column (table-fixed squishes overflow)
+                        "w-[22px] h-8 sm:w-5 sm:h-5 rounded text-[10px] sm:text-[9px] font-bold border transition-all active:scale-95 touch-manipulation",
                         OPTION_STYLES[opt].bg,
                         disabled && "opacity-50 cursor-not-allowed"
                       )}

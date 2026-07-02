@@ -81,6 +81,10 @@ export default function SettingsPage() {
     timers.current[key] = setTimeout(fn, ms);
   }
 
+  // A save failure anywhere on the page must be SAID — auto-save with a false
+  // "נשמר ✓" (or silence) is silent data loss.
+  const [saveError, setSaveError] = useState("");
+
   // ── Shift role types (already auto-saving) ─────────────────────────────────
   const [shiftRoles, setShiftRoles] = useState<string[]>([]);
   const [newRole, setNewRole] = useState("");
@@ -93,13 +97,19 @@ export default function SettingsPage() {
   }, []);
 
   async function saveRoles(updated: string[]) {
-    await fetch("/api/shift-roles", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roles: updated }),
-    });
-    setRolesSaved(true);
-    setTimeout(() => setRolesSaved(false), 2000);
+    try {
+      const res = await fetch("/api/shift-roles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roles: updated }),
+      });
+      if (!res.ok) throw new Error();
+      setSaveError("");
+      setRolesSaved(true);
+      setTimeout(() => setRolesSaved(false), 2000);
+    } catch {
+      setSaveError("שגיאה בשמירת התפקידים — נסה שנית");
+    }
   }
 
   function addRole() {
@@ -115,6 +125,15 @@ export default function SettingsPage() {
     const updated = shiftRoles.filter(r => r !== role);
     setShiftRoles(updated);
     saveRoles(updated);
+    // Clear the deleted role everywhere it's referenced, so no shift or employee
+    // stays silently restricted to a role that no longer exists.
+    if (shiftsRef.current.some(s => s.role === role)) {
+      setShifts(prev => prev.map(s => (s.role === role ? { ...s, role: "" } : s)));
+      queueSaveShifts();
+    }
+    empsRef.current
+      .filter(e => e.roles.includes(role))
+      .forEach(e => updateEmpLocal(e.id, { roles: e.roles.filter(r => r !== role) }));
   }
 
   // ── Employees ──────────────────────────────────────────────────────────────
@@ -143,29 +162,36 @@ export default function SettingsPage() {
     if (!name.trim()) return;
     setEmpLoading(true);
     setEmpError("");
-    const res = await fetch("/api/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
-    });
-    const data = await res.json();
-    if (!res.ok) { setEmpLoading(false); setEmpError(data.error ?? "שגיאה בהוספה"); return; }
-    // Save roles + contract immediately if set
-    if (newRoles.length > 0 || newContract > 0) {
-      await fetch("/api/employees", {
-        method: "PATCH",
+    try {
+      const res = await fetch("/api/employees", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: data.id, roles: newRoles, contractShifts: newContract > 0 ? newContract : null }),
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
       });
-      data.roles = newRoles;
-      data.contractShifts = newContract > 0 ? newContract : null;
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) { setEmpError(data?.error ?? "שגיאה בהוספה"); return; }
+      // Save roles + contract immediately if set — only reflect locally if persisted
+      if (newRoles.length > 0 || newContract > 0) {
+        const patchRes = await fetch("/api/employees", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: data.id, roles: newRoles, contractShifts: newContract > 0 ? newContract : null }),
+        });
+        if (patchRes.ok) {
+          data.roles = newRoles;
+          data.contractShifts = newContract > 0 ? newContract : null;
+        }
+      }
+      setEmployees(prev => [...prev, data]);
+      setName("");
+      setPhone("");
+      setNewRoles([]);
+      setNewContract(0);
+    } catch {
+      setEmpError("שגיאת רשת — נסה שנית");
+    } finally {
+      setEmpLoading(false);
     }
-    setEmpLoading(false);
-    setEmployees(prev => [...prev, data]);
-    setName("");
-    setPhone("");
-    setNewRoles([]);
-    setNewContract(0);
   }
 
   async function handleDeleteEmployee(id: string) {
@@ -184,13 +210,19 @@ export default function SettingsPage() {
     debounced(`emp-${id}`, async () => {
       const emp = empsRef.current.find(e => e.id === id);
       if (!emp) return;
-      await fetch("/api/employees", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts, isShiftLead: emp.isShiftLead ?? false }),
-      });
-      setEmpSaved(id);
-      setTimeout(() => setEmpSaved(cur => (cur === id ? null : cur)), 2000);
+      try {
+        const res = await fetch("/api/employees", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, roles: emp.roles, contractShifts: emp.contractShifts, isShiftLead: emp.isShiftLead ?? false }),
+        });
+        if (!res.ok) throw new Error();
+        setSaveError("");
+        setEmpSaved(id);
+        setTimeout(() => setEmpSaved(cur => (cur === id ? null : cur)), 2000);
+      } catch {
+        setSaveError(`שגיאה בשמירת ${emp.name} — נסה שנית`);
+      }
     });
   }
 
@@ -339,31 +371,54 @@ export default function SettingsPage() {
     return `${p("year")}-${p("month")}-${p("day")}T${p("hour")}:${p("minute")}`;
   }
 
+  /** Interpret a datetime-local string as Asia/Jerusalem wall-clock time and return UTC ISO
+   *  (display already formats in Asia/Jerusalem — save must be symmetric). */
+  function fromJerusalemLocal(v: string): string {
+    const asUtc = new Date(v + ":00Z");
+    const offsetMs =
+      new Date(asUtc.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" })).getTime() -
+      new Date(asUtc.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
+    return new Date(asUtc.getTime() - offsetMs).toISOString();
+  }
+
   function queueSaveDeadline(value: string) {
     setDeadlineInput(value);
     debounced("deadline", async () => {
       const v = deadlineRef.current;
-      if (!v || isNaN(new Date(v).getTime())) return;
-      await fetch("/api/deadline", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deadline: new Date(v).toISOString() }),
-      });
-      setDeadlineSaved(true);
-      setTimeout(() => setDeadlineSaved(false), 2000);
+      if (v && isNaN(new Date(v).getTime())) return;
+      try {
+        const res = await fetch("/api/deadline", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          // Empty field = clear the deadline (unlocks submissions with no time limit)
+          body: JSON.stringify({ deadline: v ? fromJerusalemLocal(v) : null }),
+        });
+        if (!res.ok) throw new Error();
+        setSaveError("");
+        setDeadlineSaved(true);
+        setTimeout(() => setDeadlineSaved(false), 2000);
+      } catch {
+        setSaveError("שגיאה בשמירת מועד ההגשה — נסה שנית");
+      }
     });
   }
 
   function queueSaveRest(value: number) {
     setMinRestHours(value);
     debounced("rest", async () => {
-      await fetch("/api/min-rest-hours", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minRestHours: restRef.current }),
-      });
-      setRestSaved(true);
-      setTimeout(() => setRestSaved(false), 2000);
+      try {
+        const res = await fetch("/api/min-rest-hours", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ minRestHours: restRef.current }),
+        });
+        if (!res.ok) throw new Error();
+        setSaveError("");
+        setRestSaved(true);
+        setTimeout(() => setRestSaved(false), 2000);
+      } catch {
+        setSaveError("שגיאה בשמירת שעות המנוחה — נסה שנית");
+      }
     });
   }
 
@@ -372,13 +427,19 @@ export default function SettingsPage() {
     if (patch.requireShiftLead !== undefined) setRequireShiftLead(patch.requireShiftLead);
     if (patch.managerPhone !== undefined) setManagerPhone(patch.managerPhone);
     debounced("rules", async () => {
-      await fetch("/api/scheduling-rules", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(rulesRef.current),
-      });
-      setRulesSaved(true);
-      setTimeout(() => setRulesSaved(false), 2000);
+      try {
+        const res = await fetch("/api/scheduling-rules", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(rulesRef.current),
+        });
+        if (!res.ok) throw new Error();
+        setSaveError("");
+        setRulesSaved(true);
+        setTimeout(() => setRulesSaved(false), 2000);
+      } catch {
+        setSaveError("שגיאה בשמירת כללי השיבוץ — נסה שנית");
+      }
     });
   }
 
@@ -404,6 +465,7 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגדרות</h1>
         <p className="text-xs text-navy-muted/70 dark:text-slate-500 mt-0.5">כל שינוי נשמר אוטומטית.</p>
+        {saveError && <p className="text-sm text-red-600 dark:text-rose-300 mt-2" role="alert">{saveError}</p>}
       </div>
 
       {/* ── 1. Employees — the first thing a new manager needs ── */}
@@ -710,7 +772,7 @@ export default function SettingsPage() {
               onChange={e => setNewRole(e.target.value)}
               onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addRole())}
               placeholder="שם תפקיד חדש"
-              className="flex-1 text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="flex-1 text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             />
             <Button onClick={addRole} size="md" disabled={!newRole.trim()}>הוסף</Button>
           </div>
@@ -755,7 +817,7 @@ export default function SettingsPage() {
                     type="datetime-local"
                     value={deadlineInput}
                     onChange={e => queueSaveDeadline(e.target.value)}
-                    className="text-base sm:text-sm border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                    className="text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                   />
                   <SavedTick show={deadlineSaved} />
                 </div>

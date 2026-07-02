@@ -74,15 +74,20 @@ export default function MySchedulePage() {
 
   const uid = userId || session?.user?.id || "";
 
-  // Flatten one week's schedule into this employee's shift items
+  // Flatten one week's schedule into this employee's shift items. Iterate the
+  // SCHEDULE's own keys (not the live config) so shifts whose id was renamed or
+  // removed in settings after publishing still render instead of vanishing.
   function myItems(week: WeekData | null): ShiftItem[] {
     if (!week) return [];
     const ws = new Date(week.weekStart);
     const items: ShiftItem[] = [];
     DAYS.forEach((day, dayIdx) => {
-      for (const cfg of shifts) {
-        const slot = week.schedule[day]?.[cfg.id];
+      const dayData = week.schedule[day] ?? {};
+      for (const shiftId of Object.keys(dayData)) {
+        const slot = dayData[shiftId];
         if (!slot?.employeeIds?.includes(uid)) continue;
+        const cfg: ShiftConfig = shifts.find(s => s.id === shiftId)
+          ?? { id: shiftId, label: shiftId, start: "00:00", end: "00:00", minWorkers: 0 };
         const date = new Date(ws.getUTCFullYear(), ws.getUTCMonth(), ws.getUTCDate() + dayIdx);
         const [h, m] = cfg.start.split(":").map(Number);
         const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, m);
@@ -159,13 +164,16 @@ export default function MySchedulePage() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-surface-high dark:border-white/10 px-4 py-3 text-sm text-navy-muted dark:text-slate-400">
-            לא שובצת השבוע.
+            {isCurrent ? "לא שובצת השבוע." : "לא שובצת בשבוע הבא."}
           </div>
         ) : (
           <div className="space-y-2">
             {items.map(it => {
               const isToday = isCurrent && it.dayIdx === todayIdx;
-              const isPast = isCurrent && it.dayIdx < todayIdx;
+              // Past = the shift has ENDED (an in-progress overnight shift is not past)
+              let durMins = toMins(it.cfg.end) - toMins(it.cfg.start);
+              if (durMins <= 0) durMins += 1440;
+              const isPast = isCurrent && it.start.getTime() + durMins * 60000 <= Date.now();
               return (
                 <Card key={`${it.day}-${it.cfg.id}`} className={cn(isPast && "opacity-55", isToday && "ring-2 ring-brand-400/60")}>
                   <CardContent className="py-3 px-4">

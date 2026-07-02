@@ -87,7 +87,6 @@ export default function DashboardPage() {
 
   const [shifts, setShifts] = useState<ShiftConfig[]>(DEFAULT_SHIFTS);
   const [minRestHours, setMinRestHours] = useState(8);
-  const [orgCode, setOrgCode] = useState<string | null>(null);
   const [empFilter, setEmpFilter] = useState<string | null>(null);
   const [setupDone, setSetupDone] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -140,7 +139,7 @@ export default function DashboardPage() {
   useEscapeClose(!!confirmClear, () => setConfirmClear(null));
   useEscapeClose(!!conflictDialog, () => setConflictDialog(null));
   useEscapeClose(!!confirmGen, () => setConfirmGen(null));
-  useEscapeClose(publishStep !== null, () => setPublishStep(null));
+  useEscapeClose(publishStep !== null && !publishing, () => setPublishStep(null));
 
   // Fresh "sent" checkmarks every time the share sheet is opened
   useEffect(() => {
@@ -164,6 +163,9 @@ export default function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     setLoadError(false);
+    // Week-scoped UI state must not leak across weeks (undo could overwrite the wrong week)
+    setUndoSnap(null);
+    setEditingCell(null);
     Promise.all([
       fetch(`/api/schedule?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
@@ -175,7 +177,6 @@ export default function DashboardPage() {
       else { setExisting(null); setScheduleData(null); }
       if (Array.isArray(emps)) setEmployees(emps);
       if (shiftsCfg?.shifts) setShifts(shiftsCfg.shifts);
-      if (typeof shiftsCfg?.orgCode === "string") setOrgCode(shiftsCfg.orgCode);
       if (typeof restCfg?.minRestHours === "number") setMinRestHours(restCfg.minRestHours);
       setDeadline(deadlineCfg?.deadline ? new Date(deadlineCfg.deadline) : null);
       setLoading(false);
@@ -207,13 +208,13 @@ export default function DashboardPage() {
     const cells: Record<string, "understaffed" | "conflict"> = {};
     if (!scheduleData) return { cells, count: 0 };
     for (const day of DAYS) {
-      const dayData = scheduleData[day];
-      if (!dayData) continue;
+      const dayData = scheduleData[day] ?? {};
       for (const shiftCfg of shifts) {
         const slot = dayData[shiftCfg.id];
-        if (!slot) continue;
         const key = `${day}-${shiftCfg.id}`;
-        if (slot.employeeIds.length < (shiftCfg.minWorkers ?? 2)) cells[key] = "understaffed";
+        // A missing slot (shift added after generation) is an unstaffed shift, not "no problem"
+        if ((slot?.employeeIds.length ?? 0) < (shiftCfg.minWorkers ?? 2)) cells[key] = "understaffed";
+        if (!slot) continue;
         slot.employeeIds.forEach(empId => {
           const emp = empMap[empId];
           if (!emp) return;
@@ -272,6 +273,7 @@ export default function DashboardPage() {
       });
       if (!res.ok) {
         setScheduleData(previous);
+        setUndoSnap(null); // the action was rolled back — an undo offer would lie
         setErrorToast("שגיאה בשמירת השינויים");
         setTimeout(() => setErrorToast(null), 4000);
       } else {
@@ -281,6 +283,7 @@ export default function DashboardPage() {
       }
     } catch {
       setScheduleData(previous);
+      setUndoSnap(null);
       setErrorToast("שגיאת רשת — השינויים לא נשמרו");
       setTimeout(() => setErrorToast(null), 4000);
     }
@@ -322,17 +325,19 @@ export default function DashboardPage() {
     setUndoSnap({ data: snap, label: "העובד הוסר" });
   }
 
-  // Returns the shift IDs the employee is already in on that day (excluding the target shift)
-  function empShiftsOnDay(empId: string, day: string, excludeShift: string): string[] {
+  // Returns the shift IDs the employee is already in on that day (excluding the target
+  // shift, and optionally a shift being vacated by a same-day move).
+  function empShiftsOnDay(empId: string, day: string, excludeShift: string, alsoExclude?: string): string[] {
     if (!scheduleData) return [];
-    return shifts.map(s => s.id).filter(sid => sid !== excludeShift && scheduleData[day]?.[sid]?.employeeIds.includes(empId));
+    return shifts.map(s => s.id).filter(sid =>
+      sid !== excludeShift && sid !== alsoExclude && scheduleData[day]?.[sid]?.employeeIds.includes(empId));
   }
 
-  function hasOverlapConflict(empId: string, day: string, shift: string): boolean {
+  function hasOverlapConflict(empId: string, day: string, shift: string, alsoExclude?: string): boolean {
     const cfg = shifts.find(s => s.id === shift);
     if (!cfg) return false;
     const [cs, ce] = shiftMinRange(cfg);
-    return empShiftsOnDay(empId, day, shift).some(sid => {
+    return empShiftsOnDay(empId, day, shift, alsoExclude).some(sid => {
       const other = shifts.find(s => s.id === sid);
       if (!other) return false;
       const [os, oe] = shiftMinRange(other);
@@ -341,11 +346,11 @@ export default function DashboardPage() {
     });
   }
 
-  function hasRestViolation(empId: string, day: string, shift: string): boolean {
+  function hasRestViolation(empId: string, day: string, shift: string, alsoExclude?: string): boolean {
     const cfg = shifts.find(s => s.id === shift);
     if (!cfg) return false;
     const [cs, ce] = shiftMinRange(cfg);
-    return empShiftsOnDay(empId, day, shift).some(sid => {
+    return empShiftsOnDay(empId, day, shift, alsoExclude).some(sid => {
       const other = shifts.find(s => s.id === sid);
       if (!other) return false;
       const [os, oe] = shiftMinRange(other);
@@ -358,8 +363,9 @@ export default function DashboardPage() {
   function addToSlot(emp: Employee, day: string, shift: string) {
     if (!scheduleData) return;
     setEditingCell(null);
-    const slot = scheduleData[day]?.[shift];
-    if (!slot) return;
+    // Shifts added in settings AFTER generation have no slot yet — create one
+    // instead of silently doing nothing.
+    const slot = scheduleData[day]?.[shift] ?? { employeeIds: [], employeeNames: [], pinnedIds: [] };
     if (slot.employeeIds.includes(emp.id)) return;
     const name = emp.name ?? emp.email;
 
@@ -395,6 +401,9 @@ export default function DashboardPage() {
     if (availability === "unavailable") warnings.push(`${name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
     if (hasOverlapConflict(emp.id, day, shift)) warnings.push(`${name} כבר משובץ/ת במשמרת חופפת באותו יום`);
     else if (hasRestViolation(emp.id, day, shift)) warnings.push(`${name} לא יהיו ${minRestHours} שעות מנוחה בין המשמרות`);
+    const empWorkedDays = DAYS.filter(d => shifts.some(sc => scheduleData[d]?.[sc.id]?.employeeIds.includes(emp.id)));
+    if (empWorkedDays.indexOf(day as Day) === -1 && empWorkedDays.length >= 6)
+      warnings.push(`${name} כבר עובד/ת 6 ימים השבוע — יום שביעי מנוגד לחוק מנוחה שבועית`);
     if (warnings.length > 0) {
       setConflictDialog({ lines: warnings, onIgnore: doAdd });
       return;
@@ -408,8 +417,7 @@ export default function DashboardPage() {
     if (dragging.fromDay === toDay && dragging.fromShift === toShift) { setDragging(null); return; }
 
     const emp = empMap[dragging.empId];
-    const toSlot = scheduleData[toDay]?.[toShift];
-    if (!toSlot) { setDragging(null); return; }
+    const toSlot = scheduleData[toDay]?.[toShift] ?? { employeeIds: [], employeeNames: [], pinnedIds: [] };
     if (toSlot.employeeIds.includes(dragging.empId)) {
       setErrorToast(`${dragging.name} כבר משובץ/ת במשמרת זו`);
       setTimeout(() => setErrorToast(null), 3000);
@@ -457,8 +465,18 @@ export default function DashboardPage() {
       dragWarnings.push(`${dragging.name} כבר מגיע/ה ל-${dragEmp.contractShifts} משמרות לפי החוזה (כרגע: ${dragWeekCount})`);
     if (toShiftRole && !emp?.roles.includes(toShiftRole)) dragWarnings.push(`${dragging.name} אינו/ה מוגדר/ת לתפקיד "${toShiftRole}"`);
     if (availability === "unavailable") dragWarnings.push(`${dragging.name} ציין/ה שאינו/ה זמין/ה למשמרת זו`);
-    if (hasOverlapConflict(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} כבר משובץ/ת במשמרת חופפת באותו יום`);
-    else if (hasRestViolation(dragging.empId, toDay, toShift)) dragWarnings.push(`${dragging.name} לא יהיו ${minRestHours} שעות מנוחה בין המשמרות`);
+    // Same-day move: the shift being vacated must not count against the check
+    const vacating = dragging.fromDay === toDay ? dragging.fromShift : undefined;
+    if (hasOverlapConflict(dragging.empId, toDay, toShift, vacating)) dragWarnings.push(`${dragging.name} כבר משובץ/ת במשמרת חופפת באותו יום`);
+    else if (hasRestViolation(dragging.empId, toDay, toShift, vacating)) dragWarnings.push(`${dragging.name} לא יהיו ${minRestHours} שעות מנוחה בין המשמרות`);
+    const dragDays = DAYS.filter(d => shifts.some(sc => {
+      const s = scheduleData[d]?.[sc.id];
+      if (!s?.employeeIds.includes(dragging.empId)) return false;
+      if (d === dragging.fromDay && sc.id === dragging.fromShift) return false; // being vacated
+      return true;
+    }));
+    if (dragDays.indexOf(toDay as Day) === -1 && dragDays.length >= 6)
+      dragWarnings.push(`${dragging.name} כבר עובד/ת 6 ימים השבוע — יום שביעי מנוגד לחוק מנוחה שבועית`);
     if (dragWarnings.length > 0) {
       setConflictDialog({ lines: dragWarnings, onIgnore: doMove });
       setDragging(null);
@@ -624,7 +642,8 @@ export default function DashboardPage() {
   async function copyLastWeek() {
     setCopying(true);
     try {
-      const prev = addDays(weekStart, -7);
+      // UTC math — addDays keeps local wall-clock and drifts the key across DST changes
+      const prev = new Date(weekStart.getTime() - 7 * 86400000);
       const res = await fetch(`/api/schedule?weekStart=${prev.toISOString()}`);
       const data = res.ok ? await res.json() : null;
       if (!data?.schedule) {
@@ -743,11 +762,11 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-navy dark:text-slate-100 tracking-tight">לוח בקרה</h1>
           <div className="flex items-center gap-1.5 mt-1">
-            <button onClick={() => setWeekStart(w => addDays(w, -7))} aria-label="שבוע קודם" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
+            <button onClick={() => setWeekStart(w => new Date(w.getTime() - 7 * 86400000))} aria-label="שבוע קודם" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
             <p className="text-sm font-medium text-navy dark:text-slate-300 min-w-[150px] text-center tnum">{weekLabel}</p>
-            <button onClick={() => setWeekStart(w => addDays(w, 7))} aria-label="שבוע הבא" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
+            <button onClick={() => setWeekStart(w => new Date(w.getTime() + 7 * 86400000))} aria-label="שבוע הבא" className="w-7 h-7 grid place-items-center rounded-lg text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.06] transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
@@ -845,7 +864,7 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-surface-high dark:border-white/10 bg-surface-low dark:bg-white/[0.03] py-16 text-center px-6">
           <p className="text-sm text-navy-muted/70 dark:text-slate-500 mb-4">טרם נוצר סידור עבודה לשבוע זה.</p>
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <Button onClick={generate} loading={generating} size="md">צור סידור אוטומטי</Button>
+            <Button onClick={requestGenerate} loading={generating} size="md">צור סידור אוטומטי</Button>
             <Button onClick={copyLastWeek} loading={copying} variant="outline" size="md"><Copy className="w-4 h-4" /> העתק מהשבוע שעבר</Button>
           </div>
         </div>
@@ -1036,13 +1055,21 @@ export default function DashboardPage() {
                                   );
                                 })}
                               </div>
-                            ) : (slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2) && (
+                            ) : (
+                              // Always available — a busy Friday may legitimately need MORE than
+                              // the minimum; prominent while understaffed, subtle once met.
                               <button
                                 onClick={e => { e.stopPropagation(); setEditingCell({ day, shift }); }}
-                                className="w-full flex items-center justify-center gap-1 text-navy-muted/50 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400 text-[11px] font-medium py-1 rounded-lg border border-dashed border-surface-high/70 dark:border-white/[0.08] hover:border-brand-300 dark:hover:border-brand-400/40 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-colors"
+                                className={cn(
+                                  "w-full flex items-center justify-center gap-1 text-[11px] font-medium py-1 rounded-lg transition-all text-navy-muted/50 dark:text-slate-600 hover:text-brand-600 dark:hover:text-brand-400",
+                                  (slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2)
+                                    ? "border border-dashed border-surface-high/70 dark:border-white/[0.08] hover:border-brand-300 dark:hover:border-brand-400/40 hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                                    : "opacity-100 sm:opacity-0 sm:group-hover/cell:opacity-100 focus:opacity-100"
+                                )}
                                 title="הוסף עובד"
                               >
-                                <Plus className="w-3.5 h-3.5" /> הוסף
+                                <Plus className="w-3.5 h-3.5" />
+                                {(slot?.employeeIds ?? []).length < (shifts.find(s => s.id === shift)?.minWorkers ?? 2) ? "הוסף" : null}
                               </button>
                             )}
                             {(slot?.employeeIds ?? []).length > 0 && (
@@ -1150,7 +1177,8 @@ export default function DashboardPage() {
                   </button>
                   <button
                     onClick={() => setPublishStep(null)}
-                    className="flex-1 py-2 rounded-lg border border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03] text-navy dark:text-slate-100 text-sm font-semibold transition-colors"
+                    disabled={publishing}
+                    className="flex-1 py-2 rounded-lg border border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03] text-navy dark:text-slate-100 text-sm font-semibold transition-colors disabled:opacity-50"
                   >
                     ביטול
                   </button>

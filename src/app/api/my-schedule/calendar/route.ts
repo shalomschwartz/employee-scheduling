@@ -56,17 +56,26 @@ export async function GET() {
     "METHOD:PUBLISH",
   ];
 
+  // RFC 5545 requires DTSTAMP on every VEVENT (strict importers reject it otherwise)
+  const now = new Date();
+  const dtstamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
+
   weeks.forEach((ws, wi) => {
     const row = rows[wi];
     if (!row || row.status !== "PUBLISHED") return;
     const schedule = row.schedule as unknown as Schedule;
     DAYS.forEach((day, dayIdx) => {
-      for (const cfg of shifts) {
-        if (!schedule[day]?.[cfg.id]?.employeeIds?.includes(uid)) continue;
+      const dayData = (schedule[day] ?? {}) as Record<string, Slot>;
+      // Iterate the schedule's own keys so renamed/removed shift ids aren't dropped
+      for (const shiftId of Object.keys(dayData)) {
+        if (!dayData[shiftId]?.employeeIds?.includes(uid)) continue;
+        const cfg = shifts.find(s => s.id === shiftId);
+        if (!cfg) continue; // config gone — no reliable times for an event
         const overnight = toMins(cfg.end) <= toMins(cfg.start);
         lines.push(
           "BEGIN:VEVENT",
           `UID:${row.id}-${day}-${cfg.id}@shiftsync`,
+          `DTSTAMP:${dtstamp}`,
           `DTSTART:${icsDate(ws, dayIdx, cfg.start)}`,
           `DTEND:${icsDate(ws, dayIdx, cfg.end, overnight ? 1 : 0)}`,
           `SUMMARY:${esc(`משמרת ${cfg.label} — ${orgName}`)}`,

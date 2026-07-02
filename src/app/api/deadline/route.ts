@@ -21,7 +21,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "אין הרשאה" }, { status: 401 });
 
   const { deadline } = await req.json();
-  if (!deadline || isNaN(new Date(deadline).getTime()))
+  // null clears the deadline (no submission time limit)
+  if (deadline !== null && (!deadline || isNaN(new Date(deadline).getTime())))
     return NextResponse.json({ error: "תאריך לא תקין" }, { status: 400 });
 
   const org = await prisma.organization.findUnique({

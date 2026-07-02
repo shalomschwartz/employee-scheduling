@@ -62,7 +62,7 @@ function DeadlineBanner({ deadline }: { deadline: Date | null }) {
       <p className="font-medium">⏰ יש להגיש זמינות עד {deadlineDateStr} בשעה {deadlineTimeStr}</p>
       <div className="mt-1 flex items-baseline gap-2">
         {days > 0 && (
-          <span className="text-base" style={{ fontFamily: "Arial, sans-serif" }}>
+          <span className="text-base tnum">
             {days} ימים
           </span>
         )}
@@ -147,8 +147,13 @@ export default function AvailabilityPage() {
           const d = await deadlineRes.json();
           if (d.deadline) {
             const dl = new Date(d.deadline);
-            setDeadline(dl);
-            setIsPastDeadline(Date.now() >= dl.getTime());
+            // The deadline only binds the week it belongs to — a stale date from a
+            // past week must not lock every future submission forever.
+            const relevant = Math.abs(dl.getTime() - weekStart.getTime()) < 7 * 86400000;
+            if (relevant) {
+              setDeadline(dl);
+              setIsPastDeadline(Date.now() >= dl.getTime());
+            }
           }
         }
       } catch {
@@ -179,11 +184,14 @@ export default function AvailabilityPage() {
       setStatus("success");
       setAlreadySubmitted(true);
       setLastSaved(new Date());
-      if (!localStorage.getItem("shiftsync_pwa_nudged")) {
+      const firstTime = !localStorage.getItem("shiftsync_pwa_nudged");
+      if (firstTime) {
         localStorage.setItem("shiftsync_pwa_nudged", "true");
         setShowPwaTip(true);
+      } else {
+        // The one-time PWA tip needs a deliberate dismissal, not a 2.5s flash
+        setTimeout(() => setStatus("idle"), 2500);
       }
-      setTimeout(() => setStatus("idle"), 2500);
     } catch {
       setStatus("error");
       setTimeout(() => setStatus("idle"), 4000);
@@ -204,24 +212,35 @@ export default function AvailabilityPage() {
   // Don't let unsent edits vanish silently when the tab/PWA is closed
   useEffect(() => {
     if (!isDirty || isPastDeadline) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isDirty, isPastDeadline]);
 
   function copyLastWeek() {
     if (!prevData) return;
-    setConstraints(prevData);
+    // Rebuild on the CURRENT shift config — only overlay keys that still exist,
+    // so stale shift ids from a changed config never reach the server.
+    const base = defaultConstraintData(shifts);
+    for (const d of DAYS) {
+      for (const s of shifts) {
+        const v = prevData[d]?.[s.id];
+        if (v) base[d][s.id] = v;
+      }
+    }
+    setConstraints(base);
   }
 
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function resetToAvailable() {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
     setResetSnap(constraints);
     setConstraints(defaultConstraintData(shifts));
-    setTimeout(() => setResetSnap(null), 6000);
+    resetTimer.current = setTimeout(() => setResetSnap(null), 6000);
   }
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto" style={{ fontFamily: "Arial, sans-serif" }}>
+    <div className="space-y-4 max-w-2xl mx-auto">
       <div>
         <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגשת זמינות</h1>
         <p className="text-sm text-navy-muted dark:text-slate-400 mt-0.5">שבוע {weekLabel}</p>
@@ -286,7 +305,7 @@ export default function AvailabilityPage() {
           {resetSnap ? (
             <button
               type="button"
-              onClick={() => { setConstraints(resetSnap); setResetSnap(null); }}
+              onClick={() => { if (resetTimer.current) clearTimeout(resetTimer.current); setConstraints(resetSnap); setResetSnap(null); }}
               className="text-sm font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30 rounded-lg px-3 py-1.5"
             >
               אופס? ביטול איפוס ↩
@@ -295,8 +314,8 @@ export default function AvailabilityPage() {
             <button
               type="button"
               onClick={resetToAvailable}
-              className="text-sm text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300"
-              disabled={status === "loading"}
+              className="text-sm text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300 disabled:opacity-40"
+              disabled={status === "loading" || isPastDeadline}
             >
               איפוס לזמין
             </button>
@@ -332,7 +351,7 @@ export default function AvailabilityPage() {
       )}
 
       {status === "success" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setStatus("idle")}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setStatus("idle"); setShowPwaTip(false); }}>
           <div role="status" aria-live="polite" className="bg-white rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-2 mx-6">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-1">
               <svg className="w-9 h-9 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
