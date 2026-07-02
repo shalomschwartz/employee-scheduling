@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   // updateMany so a missing row returns 0 (no throw) instead of crashing
   const result = await prisma.generatedSchedule.updateMany({
     where: { organizationId: session.user.organizationId, weekStart },
-    data: { status: "PUBLISHED" },
+    data: { status: "PUBLISHED", publishedAt: new Date() },
   });
   if (result.count === 0)
     return NextResponse.json({ error: "אין סידור לפרסום" }, { status: 404 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { KeyRound, Copy, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -271,14 +272,33 @@ export default function SettingsPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [regenerated, setRegenerated] = useState(false);
 
+  // ── Invite employees (org code) ─────────────────────────────────────────────
+  const [orgCode, setOrgCode] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
   useEffect(() => {
     fetch("/api/shifts")
       .then(r => r.json())
       .then(data => {
         const arr = Array.isArray(data) ? data : data?.shifts;
         if (Array.isArray(arr)) { setShifts(arr); savedShifts.current = arr; }
+        if (typeof data?.orgCode === "string") setOrgCode(data.orgCode);
       });
   }, []);
+
+  function copyInviteCode() {
+    if (!orgCode) return;
+    navigator.clipboard?.writeText(orgCode).then(() => {
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 1800);
+    }).catch(() => {});
+  }
+
+  function inviteWhatsAppUrl(): string {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const msg = `היי! מהיום מגישים זמינות למשמרות באפליקציה 🙌\nנכנסים לכאן: ${origin}/login\nבוחרים "עובד" ומתחברים עם השם המלא, מספר הטלפון והקוד: ${orgCode}`;
+    return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  }
 
   function updateShift(id: string, field: keyof ShiftConfig, value: string | number) {
     setShifts(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
@@ -479,7 +499,7 @@ export default function SettingsPage() {
                     <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עד</span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עובדים:</span>
+                    <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">עובדים נדרשים:</span>
                     <button onClick={() => updateShift(shift.id, "minWorkers", Math.max(1, (shift.minWorkers ?? 2) - 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">−</button>
                     <span className="w-5 text-center text-xs font-semibold text-navy dark:text-slate-100">{shift.minWorkers ?? 2}</span>
                     <button onClick={() => updateShift(shift.id, "minWorkers", Math.min(20, (shift.minWorkers ?? 2) + 1))} className="w-9 h-9 sm:w-6 sm:h-6 rounded border border-surface-high dark:border-white/10 text-navy-muted dark:text-slate-400 hover:bg-surface-mid dark:hover:bg-white/[0.08] flex items-center justify-center text-sm leading-none">+</button>
@@ -622,6 +642,35 @@ export default function SettingsPage() {
           <p className="text-xs text-navy-muted dark:text-slate-400">
             הוסף עובדים לפי שם וטלפון. לחץ על שם העובד להגדרת תפקידים וחוזה.
           </p>
+
+          {/* Invite employees — the org join code lives here, next to where employees are added */}
+          {orgCode && (
+            <div className="flex items-center gap-3 flex-wrap p-3 rounded-xl border border-brand-200 dark:border-brand-400/20 bg-brand-50 dark:bg-brand-500/10">
+              <KeyRound className="w-4 h-4 text-brand-600 dark:text-brand-400 flex-shrink-0" />
+              <div className="flex-1 min-w-[180px]">
+                <p className="text-xs font-semibold text-navy dark:text-slate-100">
+                  קוד כניסה לעובדים: <span className="font-mono tracking-[0.2em] text-brand-700 dark:text-brand-300">{orgCode}</span>
+                </p>
+                <p className="text-[11px] text-navy-muted dark:text-slate-400 mt-0.5">עובדים נכנסים עם שם, טלפון והקוד הזה.</p>
+              </div>
+              <button
+                type="button"
+                onClick={copyInviteCode}
+                className="flex items-center gap-1 text-xs font-medium text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 px-2 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-500/15 transition-colors"
+              >
+                {inviteCopied ? <Check className="w-3.5 h-3.5 text-success-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {inviteCopied ? "הועתק" : "העתק"}
+              </button>
+              <a
+                href={inviteWhatsAppUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-white bg-[#16a34a] hover:bg-[#15803d] px-3 py-1.5 rounded-lg transition-colors"
+              >
+                הזמן בוואטסאפ
+              </a>
+            </div>
+          )}
 
           <form onSubmit={handleAddEmployee} className="space-y-3 p-3 rounded-xl border border-surface-high dark:border-white/10 bg-surface-low dark:bg-white/[0.03]">
             <div className="flex gap-2">

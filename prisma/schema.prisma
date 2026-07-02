@@ -85,6 +85,7 @@ model GeneratedSchedule {
   schedule       Json
 
   status         ScheduleStatus @default(DRAFT)
+  publishedAt    DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 

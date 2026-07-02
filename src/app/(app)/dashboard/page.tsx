@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Sparkles, Download, Users, LayoutGrid, Clock, CircleCheck, AlertTriangle, X, Plus, Pin, GripVertical, ChevronDown, KeyRound, Copy, Check, Send, ChevronRight, ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkles, Download, Users, LayoutGrid, AlertTriangle, X, Plus, Pin, ChevronDown, Copy, Check, Send, ChevronRight, ChevronLeft, Share2 } from "lucide-react";
 import { useEscapeClose } from "@/lib/useEscapeClose";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, addDays } from "date-fns";
+import { he } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { type ConstraintData } from "@/components/availability/AvailabilityGrid";
 import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, toMins, cn, type Day, type ShiftConfig } from "@/lib/utils";
 
 interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; pinnedIds?: string[]; }
 type ScheduleData = Record<string, Record<string, ShiftSlot>>;
-interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; }
+interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; publishedAt?: string | null; }
 interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; roles: string[]; contractShifts: number | null; }
 
 // 24 visually distinct base colors — covers most orgs without repeating
@@ -34,11 +34,6 @@ function empHex(index: number): string {
   return `hsl(${hue},65%,38%)`;
 }
 
-/** Tailwind-compatible chip class for a given employee index. Uses inline bg since arbitrary hsl isn't purgeable. */
-function empChipClass(_index: number): string {
-  return "text-white"; // bg set via style prop for generated colors
-}
-
 /** Absolute same-day minute range [start, end) for a shift; overnight shifts wrap past midnight. */
 function shiftMinRange(cfg: ShiftConfig): [number, number] {
   const s = toMins(cfg.start);
@@ -57,18 +52,6 @@ function Avatar({ name, color, size = 18 }: { name: string | null; color: string
     >
       {ini}
     </span>
-  );
-}
-
-function KpiCard({ icon, label, value, accent, ok }: { icon: ReactNode; label: string; value: ReactNode; accent?: boolean; ok?: boolean }) {
-  return (
-    <div className={cn("rounded-2xl border bg-surface-white dark:bg-white/[0.04] p-4 shadow-card", accent ? "border-brand-200 ring-1 ring-brand-200 dark:ring-brand-400/20" : "border-surface-high dark:border-white/[0.08]")}>
-      <div className="flex items-center gap-2 text-navy-muted dark:text-slate-400 text-xs font-medium">
-        <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded-lg", ok ? "bg-success-100 text-success-600" : accent ? "bg-brand-100 text-brand-600 dark:text-brand-400" : "bg-surface-mid dark:bg-white/[0.07] text-navy-muted dark:text-slate-400")}>{icon}</span>
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-extrabold text-navy dark:text-slate-100 tnum">{value}</div>
-    </div>
   );
 }
 
@@ -106,13 +89,13 @@ export default function DashboardPage() {
   const [minRestHours, setMinRestHours] = useState(7);
   const [orgCode, setOrgCode] = useState<string | null>(null);
   const [empFilter, setEmpFilter] = useState<string | null>(null);
-  const [showGuide, setShowGuide] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("shiftsync_guide_open") === "true";
+  const [setupDone, setSetupDone] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("shiftsync_setup_done") === "true";
   });
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [showTeam, setShowTeam] = useState(false);
   const [showAvailDetail, setShowAvailDetail] = useState(false);
+  const [deadline, setDeadline] = useState<Date | null>(null);
 
   // Hidden print-calendar ref for PDF capture
   const printRef = useRef<HTMLDivElement>(null);
@@ -126,22 +109,18 @@ export default function DashboardPage() {
 
   // Conflict dialog
   const [conflictDialog, setConflictDialog] = useState<{ lines: string[]; onIgnore: () => void } | null>(null);
-  const [conflictsIgnored, setConflictsIgnored] = useState(false);
-  const [warningsIgnored, setWarningsIgnored] = useState(false);
 
   // Drag and drop
   const [dragging, setDragging] = useState<{ empId: string; name: string; fromDay: string; fromShift: string } | null>(null);
-  const [draggingRow, setDraggingRow] = useState<string | null>(null);
-  const [dragOverRow, setDragOverRow] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<{ day: string; shift: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [undoSnap, setUndoSnap] = useState<{ data: ScheduleData; label: string } | null>(null);
-  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [confirmGen, setConfirmGen] = useState<string[] | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [publishStep, setPublishStep] = useState<null | "confirm" | "share">(null);
   const [copying, setCopying] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [orgCodeCopied, setOrgCodeCopied] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("welcome") === "1") {
@@ -159,7 +138,8 @@ export default function DashboardPage() {
 
   useEscapeClose(!!confirmClear, () => setConfirmClear(null));
   useEscapeClose(!!conflictDialog, () => setConflictDialog(null));
-  useEscapeClose(confirmRegen, () => setConfirmRegen(false));
+  useEscapeClose(!!confirmGen, () => setConfirmGen(null));
+  useEscapeClose(publishStep !== null, () => setPublishStep(null));
 
   const [weekStart, setWeekStart] = useState(() => getNextWeekStart());
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
@@ -178,20 +158,20 @@ export default function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     setLoadError(false);
-    setConflictsIgnored(false);
-    setWarningsIgnored(false);
     Promise.all([
       fetch(`/api/schedule?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch(`/api/admin/constraints?weekStart=${weekStart.toISOString()}`).then(r => r.json()),
       fetch("/api/shifts").then(r => r.json()),
       fetch("/api/min-rest-hours").then(r => r.json()),
-    ]).then(([sched, emps, shiftsCfg, restCfg]) => {
+      fetch("/api/deadline").then(r => r.json()).catch(() => null),
+    ]).then(([sched, emps, shiftsCfg, restCfg, deadlineCfg]) => {
       if (sched?.id) { setExisting(sched); setScheduleData(sched.schedule as ScheduleData); }
       else { setExisting(null); setScheduleData(null); }
       if (Array.isArray(emps)) setEmployees(emps);
       if (shiftsCfg?.shifts) setShifts(shiftsCfg.shifts);
       if (typeof shiftsCfg?.orgCode === "string") setOrgCode(shiftsCfg.orgCode);
       if (typeof restCfg?.minRestHours === "number") setMinRestHours(restCfg.minRestHours);
+      setDeadline(deadlineCfg?.deadline ? new Date(deadlineCfg.deadline) : null);
       setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
 
@@ -215,53 +195,30 @@ export default function DashboardPage() {
 
   const empMap = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees]);
 
-  const warnings = useMemo(() => {
-    if (!scheduleData) return {} as Record<string, string[]>;
-    const result: Record<string, string[]> = {};
+  // problems: one map of cells that need attention (understaffed / availability conflict),
+  // rendered in-place as cell highlights + one clickable counter — no separate strips.
+  const problems = useMemo(() => {
+    const cells: Record<string, "understaffed" | "conflict"> = {};
+    if (!scheduleData) return { cells, count: 0 };
     for (const day of DAYS) {
       const dayData = scheduleData[day];
       if (!dayData) continue;
       for (const shiftCfg of shifts) {
         const slot = dayData[shiftCfg.id];
         if (!slot) continue;
-        const count = slot.employeeIds.length;
-        const min = shiftCfg.minWorkers ?? 2;
-        let msg: string | null = null;
-        if (count === 0) msg = `${shiftCfg.label}: אין עובדים משובצים`;
-        else if (count < min) msg = `${shiftCfg.label}: רק ${count}/${min} עובדים`;
-        if (msg) {
-          const label = DAY_LABELS_HE[day as Day];
-          result[label] ??= [];
-          result[label].push(msg);
-        }
-      }
-    }
-    return result;
-  }, [scheduleData, shifts]);
-
-  const conflicts = useMemo(() => {
-    if (!scheduleData) return {} as Record<string, string[]>;
-    const result: Record<string, string[]> = {};
-    for (const day of DAYS) {
-      const dayData = scheduleData[day];
-      if (!dayData) continue;
-      for (const shiftCfg of shifts) {
-        const slot = dayData[shiftCfg.id];
-        if (!slot) continue;
-        slot.employeeIds.forEach((empId, i) => {
+        const key = `${day}-${shiftCfg.id}`;
+        if (slot.employeeIds.length < (shiftCfg.minWorkers ?? 2)) cells[key] = "understaffed";
+        slot.employeeIds.forEach(empId => {
           const emp = empMap[empId];
           if (!emp) return;
-          const availability = emp.constraints[0]?.data?.[day as Day]?.[shiftCfg.id] ?? "available";
-          if (availability === "unavailable") {
-            const name = slot.employeeNames[i] ?? emp.name ?? emp.email;
-            if (!result[name]) result[name] = [];
-            result[name].push(`${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}`);
+          if ((emp.constraints[0]?.data?.[day as Day]?.[shiftCfg.id] ?? "available") === "unavailable") {
+            cells[key] = "conflict"; // conflict outranks understaffed
           }
         });
       }
     }
-    return result;
-  }, [scheduleData, employees, shifts]);
+    return { cells, count: Object.keys(cells).length };
+  }, [scheduleData, shifts, empMap]);
 
   // colorMap: name → hex color (unique per employee, never repeats)
   const colorMap = useMemo(() => {
@@ -272,71 +229,30 @@ export default function DashboardPage() {
     return map;
   }, [employees]);
 
-  const DAY_SHORT: Record<string, string> = {
-    sunday: "א׳", monday: "ב׳", tuesday: "ג׳", wednesday: "ד׳",
-    thursday: "ה׳", friday: "ו׳", saturday: "ש׳",
-  };
+  const submittedCount = useMemo(() => employees.filter(e => e.constraints.length > 0).length, [employees]);
 
-  const shiftsPerEmployeeMap = useMemo(() => {
-    const map: Record<string, { shiftLabel: string; days: string[] }[]> = {};
-    if (!scheduleData) return map;
-    for (const emp of employees) {
-      const entries: { shiftLabel: string; days: string[] }[] = [];
-      for (const shiftCfg of shifts) {
-        const days: string[] = [];
-        for (const day of DAYS) {
-          if (scheduleData[day]?.[shiftCfg.id]?.employeeIds.includes(emp.id)) {
-            days.push(day);
-          }
-        }
-        if (days.length > 0) entries.push({ shiftLabel: shiftCfg.label, days });
-      }
-      map[emp.id] = entries;
-    }
-    return map;
-  }, [scheduleData, shifts, employees]);
-
-  const hoursMap = useMemo(() => {
+  // Shifts assigned per employee this week — shown as "3/4" next to the contract in the filter chips
+  const assignedCountMap = useMemo(() => {
     const map: Record<string, number> = {};
     if (!scheduleData) return map;
-    function shiftHours(start: string, end: string) {
-      const [sh, sm] = start.split(":").map(Number);
-      const [eh, em] = end.split(":").map(Number);
-      const startMins = sh * 60 + sm;
-      const endMins = eh * 60 + em;
-      return (endMins > startMins ? endMins - startMins : 1440 - startMins + endMins) / 60;
-    }
     for (const day of DAYS) {
       for (const shiftCfg of shifts) {
-        const slot = scheduleData[day]?.[shiftCfg.id];
-        if (!slot) continue;
-        const h = shiftHours(shiftCfg.start, shiftCfg.end);
-        slot.employeeIds.forEach(id => {
-          map[id] = (map[id] ?? 0) + h;
+        scheduleData[day]?.[shiftCfg.id]?.employeeIds.forEach(id => {
+          map[id] = (map[id] ?? 0) + 1;
         });
       }
     }
     return map;
   }, [scheduleData, shifts]);
 
-  const stats = useMemo(() => {
-    const empCount = employees.length;
-    const submittedCount = employees.filter(e => e.constraints.length > 0).length;
-    let required = 0, filled = 0;
-    const daily = DAYS.map(day => {
-      let req = 0, fil = 0;
-      for (const sc of shifts) {
-        const min = sc.minWorkers ?? 2;
-        req += min;
-        fil += Math.min(scheduleData?.[day]?.[sc.id]?.employeeIds.length ?? 0, min);
-      }
-      required += req; filled += fil;
-      return { day, pct: req > 0 ? Math.round((fil / req) * 100) : 0 };
-    });
-    const fillPct = scheduleData && required > 0 ? Math.round((filled / required) * 100) : null;
-    const totalHours = Math.round(Object.values(hoursMap).reduce((a, b) => a + b, 0));
-    return { empCount, submittedCount, fillPct, totalHours, daily };
-  }, [employees, shifts, scheduleData, hoursMap]);
+  const isPublished = existing?.status === "PUBLISHED";
+  // Edits after publishing go live to employees instantly — surface that as "שלח עדכון".
+  const hasUnsentEdits = isPublished && !!existing?.publishedAt &&
+    new Date(existing.updatedAt).getTime() - new Date(existing.publishedAt).getTime() > 3000;
+
+  const nextWeekMs = getNextWeekStart().getTime();
+  const relWeek = weekStart.getTime() === nextWeekMs ? "שבוע הבא"
+    : weekStart.getTime() === nextWeekMs - 7 * 86400000 ? "השבוע" : null;
 
 
   async function persistSchedule(updated: ScheduleData) {
@@ -352,6 +268,10 @@ export default function DashboardPage() {
         setScheduleData(previous);
         setErrorToast("שגיאה בשמירת השינויים");
         setTimeout(() => setErrorToast(null), 4000);
+      } else {
+        // Keep `existing` in sync so post-publish edits flip the button to "שלח עדכון"
+        const saved = await res.json().catch(() => null);
+        if (saved?.id) setExisting(saved);
       }
     } catch {
       setScheduleData(previous);
@@ -435,12 +355,6 @@ export default function DashboardPage() {
     const slot = scheduleData[day]?.[shift];
     if (!slot) return;
     if (slot.employeeIds.includes(emp.id)) return;
-    const minW = shifts.find(s => s.id === shift)?.minWorkers ?? 2;
-    if (slot.employeeIds.length >= minW) {
-      setErrorToast(`המשמרת מלאה (${minW}/${minW}) — הסר עובד קודם`);
-      setTimeout(() => setErrorToast(null), 3000);
-      return;
-    }
     const name = emp.name ?? emp.email;
 
     const doAdd = () => {
@@ -496,13 +410,6 @@ export default function DashboardPage() {
       setDragging(null);
       return;
     }
-    const toMinW = shifts.find(s => s.id === toShift)?.minWorkers ?? 2;
-    if (toSlot.employeeIds.length >= toMinW) {
-      setErrorToast(`המשמרת מלאה (${toMinW}/${toMinW}) — הסר עובד קודם`);
-      setTimeout(() => setErrorToast(null), 3000);
-      setDragging(null);
-      return;
-    }
     const doMove = () => {
       const fromSlot = scheduleData[dragging.fromDay]?.[dragging.fromShift];
       if (!fromSlot) { setDragging(null); return; }
@@ -554,19 +461,6 @@ export default function DashboardPage() {
     doMove();
   }
 
-  function handleRowDrop(toShiftId: string) {
-    setDragOverRow(null);
-    if (!draggingRow || draggingRow === toShiftId) { setDraggingRow(null); return; }
-    const newShifts = [...shifts];
-    const fromIdx = newShifts.findIndex(s => s.id === draggingRow);
-    const toIdx = newShifts.findIndex(s => s.id === toShiftId);
-    const [moved] = newShifts.splice(fromIdx, 1);
-    newShifts.splice(toIdx, 0, moved);
-    setShifts(newShifts);
-    setDraggingRow(null);
-    fetch("/api/shifts", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shifts: newShifts }) });
-  }
-
   async function executePdfDownload() {
     setPdfLoading(true);
     try {
@@ -588,56 +482,11 @@ export default function DashboardPage() {
     }
   }
 
-  function getDownloadConflicts(): string[] {
-    if (!scheduleData) return [];
-    const result: string[] = [];
-    for (const day of DAYS) {
-      const dayData = scheduleData[day];
-      if (!dayData) continue;
-      for (const shiftCfg of shifts) {
-        const slot = dayData[shiftCfg.id];
-        if (!slot) continue;
-        slot.employeeIds.forEach((empId, i) => {
-          const emp = empMap[empId];
-          if (!emp) return;
-          const availability = emp.constraints[0]?.data?.[day as Day]?.[shiftCfg.id] ?? "available";
-          if (availability === "unavailable") {
-            result.push(`${slot.employeeNames[i] ?? emp.name ?? emp.email} — ${DAY_LABELS_HE[day as Day]} ${shiftCfg.label}`);
-          }
-        });
-      }
-    }
-    return result;
-  }
-
-  async function handleDownload() {
-    if (!scheduleData) return;
-    const downloadConflicts = getDownloadConflicts();
-    if (downloadConflicts.length > 0) {
-      setConflictDialog({ lines: downloadConflicts, onIgnore: executePdfDownload });
-    } else {
-      await executePdfDownload();
-    }
-  }
-
-  function handleWhatsApp() {
-    if (!scheduleData) return;
-    const WA_URL = `https://wa.me/?text=${encodeURIComponent(`סידור עבודה לשבוע ${weekLabel} מצורף`)}`;
-    const downloadConflicts = getDownloadConflicts();
-    if (downloadConflicts.length > 0) {
-      // onIgnore runs inside a user click → window.open won't be blocked
-      setConflictDialog({
-        lines: downloadConflicts,
-        onIgnore: async () => {
-          await executePdfDownload();
-          window.open(WA_URL, "_blank");
-        },
-      });
-    } else {
-      // No dialog — open WhatsApp synchronously (user gesture), then download
-      window.open(WA_URL, "_blank");
-      executePdfDownload();
-    }
+  /** wa.me link with an honest, useful message — employees view their shifts in the app. */
+  function waShareUrl(): string {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const msg = `סידור העבודה לשבוע ${weekLabel} פורסם! היכנסו לצפות במשמרות שלכם: ${origin}/my-schedule`;
+    return `https://wa.me/?text=${encodeURIComponent(msg)}`;
   }
 
   async function generate() {
@@ -652,8 +501,6 @@ export default function DashboardPage() {
         const data = await res.json();
         setExisting(data.schedule);
         setScheduleData(data.schedule.schedule as ScheduleData);
-        setConflictsIgnored(false);
-        setWarningsIgnored(false);
         setToast("הסידור נוצר בהצלחה!");
         setTimeout(() => setToast(null), 3000);
       } else {
@@ -668,8 +515,14 @@ export default function DashboardPage() {
   }
 
   function requestGenerate() {
-    if (scheduleData) setConfirmRegen(true);
-    else generate();
+    const lines: string[] = [];
+    const notSubmitted = employees.length - submittedCount;
+    if (notSubmitted > 0)
+      lines.push(`${notSubmitted} עובדים טרם הגישו זמינות — מי שלא הגיש ייחשב כזמין בכל המשמרות`);
+    if (scheduleData)
+      lines.push("יצירת סידור חדש תחליף את הסידור הנוכחי (פרט למשובצים נעוצים)");
+    if (lines.length === 0) { generate(); return; }
+    setConfirmGen(lines);
   }
 
   async function publish() {
@@ -681,18 +534,34 @@ export default function DashboardPage() {
         body: JSON.stringify({ weekStart: weekStart.toISOString() }),
       });
       if (res.ok) {
-        setExisting(prev => (prev ? { ...prev, status: "PUBLISHED" } : prev));
-        setToast("הסידור פורסם לעובדים!");
-        setTimeout(() => setToast(null), 3000);
+        const now = new Date().toISOString();
+        setExisting(prev => (prev ? { ...prev, status: "PUBLISHED", publishedAt: now, updatedAt: now } : prev));
+        setPublishStep("share");
+        if (!setupDone) {
+          localStorage.setItem("shiftsync_setup_done", "true");
+          setSetupDone(true);
+        }
       } else {
+        setPublishStep(null);
         setErrorToast("שגיאה בפרסום הסידור");
         setTimeout(() => setErrorToast(null), 4000);
       }
     } catch {
+      setPublishStep(null);
       setErrorToast("שגיאת רשת — נסה שנית");
       setTimeout(() => setErrorToast(null), 4000);
     }
     setPublishing(false);
+  }
+
+  function scrollToFirstProblem() {
+    const key = Object.keys(problems.cells)[0];
+    if (!key) return;
+    const el = document.getElementById(`cell-${key}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-amber-400");
+    setTimeout(() => el.classList.remove("ring-2", "ring-amber-400"), 1800);
   }
 
   async function copyLastWeek() {
@@ -722,14 +591,6 @@ export default function DashboardPage() {
     setUndoSnap(null);
   }
 
-  function copyOrgCode() {
-    if (!orgCode) return;
-    navigator.clipboard?.writeText(orgCode).then(() => {
-      setOrgCodeCopied(true);
-      setTimeout(() => setOrgCodeCopied(false), 1800);
-    }).catch(() => {});
-  }
-
   const shiftKeys = shifts.map(s => s.id);
 
   const filterBar = (
@@ -747,6 +608,8 @@ export default function DashboardPage() {
         const id = emp.id;
         const label = (emp.name ?? emp.email).split(" ")[0];
         const selected = empFilter === id;
+        const assigned = assignedCountMap[id] ?? 0;
+        const contract = emp.contractShifts;
         return (
           <button
             key={id}
@@ -758,6 +621,14 @@ export default function DashboardPage() {
             style={selected ? { backgroundColor: empHex(i) } : undefined}
           >
             {label}
+            {scheduleData && contract != null && contract > 0 && (
+              <span className={cn(
+                "ms-1.5 tnum font-semibold",
+                selected ? "text-white/85" : assigned < contract ? "text-amber-600 dark:text-amber-400" : assigned > contract ? "text-rose-600 dark:text-rose-400" : "text-navy-muted/70 dark:text-slate-500"
+              )}>
+                {assigned}/{contract}
+              </span>
+            )}
           </button>
         );
       })}
@@ -781,46 +652,34 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Guide */}
-      <div className="rounded-xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] text-sm text-navy-muted dark:text-slate-400 shadow-card">
-        <button
-          onClick={() => {
-            const next = !showGuide;
-            setShowGuide(next);
-            localStorage.setItem("shiftsync_guide_open", next ? "true" : "false");
-          }}
-          className="w-full flex items-center justify-between px-4 py-3 text-right"
-        >
-          <span className="font-semibold text-navy-muted dark:text-slate-400 text-sm">איך ShiftSync עובד</span>
-          <ChevronDown className={cn("w-5 h-5 text-brand-600 dark:text-brand-400 transition-transform", showGuide && "rotate-180")} />
-        </button>
-        {showGuide && (
-          <div className="px-4 pb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Group 1 */}
-              <div className="bg-surface-mid dark:bg-white/[0.06] rounded-lg border border-surface-high dark:border-white/10 p-3 space-y-2">
-                <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-1">הגדרה חד-פעמית</p>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">1.</span><span><span className="font-semibold">הוסף עובדים</span> — עבור להגדרות, הוסף עובדים עם שם ומספר טלפון.</span></div>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">2.</span><span><span className="font-semibold">הגדר תפקידים</span> — צור סוגי תפקידים (מלצר, ברמן…) והגדר לכל עובד ומשמרת את התפקיד המתאים.</span></div>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">3.</span><span><span className="font-semibold">הגדר חוזים</span> — קבע לכל עובד מספר משמרות שבועי מחייב.</span></div>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">4.</span><span><span className="font-semibold">קבע דדליין</span> — בחר מועד אחרון להגשת זמינות (ברירת מחדל: רביעי 21:00).</span></div>
-              </div>
-              {/* Group 2 */}
-              <div className="bg-surface-mid dark:bg-white/[0.06] rounded-lg border border-surface-high dark:border-white/10 p-3 space-y-2">
-                <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-1">כל שבוע</p>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">5.</span><span><span className="font-semibold">עובדים ממלאים זמינות</span> — כל עובד נכנס ומסמן את הימים והמשמרות שמתאימים לו.</span></div>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">6.</span><span><span className="font-semibold">צור שיבוץ</span> — לחץ "צור שיבוץ". האלגוריתם ישבץ לפי זמינות, תפקיד וחוזה — ויחלק משמרות שווה.</span></div>
-              </div>
-              {/* Group 3 */}
-              <div className="bg-surface-mid dark:bg-white/[0.06] rounded-lg border border-surface-high dark:border-white/10 p-3 space-y-2">
-                <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-1">עריכה ושיתוף</p>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">7.</span><span><span className="font-semibold">ערוך ידנית</span> — גרור עובדים בין משמרות, הוסף/הסר, נעץ עובד, או נקה תא עם "מחק משמרת".</span></div>
-                <div className="flex gap-2"><span className="font-bold text-brand-700 dark:text-brand-300">8.</span><span><span className="font-semibold">שלח לעובדים</span> — הורד PDF או שלח לוואצאפ לשיתוף.</span></div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* First-run setup checklist — disappears after the first publish */}
+      {!setupDone && !loading && (
+        <div className="rounded-xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] shadow-card px-4 py-3 flex items-center gap-x-4 gap-y-2 flex-wrap text-xs">
+          <span className="font-semibold text-navy dark:text-slate-100">צעדים ראשונים:</span>
+          {[
+            { label: "הוסף עובדים", done: employees.length > 0, href: "/settings" },
+            { label: "העובדים מגישים זמינות", done: submittedCount > 0 },
+            { label: "צור סידור", done: !!scheduleData },
+            { label: "פרסם לעובדים", done: isPublished },
+          ].map(step => (
+            <span key={step.label} className={cn("flex items-center gap-1.5", step.done ? "text-emerald-700 dark:text-emerald-400" : "text-navy-muted dark:text-slate-400")}>
+              {step.done
+                ? <Check className="w-3.5 h-3.5" />
+                : <span className="w-3.5 h-3.5 rounded-full border-2 border-current opacity-50 inline-block" />}
+              {step.href && !step.done
+                ? <button onClick={() => router.push(step.href)} className="underline underline-offset-2 hover:text-brand-600 dark:hover:text-brand-400">{step.label}</button>
+                : step.label}
+            </span>
+          ))}
+          <button
+            onClick={() => { localStorage.setItem("shiftsync_setup_done", "true"); setSetupDone(true); }}
+            aria-label="סגור"
+            className="ms-auto text-navy-muted/60 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -835,173 +694,78 @@ export default function DashboardPage() {
               <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
-          {orgCode && (
-            <button
-              type="button"
-              onClick={copyOrgCode}
-              title="העתק קוד"
-              className="inline-flex items-center gap-2 mt-3 rounded-xl bg-brand-50 dark:bg-brand-500/10 ring-1 ring-brand-200 dark:ring-brand-400/20 px-3 py-1.5 hover:bg-brand-100 dark:hover:bg-brand-500/15 transition-colors"
-            >
-              <KeyRound className="w-4 h-4 text-brand-600 dark:text-brand-400" />
-              <span className="text-xs text-navy-muted dark:text-slate-400">קוד עובדים</span>
-              <span className="font-mono font-bold tracking-[0.2em] text-brand-700 dark:text-brand-300">{orgCode}</span>
-              {orgCodeCopied ? (
-                <Check className="w-3.5 h-3.5 text-success-600 dark:text-emerald-400" />
-              ) : (
-                <Copy className="w-3.5 h-3.5 text-navy-muted/70 dark:text-slate-500" />
+          {/* Stage-aware status line — the one line that tells the manager where they are */}
+          {!loading && employees.length > 0 && (
+            <div className="flex items-center gap-2 mt-2.5 flex-wrap text-xs">
+              {relWeek && (
+                <span className="px-2 py-0.5 rounded-full bg-surface-mid dark:bg-white/[0.08] text-navy-muted dark:text-slate-300 font-medium">{relWeek}</span>
               )}
-            </button>
+              {scheduleData ? (
+                <>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full font-semibold",
+                    hasUnsentEdits ? "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300"
+                      : isPublished ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+                      : "bg-surface-mid dark:bg-white/[0.08] text-navy-muted dark:text-slate-300"
+                  )}>
+                    {hasUnsentEdits ? "פורסם · יש שינויים שלא נשלחו" : isPublished ? "פורסם" : "טיוטה"}
+                  </span>
+                  {problems.count > 0 ? (
+                    <button
+                      onClick={scrollToFirstProblem}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 font-semibold hover:bg-amber-200 dark:hover:bg-amber-500/25 transition-colors"
+                    >
+                      <AlertTriangle className="w-3 h-3" /> {problems.count} בעיות
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium"><Check className="w-3 h-3" /> אין בעיות</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full font-semibold",
+                    submittedCount < employees.length
+                      ? "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300"
+                      : "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+                  )}>
+                    {submittedCount}/{employees.length} הגישו זמינות
+                  </span>
+                  {deadline && Date.now() < deadline.getTime() && (
+                    <span className="text-navy-muted dark:text-slate-400">דדליין: {format(deadline, "EEEE HH:mm", { locale: he })}</span>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={requestGenerate} loading={generating} disabled={employees.length === 0} size="lg" className="bg-gradient-to-l from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 shadow-card">
-            <Sparkles className="w-[18px] h-[18px]" /> צור שיבוץ
-          </Button>
-          {scheduleData && (
-            <Button onClick={publish} loading={publishing} size="lg" variant={existing?.status === "PUBLISHED" ? "outline" : "accent"}>
-              {existing?.status === "PUBLISHED" ? <><Check className="w-[18px] h-[18px]" /> פורסם</> : <><Send className="w-[18px] h-[18px]" /> פרסם</>}
+        <div className="flex items-center gap-3">
+          {!scheduleData ? (
+            <Button onClick={requestGenerate} loading={generating} disabled={employees.length === 0} size="lg" className="bg-gradient-to-l from-brand-600 to-brand-500 hover:from-brand-700 hover:to-brand-600 shadow-card">
+              <Sparkles className="w-[18px] h-[18px]" /> צור סידור
             </Button>
-          )}
-          {scheduleData && (
-            <button onClick={handleDownload} disabled={pdfLoading} aria-label="הורד PDF" className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] text-navy-muted dark:text-slate-400 hover:bg-surface-low dark:hover:bg-white/[0.03] hover:text-navy dark:hover:text-slate-100 transition-colors disabled:opacity-50">
-              <Download className="w-5 h-5" />
-            </button>
-          )}
-          {scheduleData && (
-            <button onClick={handleWhatsApp} aria-label="שלח בוואטסאפ" className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] text-[#16a34a] hover:bg-green-50 dark:hover:bg-green-500/10 transition-colors">
-              <WhatsAppIcon className="w-5 h-5" />
-            </button>
+          ) : (
+            <>
+              <button
+                onClick={requestGenerate}
+                disabled={generating}
+                className="text-xs font-medium text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 underline underline-offset-2 disabled:opacity-50"
+              >
+                {generating ? "יוצר…" : "צור מחדש"}
+              </button>
+              {!isPublished || hasUnsentEdits ? (
+                <Button onClick={() => setPublishStep("confirm")} loading={publishing} size="lg" variant="accent">
+                  <Send className="w-[18px] h-[18px]" /> {hasUnsentEdits ? "שלח עדכון" : "פרסם"}
+                </Button>
+              ) : (
+                <Button onClick={() => setPublishStep("share")} size="lg" variant="outline">
+                  <Share2 className="w-[18px] h-[18px]" /> שתף
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
-
-      {/* Hero — coverage ring + 7-day staffing chart + stats */}
-      {!loading && employees.length > 0 && (
-        <div className="relative flex flex-wrap items-center gap-5 sm:gap-7 rounded-2xl border border-surface-high dark:border-white/10 bg-surface-white dark:bg-white/[0.04] p-5">
-          <svg width="116" height="116" viewBox="0 0 124 124" className="flex-shrink-0" style={{ filter: "drop-shadow(0 0 10px rgba(79,124,255,0.25))" }} aria-hidden="true">
-            <defs>
-              <linearGradient id="cov" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#4f7cff" />
-                <stop offset="1" stopColor="#a78bfa" />
-              </linearGradient>
-            </defs>
-            <circle cx="62" cy="62" r="52" fill="none" strokeWidth="11" className="stroke-surface-high dark:stroke-white/[0.07]" />
-            <circle cx="62" cy="62" r="52" fill="none" stroke="url(#cov)" strokeWidth="11" strokeLinecap="round" strokeDasharray={326.7} strokeDashoffset={326.7 * (1 - (stats.fillPct ?? 0) / 100)} transform="rotate(-90 62 62)" />
-            <text x="62" y="58" textAnchor="middle" fontSize="28" fontWeight="600" className="fill-navy dark:fill-white">{stats.fillPct != null ? `${stats.fillPct}%` : "—"}</text>
-            <text x="62" y="78" textAnchor="middle" fill="#64748b" fontSize="11">מאויש</text>
-          </svg>
-          <div className="flex-1 min-w-[220px]">
-            <div className="text-xs text-navy-muted dark:text-slate-400 mb-2.5">איוש לפי יום</div>
-            <div className="flex items-end gap-2 h-16">
-              {stats.daily.map(d => (
-                <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5">
-                  <div className="w-full max-w-[14px] rounded-md" style={{ height: `${Math.max(8, d.pct * 0.5)}px`, background: d.pct >= 100 ? "linear-gradient(#4f7cff,#a78bfa)" : d.pct >= 67 ? "linear-gradient(#4f7cff,#6f7ff0)" : "linear-gradient(#f59e0b,#fbbf24)" }} />
-                  <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">{DAY_SHORT[d.day]}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="hidden sm:block w-px self-stretch bg-surface-high dark:bg-white/10" />
-          <div className="flex sm:flex-col gap-6 sm:gap-3.5">
-            <div><div className="text-[11px] text-navy-muted/70 dark:text-slate-500">עובדים</div><div className="text-2xl font-bold text-navy dark:text-white leading-none">{stats.empCount}</div></div>
-            <div><div className="text-[11px] text-navy-muted/70 dark:text-slate-500">שעות</div><div className="text-2xl font-bold text-navy dark:text-white leading-none">{stats.totalHours}</div></div>
-          </div>
-        </div>
-      )}
-
-      {/* Team detail (collapsible) */}
-      {!loading && employees.length > 0 && (
-        <div className="rounded-2xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] shadow-card overflow-hidden">
-          <button onClick={() => setShowTeam(v => !v)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-low dark:hover:bg-white/[0.03] transition-colors">
-            <span className="flex items-center gap-2 text-sm font-semibold text-navy dark:text-slate-100"><Users className="w-4 h-4 text-brand-600 dark:text-brand-400" /> פרטי צוות</span>
-            <ChevronDown className={cn("w-5 h-5 text-navy-muted dark:text-slate-400 transition-transform", showTeam && "rotate-180")} />
-          </button>
-          {showTeam && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 px-4 pb-4">
-          {employees.map((emp, i) => {
-            const name = emp.name ?? emp.email;
-            const hours = hoursMap[emp.id] ?? 0;
-            return (
-              <div key={emp.id} className="rounded-xl border border-surface-high dark:border-white/10 bg-surface-white dark:bg-white/[0.04] overflow-hidden">
-                <div className="h-1.5 w-full" style={{ backgroundColor: empHex(i) }} />
-                <div className="px-4 py-3">
-                  <p className="text-xs font-semibold text-navy dark:text-slate-100 truncate">{name}</p>
-                  <p className="text-2xl font-bold text-navy dark:text-slate-100 mt-1">{hours}<span className="text-xs font-normal text-navy-muted/70 dark:text-slate-500 mr-1">שעות</span></p>
-
-                  {/* Profile summary */}
-                  <div className="mt-2 space-y-1 border-t border-surface-high dark:border-white/[0.08] pt-2">
-                    {/* Contract */}
-                    {emp.contractShifts != null && emp.contractShifts > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-navy-muted dark:text-slate-400">
-                        <span className="font-medium text-navy-muted dark:text-slate-400">חוזה:</span>
-                        <span>{emp.contractShifts} משמרות/שבוע</span>
-                      </div>
-                    )}
-                    {/* Roles */}
-                    {emp.roles.length > 0 && (
-                      <div className="flex items-start gap-1 text-xs text-navy-muted dark:text-slate-400">
-                        <span className="font-medium text-navy-muted dark:text-slate-400 shrink-0">תפקידים:</span>
-                        <span>{emp.roles.join(", ")}</span>
-                      </div>
-                    )}
-                    {/* Assigned shifts breakdown */}
-                    {(shiftsPerEmployeeMap[emp.id]?.length ?? 0) > 0 && (
-                      <>
-                        {shiftsPerEmployeeMap[emp.id].map(({ shiftLabel, days }) => (
-                          <div key={shiftLabel} className="flex items-center gap-1 text-xs text-navy-muted dark:text-slate-400">
-                            <span className="font-medium text-navy-muted dark:text-slate-400">{shiftLabel}:</span>
-                            <span>{days.map(d => DAY_SHORT[d]).join(" ")}</span>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          </div>
-          )}
-        </div>
-      )}
-
-      {/* Warnings */}
-      {Object.keys(warnings).length > 0 && !warningsIgnored && (
-        <div className="rounded-2xl border border-amber-200 dark:border-amber-500/20 bg-surface-low dark:bg-white/[0.03] px-4 py-3">
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> אזהרות שיבוץ</p>
-            <button onClick={() => setWarningsIgnored(true)} className="text-xs text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300 font-medium px-2 py-0.5 rounded hover:bg-surface-mid dark:hover:bg-white/5 transition-colors">התעלם</button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(warnings).flatMap(([day, msgs]) => msgs.map((m, i) => (
-              <span key={day + i} className="inline-flex items-center gap-1.5 text-[11px] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-2.5 py-1">
-                <span className="font-semibold text-amber-700 dark:text-amber-300">{day}</span><span className="text-amber-700/70 dark:text-amber-200/75">{m}</span>
-              </span>
-            )))}
-          </div>
-        </div>
-      )}
-
-      {/* Conflicts */}
-      {Object.keys(conflicts).length > 0 && !conflictsIgnored && (
-        <div className="rounded-2xl border border-rose-200 dark:border-rose-500/20 bg-surface-low dark:bg-white/[0.03] px-4 py-3">
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> התנגשויות זמינות</p>
-            <button onClick={() => setConflictsIgnored(true)} className="text-xs text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-300 font-medium px-2 py-0.5 rounded hover:bg-surface-mid dark:hover:bg-white/5 transition-colors">התעלם</button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(conflicts).flatMap(([name, slots]) => {
-              const empIndex = employees.findIndex(e => (e.name ?? e.email) === name);
-              return slots.map((s, i) => (
-                <span key={name + i} className="inline-flex items-center gap-1.5 text-[11px] bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 rounded-lg px-2.5 py-1">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: empIndex >= 0 ? empHex(empIndex) : "#6b7280" }} />
-                  <span className="font-semibold text-rose-700 dark:text-rose-200">{name.split(" ")[0]}</span><span className="text-rose-700/70 dark:text-rose-200/75">{s}</span>
-                </span>
-              ));
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Schedule grid */}
       {loading ? (
@@ -1030,11 +794,10 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-navy-muted/70 dark:text-slate-500 flex items-center gap-1.5"><GripVertical className="w-3.5 h-3.5" /> גרור עובדים בין משמרות · הוסף או הסר בכל תא</p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            {filterBar}
             {existing && <p className="text-xs text-navy-muted/70 dark:text-slate-500">עודכן: {format(new Date(existing.updatedAt), "d/M 'בשעה' HH:mm")}</p>}
           </div>
-          {filterBar}
           <div className="overflow-x-auto rounded-2xl border border-surface-high dark:border-white/[0.08] bg-surface-white dark:bg-white/[0.04] shadow-card">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -1052,20 +815,9 @@ export default function DashboardPage() {
                   const shiftCfg = shifts.find(s => s.id === shift);
                   const dotColors = ["bg-yellow-400","bg-orange-400","bg-indigo-400","bg-blue-400","bg-pink-400"];
                   return (
-                  <tr
-                    key={shift}
-                    className={cn("border-b border-surface-high dark:border-white/[0.08] last:border-0 transition-opacity", draggingRow === shift && "opacity-40")}
-                    draggable
-                    onDragStart={() => setDraggingRow(shift)}
-                    onDragEnd={() => { setDraggingRow(null); setDragOverRow(null); }}
-                    onDragOver={e => { e.preventDefault(); setDragOverRow(shift); }}
-                    onDragLeave={() => setDragOverRow(null)}
-                    onDrop={() => handleRowDrop(shift)}
-                    style={dragOverRow === shift && draggingRow !== shift ? { outline: "2px solid #6366f1", outlineOffset: "-2px" } : undefined}
-                  >
+                  <tr key={shift} className="border-b border-surface-high dark:border-white/[0.08] last:border-0">
                     <td className="py-3 ps-4 pe-3 align-middle border-e border-surface-high/60 dark:border-white/[0.06]">
                       <div className="flex items-center gap-2">
-                        <GripVertical className="w-4 h-4 text-navy-muted/50 dark:text-slate-600 cursor-grab active:cursor-grabbing flex-shrink-0" aria-label="גרור לסידור מחדש" />
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
                         <div className="flex-1">
                           <div className="flex items-center gap-1.5">
@@ -1122,10 +874,17 @@ export default function DashboardPage() {
                           : cellAv === "prefer_not" ? "outline outline-2 outline-yellow-400 rounded-lg"
                           : "outline outline-2 outline-red-400 rounded-lg"
                         : "";
+                      const cellProblem = problems.cells[`${day}-${shift}`];
                       return (
                         <td
                           key={day}
-                          className={cn("group/cell py-2 px-2 align-top transition-colors border-e border-surface-high/60 dark:border-white/[0.06] last:border-e-0", dragging && dragBg, dropOutline)}
+                          id={`cell-${day}-${shift}`}
+                          className={cn(
+                            "group/cell py-2 px-2 align-top transition-colors border-e border-surface-high/60 dark:border-white/[0.06] last:border-e-0",
+                            !dragging && cellProblem === "understaffed" && "bg-amber-50/70 dark:bg-amber-500/[0.08]",
+                            !dragging && cellProblem === "conflict" && "bg-rose-50/70 dark:bg-rose-500/[0.08]",
+                            dragging && dragBg, dropOutline
+                          )}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
                           onDragLeave={() => setDragOver(null)}
                           onDrop={() => handleDrop(day, shift)}
@@ -1207,7 +966,7 @@ export default function DashboardPage() {
                                 onClick={e => { e.stopPropagation(); setConfirmClear({ day, shift }); }}
                                 className="w-full text-center text-[10px] font-normal py-0.5 rounded text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all opacity-100 sm:opacity-0 sm:group-hover/cell:opacity-100 focus:opacity-100"
                               >
-                                מחק משמרת
+                                נקה תא
                               </button>
                             )}
                           </div>
@@ -1252,26 +1011,97 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Confirm regenerate dialog */}
-      {confirmRegen && (
+      {/* Confirm generate dialog — regenerate overwrite + non-submitter heads-up */}
+      {confirmGen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#131f33] rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
-            <p className="font-bold text-navy dark:text-slate-100 text-base mb-1">יצירת שיבוץ חדש</p>
-            <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">פעולה זו תחליף את השיבוץ הנוכחי (פרט למשובצים נעוצים). להמשיך?</p>
-            <div className="flex gap-2 justify-center">
+          <div className="bg-white dark:bg-[#131f33] rounded-2xl shadow-xl p-6 max-w-sm w-full" dir="rtl">
+            <p className="font-bold text-navy dark:text-slate-100 text-base mb-3">רגע לפני שיוצרים</p>
+            <ul className="space-y-2 mb-5">
+              {confirmGen.map((line, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-navy-muted dark:text-slate-400">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
               <button
-                onClick={() => { setConfirmRegen(false); generate(); }}
+                onClick={() => { setConfirmGen(null); generate(); }}
                 className="flex-1 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors"
               >
-                צור מחדש
+                צור סידור
               </button>
               <button
-                onClick={() => setConfirmRegen(false)}
+                onClick={() => setConfirmGen(null)}
                 className="flex-1 py-2 rounded-lg border border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03] text-navy dark:text-slate-100 text-sm font-semibold transition-colors"
               >
                 ביטול
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish confirm + share sheet */}
+      {publishStep && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#131f33] rounded-2xl shadow-xl p-6 max-w-sm w-full text-center" dir="rtl">
+            {publishStep === "confirm" ? (
+              <>
+                <p className="font-bold text-navy dark:text-slate-100 text-base mb-2">{hasUnsentEdits ? "שליחת עדכון לעובדים" : "פרסום הסידור לעובדים"}</p>
+                {problems.count > 0 ? (
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-5 flex items-center justify-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" /> יש {problems.count} בעיות בסידור — אפשר לפרסם ולתקן אחר כך.
+                  </p>
+                ) : (
+                  <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">העובדים יוכלו לראות את המשמרות שלהם באפליקציה.</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={publish}
+                    disabled={publishing}
+                    className="flex-1 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+                  >
+                    {publishing ? "מפרסם…" : hasUnsentEdits ? "שלח עדכון" : "פרסם"}
+                  </button>
+                  <button
+                    onClick={() => setPublishStep(null)}
+                    className="flex-1 py-2 rounded-lg border border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03] text-navy dark:text-slate-100 text-sm font-semibold transition-colors"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mx-auto w-12 h-12 rounded-full bg-success-100 dark:bg-emerald-500/15 grid place-items-center mb-3">
+                  <Check className="w-6 h-6 text-success-600 dark:text-emerald-400" />
+                </div>
+                <p className="font-bold text-navy dark:text-slate-100 text-base mb-1">הסידור פורסם!</p>
+                <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">שתף עם הצוות:</p>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => window.open(waShareUrl(), "_blank")}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#16a34a] hover:bg-[#15803d] text-white text-sm font-semibold transition-colors"
+                  >
+                    <WhatsAppIcon className="w-4 h-4" /> שלח בוואטסאפ
+                  </button>
+                  <button
+                    onClick={executePdfDownload}
+                    disabled={pdfLoading}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-surface-high dark:border-white/10 hover:bg-surface-low dark:hover:bg-white/[0.05] text-navy dark:text-slate-100 text-sm font-semibold transition-colors disabled:opacity-60"
+                  >
+                    <Download className="w-4 h-4" /> {pdfLoading ? "מכין PDF…" : "הורד PDF"}
+                  </button>
+                  <button
+                    onClick={() => setPublishStep(null)}
+                    className="w-full py-2 text-sm text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 transition-colors"
+                  >
+                    סגור
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1282,25 +1112,21 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-[#131f33] rounded-2xl shadow-xl p-6 max-w-sm w-full relative" dir="rtl">
             <button
               onClick={() => setConflictDialog(null)}
+              aria-label="סגור"
               className="absolute top-4 left-4 text-navy-muted/70 dark:text-slate-500 hover:text-navy-muted dark:hover:text-slate-400 text-xl leading-none"
             >
               ×
             </button>
-            <h3 className="font-bold text-navy dark:text-slate-100 text-base mb-1">התנגשות בזמינות</h3>
-            <p className="text-xs text-navy-muted dark:text-slate-400 mb-3">העובדים הבאים ציינו שאינם זמינים:</p>
+            <h3 className="font-bold text-navy dark:text-slate-100 text-base mb-1">שים לב לפני השיבוץ</h3>
+            <p className="text-xs text-navy-muted dark:text-slate-400 mb-3">בדוק את הנקודות הבאות:</p>
             <ul className="space-y-1 mb-5">
               {conflictDialog.lines.map((line, i) => (
                 <li key={i} className="text-sm text-rose-700 dark:text-rose-300 font-medium">• {line}</li>
               ))}
             </ul>
             <div className="flex gap-2 justify-start">
-              <Button
-                size="md"
-                onClick={() => { conflictDialog.onIgnore(); setConflictDialog(null); }}
-              >
-                התעלם
-              </Button>
-              <Button variant="outline" size="md" onClick={() => setConflictDialog(null)}>סגור</Button>
+              <Button size="md" onClick={() => setConflictDialog(null)}>ביטול</Button>
+              <Button variant="outline" size="md" onClick={() => { conflictDialog.onIgnore(); setConflictDialog(null); }}>שבץ בכל זאת</Button>
             </div>
           </div>
         </div>
@@ -1310,7 +1136,7 @@ export default function DashboardPage() {
       {confirmClear && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-[#131f33] rounded-2xl shadow-xl p-6 max-w-xs w-full text-center" dir="rtl">
-            <p className="font-bold text-navy dark:text-slate-100 text-base mb-1">מחיקת משמרת</p>
+            <p className="font-bold text-navy dark:text-slate-100 text-base mb-1">ניקוי תא</p>
             <p className="text-sm text-navy-muted dark:text-slate-400 mb-5">האם אתה בטוח שברצונך להסיר את כל העובדים מהמשמרת?</p>
             <div className="flex gap-2 justify-center">
               <button
@@ -1340,13 +1166,19 @@ export default function DashboardPage() {
             </button>
             {showAvailDetail && (
             <div className="mt-3">
-            <div className="mb-3">{filterBar}</div>
+            {/* Non-submitters — the availability data below only covers those who submitted */}
+            {employees.some(e => e.constraints.length === 0) && (
+              <p className="mb-3 text-xs text-navy-muted dark:text-slate-400">
+                <span className="font-semibold text-amber-700 dark:text-amber-300">טרם הגישו זמינות:</span>{" "}
+                {employees.filter(e => e.constraints.length === 0).map(e => (e.name ?? e.email).split(" ")[0]).join(", ")}
+              </p>
+            )}
 
-            {/* Legend */}
-            <div className="flex gap-3 mb-3 text-xs text-navy-muted dark:text-slate-400">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-100 dark:bg-emerald-500/15 ring-1 ring-emerald-300 dark:ring-emerald-500/25" />זמין</span>
+            {/* Legend — only exceptions are shown; an empty cell means everyone is available */}
+            <div className="flex gap-3 mb-3 text-xs text-navy-muted dark:text-slate-400 flex-wrap">
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-amber-100 dark:bg-amber-500/15 ring-1 ring-amber-300 dark:ring-amber-500/25" />מעדיף לא</span>
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm bg-rose-100 dark:bg-rose-500/15 ring-1 ring-rose-300 dark:ring-rose-500/25" />לא זמין</span>
+              <span className="text-navy-muted/70 dark:text-slate-500">תא ריק = כולם זמינים</span>
             </div>
 
             {/* Overview table */}
@@ -1378,10 +1210,10 @@ export default function DashboardPage() {
                         <td key={day} className="py-1 px-1 align-top">
                           <div className="flex flex-col gap-0.5">
                             {employees.filter(e => empFilter === null || e.id === empFilter).map(emp => {
+                              if (emp.constraints.length === 0) return null; // listed above as "טרם הגישו"
                               const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
-                              const chipStyle = av === "available"
-                                ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 ring-1 ring-emerald-300 dark:ring-emerald-500/25"
-                                : av === "prefer_not"
+                              if (av === "available") return null; // exceptions only — empty cell = available
+                              const chipStyle = av === "prefer_not"
                                 ? "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 ring-1 ring-amber-300 dark:ring-amber-500/25"
                                 : "bg-rose-100 dark:bg-rose-500/15 text-rose-800 dark:text-rose-300 ring-1 ring-rose-300 dark:ring-rose-500/25";
                               return (
