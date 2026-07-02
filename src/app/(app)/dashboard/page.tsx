@@ -14,7 +14,7 @@ import { getNextWeekStart, DEFAULT_SHIFTS, DAYS, DAY_LABELS_HE, toMins, cn, type
 interface ShiftSlot { employeeIds: string[]; employeeNames: string[]; pinnedIds?: string[]; }
 type ScheduleData = Record<string, Record<string, ShiftSlot>>;
 interface GeneratedSchedule { id: string; status: "DRAFT" | "PUBLISHED"; schedule: ScheduleData; updatedAt: string; publishedAt?: string | null; }
-interface Employee { id: string; name: string | null; email: string; constraints: { data: ConstraintData }[]; roles: string[]; contractShifts: number | null; }
+interface Employee { id: string; name: string | null; email: string; phone?: string | null; constraints: { data: ConstraintData }[]; roles: string[]; contractShifts: number | null; }
 
 // 24 visually distinct base colors — covers most orgs without repeating
 const EMP_PALETTE_HEX = [
@@ -121,6 +121,7 @@ export default function DashboardPage() {
   const [publishStep, setPublishStep] = useState<null | "confirm" | "share">(null);
   const [copying, setCopying] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [sentTo, setSentTo] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (searchParams.get("welcome") === "1") {
@@ -140,6 +141,11 @@ export default function DashboardPage() {
   useEscapeClose(!!conflictDialog, () => setConflictDialog(null));
   useEscapeClose(!!confirmGen, () => setConfirmGen(null));
   useEscapeClose(publishStep !== null, () => setPublishStep(null));
+
+  // Fresh "sent" checkmarks every time the share sheet is opened
+  useEffect(() => {
+    if (publishStep === null) setSentTo(new Set());
+  }, [publishStep]);
 
   const [weekStart, setWeekStart] = useState(() => getNextWeekStart());
   const weekLabel = `${format(weekStart, "d/M")} – ${format(addDays(weekStart, 6), "d/M/yyyy")}`;
@@ -488,6 +494,33 @@ export default function DashboardPage() {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const msg = `סידור העבודה לשבוע ${weekLabel} פורסם! היכנסו לצפות במשמרות שלכם: ${origin}/my-schedule`;
     return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  }
+
+  /** All (day, shift) assignments for one employee this week, in week order. */
+  function empShiftEntries(empId: string): { dayLabel: string; shiftLabel: string; time: string }[] {
+    const entries: { dayLabel: string; shiftLabel: string; time: string }[] = [];
+    if (!scheduleData) return entries;
+    for (const day of DAYS) {
+      for (const cfg of shifts) {
+        if (scheduleData[day]?.[cfg.id]?.employeeIds.includes(empId)) {
+          entries.push({ dayLabel: DAY_LABELS_HE[day as Day], shiftLabel: cfg.label, time: `${cfg.start}–${cfg.end}` });
+        }
+      }
+    }
+    return entries;
+  }
+
+  /** wa.me deep link to a specific employee's chat, prefilled with their own shifts. */
+  function personalWaUrl(emp: Employee): string {
+    const digits = (emp.phone ?? "").replace(/\D/g, "").replace(/^0/, "972");
+    const first = (emp.name ?? emp.email).split(" ")[0];
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const entries = empShiftEntries(emp.id);
+    const body = entries.length === 0
+      ? "השבוע אינך משובץ/ת למשמרות."
+      : entries.map(e => `• ${e.dayLabel} — ${e.shiftLabel} (${e.time})`).join("\n");
+    const msg = `היי ${first}! המשמרות שלך לשבוע ${weekLabel}:\n${body}\nלצפייה בכל רגע: ${origin}/my-schedule`;
+    return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
   }
 
   async function generate() {
@@ -1094,6 +1127,44 @@ export default function DashboardPage() {
                   >
                     <Download className="w-4 h-4" /> {pdfLoading ? "מכין PDF…" : "הורד PDF"}
                   </button>
+
+                  {/* Personal send — each employee gets their own shifts in their own chat */}
+                  {employees.some(e => e.phone && (assignedCountMap[e.id] ?? 0) > 0) && (
+                    <div className="pt-2 text-right">
+                      <p className="text-xs font-semibold text-navy-muted dark:text-slate-400 mb-1.5">או שלח לכל אחד את המשמרות שלו:</p>
+                      <div className="max-h-44 overflow-y-auto space-y-1 pe-0.5">
+                        {employees
+                          .filter(e => e.phone && (assignedCountMap[e.id] ?? 0) > 0)
+                          .map(emp => {
+                            const first = (emp.name ?? emp.email).split(" ")[0];
+                            const sent = sentTo.has(emp.id);
+                            return (
+                              <a
+                                key={emp.id}
+                                href={personalWaUrl(emp)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => setSentTo(prev => { const s = new Set(prev); s.add(emp.id); return s; })}
+                                className={cn(
+                                  "flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-sm transition-colors",
+                                  sent
+                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                    : "hover:bg-surface-low dark:hover:bg-white/[0.05] text-navy dark:text-slate-100"
+                                )}
+                              >
+                                <Avatar name={emp.name} color={colorMap[emp.id] ?? "#6b7280"} size={20} />
+                                <span className="flex-1 text-start font-medium">{first}</span>
+                                <span className="text-xs text-navy-muted/70 dark:text-slate-500">{assignedCountMap[emp.id]} משמרות</span>
+                                {sent
+                                  ? <Check className="w-4 h-4 flex-shrink-0" />
+                                  : <WhatsAppIcon className="w-4 h-4 text-[#16a34a] flex-shrink-0" />}
+                              </a>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => setPublishStep(null)}
                     className="w-full py-2 text-sm text-navy-muted dark:text-slate-400 hover:text-navy dark:hover:text-slate-200 transition-colors"
@@ -1323,6 +1394,26 @@ export default function DashboardPage() {
               })}
             </tbody>
           </table>
+
+          {/* Personal summary — each employee finds their own shifts in one glance */}
+          {employees.some(e => empShiftEntries(e.id).length > 0) && (
+            <div style={{ marginTop: "18px", paddingTop: "12px", borderTop: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: "12px", fontWeight: "700", color: "#0b2239", marginBottom: "7px" }}>סיכום אישי</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 26px" }}>
+                {employees.map(emp => {
+                  const entries = empShiftEntries(emp.id);
+                  if (entries.length === 0) return null;
+                  return (
+                    <div key={emp.id} style={{ fontSize: "11.5px", color: "#334155", whiteSpace: "nowrap" }}>
+                      <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "999px", backgroundColor: colorMap[emp.id] ?? "#94a3b8", marginLeft: "5px", verticalAlign: "1px" }} />
+                      <span style={{ fontWeight: "700", color: "#0b2239" }}>{(emp.name ?? emp.email).split(" ")[0]}:</span>{" "}
+                      {entries.map(e => `${e.dayLabel} ${e.shiftLabel}`).join(" · ")}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px", fontSize: "10.5px", color: "#94a3b8" }}>
