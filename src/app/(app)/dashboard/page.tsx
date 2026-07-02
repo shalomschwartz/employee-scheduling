@@ -1436,24 +1436,51 @@ export default function DashboardPage() {
             </tbody>
           </table>
 
-          {/* Personal summary — each employee finds their own shifts + totals in one glance */}
+          {/* Personal summary — employee × day mini-table: find your row, scan your week */}
           {employees.some(e => empShiftEntries(e.id).length > 0) && (
-            <div style={{ marginTop: "16px", paddingTop: "11px", borderTop: "1px solid #cbd5e1" }}>
-              <div style={{ fontSize: "13px", fontWeight: "700", color: "#0b2239", marginBottom: "7px" }}>סיכום אישי</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "30px", rowGap: "6px" }}>
-                {employees.map(emp => {
-                  const entries = empShiftEntries(emp.id);
-                  if (entries.length === 0) return null;
-                  const hours = Math.round(entries.reduce((a, e) => a + e.mins, 0) / 60);
-                  return (
-                    <div key={emp.id} style={{ fontSize: "12.5px", color: "#334155" }}>
-                      <span style={{ fontWeight: "700", fontSize: "13px", color: "#0b2239" }}>{displayName(emp)}:</span>{" "}
-                      {entries.map(e => `${e.dayLabel} ${e.shiftLabel}`).join(" · ")}
-                      <span style={{ color: "#64748b" }}>{` (${entries.length} משמרות · ${hours} ש׳)`}</span>
-                    </div>
-                  );
-                })}
-              </div>
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: "#0b2239", marginBottom: "6px" }}>סיכום אישי</div>
+              <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: "108px", padding: "5px 8px", textAlign: "right", backgroundColor: "#f1f5f9", color: "#52647d", fontSize: "11px", fontWeight: "700", borderBottom: "1px solid #cbd5e1" }}>עובד</th>
+                    {DAYS.map(day => (
+                      <th key={day} style={{ padding: "5px 2px", textAlign: "center", backgroundColor: "#f1f5f9", color: "#52647d", fontSize: "11px", fontWeight: "700", borderBottom: "1px solid #cbd5e1" }}>
+                        {DAY_LABELS_HE[day as Day]}
+                      </th>
+                    ))}
+                    <th style={{ width: "88px", padding: "5px 4px", textAlign: "center", backgroundColor: "#f1f5f9", color: "#52647d", fontSize: "11px", fontWeight: "700", borderBottom: "1px solid #cbd5e1" }}>סה״כ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map(emp => {
+                    const entries = empShiftEntries(emp.id);
+                    if (entries.length === 0) return null;
+                    const hours = Math.round(entries.reduce((a, e) => a + e.mins, 0) / 60);
+                    return (
+                      <tr key={emp.id}>
+                        <td style={{ padding: "5px 8px", textAlign: "right", fontSize: "12.5px", fontWeight: "700", color: "#0b2239", borderBottom: "1px solid #e2e8f0", backgroundColor: "#fbfcfe" }}>
+                          {displayName(emp)}
+                        </td>
+                        {DAYS.map(day => {
+                          const dayShifts = shifts.filter(cfg => scheduleData[day]?.[cfg.id]?.employeeIds.includes(emp.id));
+                          const isWeekend = day === "friday" || day === "saturday";
+                          return (
+                            <td key={day} style={{ padding: "5px 2px", textAlign: "center", verticalAlign: "middle", borderBottom: "1px solid #e2e8f0", backgroundColor: isWeekend ? "#eef2f7" : "#ffffff" }}>
+                              {dayShifts.map(cfg => (
+                                <div key={cfg.id} style={{ fontSize: "11.5px", fontWeight: "600", color: "#0b2239", lineHeight: "1.35" }}>{cfg.label}</div>
+                              ))}
+                            </td>
+                          );
+                        })}
+                        <td style={{ padding: "5px 4px", textAlign: "center", fontSize: "11px", color: "#52647d", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
+                          {entries.length} מש׳ · {hours} ש׳
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
 
