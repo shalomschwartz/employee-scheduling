@@ -473,7 +473,13 @@ export default function DashboardPage() {
       const { default: html2canvas } = await import("html2canvas");
       const { default: jsPDF } = await import("jspdf");
       if (!printRef.current) return;
-      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      // Deterministic capture: wait for webfonts + the logo before rasterizing
+      try { await document.fonts.ready; } catch { /* older browsers */ }
+      await Promise.all(
+        Array.from(printRef.current.querySelectorAll("img")).map(img => img.decode().catch(() => {}))
+      );
+      // scale 3 ≈ 285 DPI on landscape A4 — print-sharp and crisp on phone zoom
+      const canvas = await html2canvas(printRef.current, { scale: 3, backgroundColor: "#ffffff", useCORS: true });
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
@@ -481,9 +487,13 @@ export default function DashboardPage() {
       const scale = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
       const w = canvas.width * scale;
       const h = canvas.height * scale;
-      // JPEG instead of PNG: ~9MB -> ~300KB with no visible quality loss at print size
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.88), "JPEG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
-      pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}.pdf`);
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
+      // Mid-week reprints get a version suffix so the newest file is unambiguous
+      const suffix = hasUnsentEdits && existing ? `-עדכון-${format(new Date(existing.updatedAt), "ddMM-HHmm")}` : "";
+      pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}${suffix}.pdf`);
+    } catch {
+      setErrorToast("שגיאה בהכנת ה-PDF — נסה שנית");
+      setTimeout(() => setErrorToast(null), 4000);
     } finally {
       setPdfLoading(false);
     }
@@ -497,23 +507,36 @@ export default function DashboardPage() {
   }
 
   /** All (day, shift) assignments for one employee this week, in week order. */
-  function empShiftEntries(empId: string): { dayLabel: string; shiftLabel: string; time: string }[] {
-    const entries: { dayLabel: string; shiftLabel: string; time: string }[] = [];
+  function empShiftEntries(empId: string): { dayLabel: string; shiftLabel: string; time: string; mins: number }[] {
+    const entries: { dayLabel: string; shiftLabel: string; time: string; mins: number }[] = [];
     if (!scheduleData) return entries;
     for (const day of DAYS) {
       for (const cfg of shifts) {
         if (scheduleData[day]?.[cfg.id]?.employeeIds.includes(empId)) {
-          entries.push({ dayLabel: DAY_LABELS_HE[day as Day], shiftLabel: cfg.label, time: `${cfg.start}–${cfg.end}` });
+          let mins = toMins(cfg.end) - toMins(cfg.start);
+          if (mins <= 0) mins += 1440;
+          entries.push({ dayLabel: DAY_LABELS_HE[day as Day], shiftLabel: cfg.label, time: `${cfg.start}–${cfg.end}`, mins });
         }
       }
     }
     return entries;
   }
 
+  /** First name only — plus a last-name initial when two employees share a first name. */
+  function displayName(emp?: Employee, fallback?: string): string {
+    const raw = emp ? (emp.name ?? emp.email.split("@")[0]) : (fallback ?? "");
+    const clean = raw.includes("@") ? raw.split("@")[0] : raw;
+    const parts = clean.trim().split(/\s+/);
+    const first = parts[0] ?? "";
+    const dupes = employees.filter(e => (e.name ?? e.email.split("@")[0]).trim().split(/\s+/)[0] === first).length;
+    if (dupes > 1 && parts[1]) return `${first} ${parts[1].charAt(0)}׳`;
+    return first;
+  }
+
   /** wa.me deep link to a specific employee's chat, prefilled with their own shifts. */
   function personalWaUrl(emp: Employee): string {
     const digits = (emp.phone ?? "").replace(/\D/g, "").replace(/^0/, "972");
-    const first = (emp.name ?? emp.email).split(" ")[0];
+    const first = displayName(emp);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const entries = empShiftEntries(emp.id);
     const body = entries.length === 0
@@ -1136,7 +1159,7 @@ export default function DashboardPage() {
                         {employees
                           .filter(e => e.phone && (assignedCountMap[e.id] ?? 0) > 0)
                           .map(emp => {
-                            const first = (emp.name ?? emp.email).split(" ")[0];
+                            const first = displayName(emp);
                             const sent = sentTo.has(emp.id);
                             return (
                               <a
@@ -1325,29 +1348,39 @@ export default function DashboardPage() {
             padding: "36px 42px", fontFamily: "var(--font-sans), Arial, sans-serif", direction: "rtl",
           }}
         >
-          {/* Header — title right, logo left, navy rule */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "18px", paddingBottom: "14px", borderBottom: "3px solid #0b2239" }}>
+          {/* Header — title right, logo left, navy rule; version stamp for mid-week reprints */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "16px", paddingBottom: "12px", borderBottom: "3px solid #0b2239" }}>
             <div>
-              <h2 style={{ margin: "0 0 3px", fontSize: "25px", fontWeight: "800", color: "#0b2239", letterSpacing: "-0.01em" }}>סידור עבודה שבועי</h2>
-              <p style={{ margin: 0, color: "#52647d", fontSize: "14px" }}>שבוע {weekLabel}</p>
+              <h2 style={{ margin: "0 0 3px", fontSize: "19px", fontWeight: "800", color: "#0b2239", letterSpacing: "-0.01em" }}>
+                סידור עבודה שבועי
+                {hasUnsentEdits && (
+                  <span style={{ display: "inline-block", marginRight: "10px", padding: "2px 10px", fontSize: "11px", fontWeight: "700", borderRadius: "999px", backgroundColor: "#fef3c7", color: "#b45309", border: "1px solid #b45309", verticalAlign: "2px" }}>
+                    גרסה מעודכנת
+                  </span>
+                )}
+              </h2>
+              <p style={{ margin: 0, color: "#52647d", fontSize: "14px" }}>
+                שבוע {weekLabel}
+                {existing && ` · עודכן: ${format(new Date(existing.updatedAt), "d/M HH:mm")}`}
+              </p>
             </div>
-            <img src="/logo.png" alt="ShiftSync" style={{ height: "46px" }} />
+            <img src="/logo.png" alt="ShiftSync" style={{ height: "44px" }} />
           </div>
 
-          {/* Table — navy day header, hairline grid, weekend tint, employee color dots */}
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          {/* Table — fixed layout (no silent column clipping), wall-size type, grayscale-safe borders */}
+          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <thead>
               <tr>
-                <th style={{ padding: "10px 12px", textAlign: "right", backgroundColor: "#0b2239", color: "#ffffff", fontWeight: "700", fontSize: "13px", width: "128px", borderRadius: "0" }}>
+                <th style={{ padding: "10px 12px", textAlign: "right", backgroundColor: "#0b2239", color: "#ffffff", fontWeight: "700", fontSize: "13px", width: "128px" }}>
                   משמרת
                 </th>
                 {DAYS.map((day, di) => {
                   const date = format(addDays(weekStart, di), "d/M");
                   return (
-                    <th key={day} style={{ padding: "10px 6px", textAlign: "center", backgroundColor: "#0b2239" }}>
-                      <span style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>{DAY_LABELS_HE[day as Day]}</span>
+                    <th key={day} style={{ padding: "10px 4px", textAlign: "center", backgroundColor: "#0b2239" }}>
+                      <span style={{ fontSize: "17px", fontWeight: "700", color: "#ffffff" }}>{DAY_LABELS_HE[day as Day]}</span>
                       <br />
-                      <span style={{ fontSize: "11px", fontWeight: "400", color: "#93a5bd" }}>{date}</span>
+                      <span style={{ fontSize: "12px", fontWeight: "400", color: "#f1f5f9" }}>{date}</span>
                     </th>
                   );
                 })}
@@ -1359,10 +1392,10 @@ export default function DashboardPage() {
                 const rc = shiftCfg?.role ? roleColorMap[shiftCfg.role] : undefined;
                 return (
                   <tr key={shift}>
-                    <td style={{ padding: "12px", textAlign: "right", verticalAlign: "middle", backgroundColor: "#f1f5f9", borderBottom: "1px solid #e2e8f0" }}>
+                    <td style={{ padding: "10px 12px", textAlign: "right", verticalAlign: "middle", backgroundColor: "#f1f5f9", borderBottom: "1px solid #cbd5e1" }}>
                       <span style={{ display: "block", color: "#0b2239", fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
                       {shiftCfg?.role?.trim() && (
-                        <span style={{ display: "inline-block", margin: "3px 0 2px", padding: "1px 8px", fontSize: "10.5px", fontWeight: "600", borderRadius: "999px", background: rc?.bg ?? "#eff6ff", color: rc?.text ?? "#1e40af", border: `1px solid ${rc?.border ?? "#bfdbfe"}` }}>
+                        <span style={{ display: "inline-block", margin: "3px 0 2px", padding: "1px 8px", fontSize: "12px", fontWeight: "600", borderRadius: "999px", background: rc?.bg ?? "#eff6ff", color: rc?.text ?? "#1e40af", border: `1px solid ${rc?.text ?? "#1e40af"}` }}>
                           {shiftCfg.role}
                         </span>
                       )}
@@ -1373,14 +1406,27 @@ export default function DashboardPage() {
                       const names = slot?.employeeNames ?? [];
                       const isWeekend = day === "friday" || day === "saturday";
                       return (
-                        <td key={day} style={{ padding: "10px 6px", textAlign: "center", verticalAlign: "middle", backgroundColor: isWeekend ? "#f8fafc" : "#ffffff", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #eef2f7" }}>
-                          {names.length === 0
-                            ? <span style={{ color: "#cbd5e1", fontSize: "13px" }}>—</span>
-                            : names.map((name, ni) => (
-                                <div key={ni} style={{ margin: "3px 0", fontSize: "13.5px", fontWeight: "600", color: "#0b2239", whiteSpace: "nowrap" }}>
-                                  {name}
-                                </div>
-                              ))}
+                        <td key={day} style={{
+                          padding: "8px 4px", textAlign: "center", verticalAlign: "middle",
+                          backgroundColor: isWeekend ? "#e8edf3" : "#ffffff",
+                          borderBottom: "1px solid #cbd5e1",
+                          // solid divider before the weekend so the boundary survives a B&W printer
+                          borderRight: day === "friday" ? "2px solid #0b2239" : "1px solid #e2e8f0",
+                        }}>
+                          {!slot ? (
+                            <span style={{ color: "#cbd5e1", fontSize: "13px" }}>—</span>
+                          ) : names.length === 0 ? (
+                            <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: "999px", backgroundColor: "#fef3c7", color: "#b45309", fontSize: "12px", fontWeight: "700", border: "1px solid #b45309" }}>
+                              משמרת פתוחה
+                            </span>
+                          ) : names.map((name, ni) => {
+                            const empId = slot?.employeeIds?.[ni];
+                            return (
+                              <div key={ni} style={{ margin: "4px 0", fontSize: "16px", fontWeight: "700", color: "#0b2239", overflowWrap: "break-word" }}>
+                                {displayName(empId ? empMap[empId] : undefined, name)}
+                              </div>
+                            );
+                          })}
                         </td>
                       );
                     })}
@@ -1390,18 +1436,20 @@ export default function DashboardPage() {
             </tbody>
           </table>
 
-          {/* Personal summary — each employee finds their own shifts in one glance */}
+          {/* Personal summary — each employee finds their own shifts + totals in one glance */}
           {employees.some(e => empShiftEntries(e.id).length > 0) && (
-            <div style={{ marginTop: "18px", paddingTop: "12px", borderTop: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: "12px", fontWeight: "700", color: "#0b2239", marginBottom: "7px" }}>סיכום אישי</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 26px" }}>
+            <div style={{ marginTop: "16px", paddingTop: "11px", borderTop: "1px solid #cbd5e1" }}>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: "#0b2239", marginBottom: "7px" }}>סיכום אישי</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "30px", rowGap: "6px" }}>
                 {employees.map(emp => {
                   const entries = empShiftEntries(emp.id);
                   if (entries.length === 0) return null;
+                  const hours = Math.round(entries.reduce((a, e) => a + e.mins, 0) / 60);
                   return (
-                    <div key={emp.id} style={{ fontSize: "11.5px", color: "#334155", whiteSpace: "nowrap" }}>
-                      <span style={{ fontWeight: "700", color: "#0b2239" }}>{(emp.name ?? emp.email).split(" ")[0]}:</span>{" "}
+                    <div key={emp.id} style={{ fontSize: "12.5px", color: "#334155" }}>
+                      <span style={{ fontWeight: "700", fontSize: "13px", color: "#0b2239" }}>{displayName(emp)}:</span>{" "}
                       {entries.map(e => `${e.dayLabel} ${e.shiftLabel}`).join(" · ")}
+                      <span style={{ color: "#64748b" }}>{` (${entries.length} משמרות · ${hours} ש׳)`}</span>
                     </div>
                   );
                 })}
