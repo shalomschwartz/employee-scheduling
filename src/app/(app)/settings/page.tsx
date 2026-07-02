@@ -476,12 +476,16 @@ export default function SettingsPage() {
   ].filter(Boolean).join(" · ");
 
   return (
-    <div className="space-y-6 max-w-lg">
+    <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-xl font-bold text-navy dark:text-slate-100">הגדרות</h1>
         <p className="text-sm text-navy-muted/70 dark:text-slate-500 mt-0.5">כל שינוי נשמר אוטומטית.</p>
         {saveError && <p className="text-sm text-red-600 dark:text-rose-300 mt-2" role="alert">{saveError}</p>}
       </div>
+
+      {/* Two columns on desktop: the (tall, growing) employees card gets its own
+          column; shifts/roles/advanced stack beside it. Mobile stays one column. */}
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
 
       {/* ── 1. Employees — the first thing a new manager needs ── */}
       <Card>
@@ -655,6 +659,9 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Second column: shifts, roles, advanced */}
+      <div className="space-y-6">
 
       {/* ── 2. Shifts ── */}
       <Card>
@@ -906,6 +913,9 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      </div>
+      </div>
 
       {confirmDeleteShift && (() => {
         const s = shifts.find(s => s.id === confirmDeleteShift);
