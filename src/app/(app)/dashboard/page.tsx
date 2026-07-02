@@ -990,19 +990,46 @@ export default function DashboardPage() {
                                   <p className="px-2 py-1.5 text-xs text-navy-muted/70 dark:text-slate-500">{shiftRole ? `אין עובדים מוסמכים ל"${shiftRole}"` : "כולם כבר מוקצים"}</p>
                                 ) : availableToAdd.map(emp => {
                                   const av = emp.constraints[0]?.data?.[day as Day]?.[shift] ?? "available";
-                                  const dot = av === "available" ? "bg-green-500" : av === "prefer_not" ? "bg-yellow-400" : "bg-red-600";
-                                  const avLabel = av === "available" ? "זמין" : av === "prefer_not" ? "מעדיף לא" : "לא זמין";
+                                  // The full truth up front: computed blockers, not just submitted availability —
+                                  // otherwise the row says "זמין" and the click surprises with a warning dialog.
+                                  const blockers: string[] = [];
+                                  if (hasOverlapConflict(emp.id, day, shift)) blockers.push("משובץ במשמרת חופפת");
+                                  else if (hasRestViolation(emp.id, day, shift)) blockers.push(`פחות מ-${minRestHours} שעות מנוחה`);
+                                  const empDays = DAYS.filter(d => shifts.some(sc => scheduleData?.[d]?.[sc.id]?.employeeIds.includes(emp.id)));
+                                  if (empDays.indexOf(day) === -1 && empDays.length >= 6) blockers.push("כבר עובד 6 ימים");
+                                  const weekCount = Object.values(scheduleData ?? {}).flatMap(dd => Object.values(dd)).filter(s => s.employeeIds.includes(emp.id)).length;
+                                  if (emp.contractShifts != null && emp.contractShifts > 0 && weekCount >= emp.contractShifts) blockers.push(`הגיע ליעד החוזה (${weekCount}/${emp.contractShifts})`);
+                                  return { emp, av, blockers };
+                                })
+                                .sort((a, b) => {
+                                  const score = (x: { av: string; blockers: string[] }) =>
+                                    x.av === "unavailable" ? 3 : x.blockers.length > 0 ? 2 : x.av === "prefer_not" ? 1 : 0;
+                                  return score(a) - score(b);
+                                })
+                                .map(({ emp, av, blockers }) => {
+                                  const blocked = blockers.length > 0 || av === "unavailable";
+                                  const dot = av === "unavailable" ? "bg-red-600" : blockers.length > 0 ? "bg-amber-500" : av === "prefer_not" ? "bg-yellow-400" : "bg-green-500";
+                                  const statusText = av === "unavailable"
+                                    ? ["לא זמין", ...blockers].join(" · ")
+                                    : blockers.length > 0 ? blockers.join(" · ")
+                                    : av === "prefer_not" ? "מעדיף לא" : "זמין";
                                   return (
                                     <button
                                       key={emp.id}
                                       onClick={() => addToSlot(emp, day, shift)}
-                                      className="flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs transition-colors border-b border-surface-high dark:border-white/[0.08] last:border-0 hover:bg-surface-low dark:hover:bg-white/[0.03]"
+                                      className={cn(
+                                        "flex items-center gap-2 w-full text-right px-2.5 py-1.5 text-xs transition-colors border-b border-surface-high dark:border-white/[0.08] last:border-0 hover:bg-surface-low dark:hover:bg-white/[0.03]",
+                                        blocked && "opacity-70"
+                                      )}
                                     >
                                       <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
                                       <span className="flex-1">
                                         <span className="block">{emp.name ?? emp.email}</span>
-                                        <span className="text-[10px] text-navy-muted/70 dark:text-slate-500">
-                                          {emp.roles.length > 0 ? emp.roles.join(", ") : "ללא תפקיד"}{" · "}{avLabel}
+                                        <span className={cn(
+                                          "text-[10px]",
+                                          blocked ? (av === "unavailable" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400") : "text-navy-muted/70 dark:text-slate-500"
+                                        )}>
+                                          {emp.roles.length > 0 ? `${emp.roles.join(", ")} · ` : ""}{statusText}
                                         </span>
                                       </span>
                                     </button>
