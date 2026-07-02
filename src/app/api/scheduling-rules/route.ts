@@ -14,6 +14,7 @@ export async function GET() {
   return NextResponse.json({
     maxConsecutiveDays: typeof s.maxConsecutiveDays === "number" ? s.maxConsecutiveDays : 0,
     requireShiftLead: s.requireShiftLead === true,
+    managerPhone: typeof s.managerPhone === "string" ? s.managerPhone : "",
   });
 }
 
@@ -31,6 +32,11 @@ export async function PUT(req: NextRequest) {
     update.maxConsecutiveDays = v;
   }
   if (body.requireShiftLead !== undefined) update.requireShiftLead = !!body.requireShiftLead;
+  if (body.managerPhone !== undefined) {
+    if (typeof body.managerPhone !== "string" || body.managerPhone.length > 20)
+      return NextResponse.json({ error: "טלפון לא תקין" }, { status: 400 });
+    update.managerPhone = body.managerPhone.trim();
+  }
 
   const org = await prisma.organization.findUnique({ where: { id: session.user.organizationId } });
   const current = (org?.settings ?? {}) as Record<string, unknown>;

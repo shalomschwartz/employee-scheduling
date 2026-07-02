@@ -130,6 +130,7 @@ export default function SettingsPage() {
   // ── Scheduling rules ────────────────────────────────────────────────────────
   const [maxConsecutiveDays, setMaxConsecutiveDays] = useState(0);
   const [requireShiftLead, setRequireShiftLead] = useState(false);
+  const [managerPhone, setManagerPhone] = useState("");
   const [rulesSaving, setRulesSaving] = useState(false);
   const [rulesSaved, setRulesSaved] = useState(false);
 
@@ -147,6 +148,7 @@ export default function SettingsPage() {
       .then(d => {
         if (typeof d.maxConsecutiveDays === "number") setMaxConsecutiveDays(d.maxConsecutiveDays);
         if (typeof d.requireShiftLead === "boolean") setRequireShiftLead(d.requireShiftLead);
+        if (typeof d.managerPhone === "string") setManagerPhone(d.managerPhone);
       });
   }, []);
 
@@ -167,7 +169,7 @@ export default function SettingsPage() {
     await fetch("/api/scheduling-rules", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ maxConsecutiveDays, requireShiftLead }),
+      body: JSON.stringify({ maxConsecutiveDays, requireShiftLead, managerPhone }),
     });
     setRulesSaving(false);
     setRulesSaved(true);
@@ -628,6 +630,18 @@ export default function SettingsPage() {
             <input type="checkbox" checked={requireShiftLead} onChange={e => setRequireShiftLead(e.target.checked)} className="w-4 h-4 accent-brand-600" />
             <span className="text-sm text-navy dark:text-slate-100">דרוש ראש משמרת בכל משמרת</span>
           </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-navy-muted dark:text-slate-400 shrink-0">טלפון המנהל (לפניות עובדים):</span>
+            <input
+              type="tel"
+              value={managerPhone}
+              onChange={e => setManagerPhone(e.target.value)}
+              placeholder="050-0000000"
+              maxLength={20}
+              className="text-base sm:text-sm bg-white dark:bg-white/[0.06] border border-surface-high dark:border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-500/30 w-40"
+            />
+          </div>
+          <p className="text-[11px] text-navy-muted/70 dark:text-slate-500 -mt-2">מאפשר לעובדים לשלוח לך "לא יכול להגיע" בוואטסאפ ישירות מהמשמרת.</p>
           <div className="flex items-center gap-3">
             <Button onClick={saveRules} loading={rulesSaving} size="md">שמור</Button>
             {rulesSaved && <span className="text-sm text-green-600 dark:text-emerald-400 font-medium">נשמר!</span>}
