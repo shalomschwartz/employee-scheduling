@@ -671,7 +671,7 @@ export default function DashboardPage() {
             {scheduleData && contract != null && contract > 0 && assigned !== contract && (
               <span className={cn(
                 "ms-1.5 tnum font-semibold",
-                selected ? "text-white/85" : assigned < contract ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"
+                selected ? "text-white/85" : assigned < contract ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400"
               )}>
                 {assigned < contract ? `חסר ${contract - assigned}` : `עודף ${assigned - contract}`}
               </span>
@@ -862,7 +862,7 @@ export default function DashboardPage() {
                   const shiftCfg = shifts.find(s => s.id === shift);
                   const dotColors = ["bg-yellow-400","bg-orange-400","bg-indigo-400","bg-blue-400","bg-pink-400"];
                   return (
-                  <tr key={shift} className="border-b border-surface-high dark:border-white/[0.08] last:border-0">
+                  <tr key={shift} className="border-b border-surface-high dark:border-white/[0.08] last:border-0 hover:bg-surface-low/50 dark:hover:bg-white/[0.015] transition-colors">
                     <td className="py-3 ps-4 pe-3 align-middle border-e border-surface-high/60 dark:border-white/[0.06]">
                       <div className="flex items-center gap-2">
                         <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", dotColors[si % dotColors.length])} />
@@ -928,8 +928,6 @@ export default function DashboardPage() {
                           id={`cell-${day}-${shift}`}
                           className={cn(
                             "group/cell py-2 px-2 align-top transition-colors border-e border-surface-high/60 dark:border-white/[0.06] last:border-e-0",
-                            !dragging && cellProblem === "understaffed" && "bg-amber-50/70 dark:bg-amber-500/[0.08]",
-                            !dragging && cellProblem === "conflict" && "bg-rose-50/70 dark:bg-rose-500/[0.08]",
                             dragging && dragBg, dropOutline
                           )}
                           onDragOver={e => { e.preventDefault(); setDragOver({ day, shift }); }}
@@ -937,6 +935,25 @@ export default function DashboardPage() {
                           onDrop={() => handleDrop(day, shift)}
                         >
                           <div className="flex flex-col gap-2.5">
+                            {cellProblem && !dragging && (() => {
+                              const missing = Math.max(1, (shiftCfg?.minWorkers ?? 2) - names.length);
+                              return (
+                                <span
+                                  title={cellProblem === "conflict"
+                                    ? "שובץ עובד שסימן שאינו זמין במשמרת זו"
+                                    : `שובצו ${names.length} מתוך ${shiftCfg?.minWorkers ?? 2} עובדים נדרשים`}
+                                  className={cn(
+                                    "self-center inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
+                                    cellProblem === "conflict"
+                                      ? "bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300"
+                                      : "bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300"
+                                  )}
+                                >
+                                  <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                                  {cellProblem === "conflict" ? "עובד לא זמין" : missing === 1 ? "חסר עובד" : `חסרים ${missing} עובדים`}
+                                </span>
+                              );
+                            })()}
                             {names.map((name, ni) => {
                               const empId = slot?.employeeIds?.[ni];
                               if (empFilter !== null && empId !== empFilter) return null;
@@ -952,6 +969,7 @@ export default function DashboardPage() {
                                 onDragEnd={() => { setDragging(null); setDragOver(null); }}
                               >
                                 <div
+                                  title={av === "prefer_not" ? "סימן/ה העדפה שלא לעבוד במשמרת זו" : av === "unavailable" ? "סימן/ה שאינו/ה זמין/ה למשמרת זו" : undefined}
                                   className={cn(
                                     "flex items-center gap-2 ps-1 pe-3 py-1.5 rounded-full w-full cursor-grab active:cursor-grabbing bg-surface-white dark:bg-white/[0.05] border-2 transition-shadow hover:shadow-xs",
                                     avBorder
