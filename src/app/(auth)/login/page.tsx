@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -20,6 +20,18 @@ function LoginForm() {
   const [isManager, setIsManager] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(hasError ? "פרטים שגויים." : "");
+
+  // Returning employees: prefill the three fields from the last successful login
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("shiftsync_emp_login") ?? "null");
+      if (saved?.name) {
+        setUsername(saved.name);
+        setPhone(saved.phone ?? "");
+        setOrgCode(saved.orgCode ?? "");
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   function switchRole(manager: boolean) {
     setIsManager(manager);
@@ -49,7 +61,14 @@ function LoginForm() {
     if (result?.error) {
       setError(isManager ? "אימייל או סיסמה שגויים." : "שם, טלפון או קוד ארגון שגויים. ודא את הפרטים מול המנהל.");
     } else {
-      router.push(isManager ? "/dashboard?welcome=1" : "/availability?welcome=1");
+      if (!isManager) {
+        try {
+          localStorage.setItem("shiftsync_emp_login", JSON.stringify({ name: username, phone, orgCode }));
+        } catch { /* ignore */ }
+      }
+      // Employees go through "/" — the smart landing sends them to my-schedule
+      // once availability is already submitted.
+      router.push(isManager ? "/dashboard?welcome=1" : "/");
       router.refresh();
     }
   }

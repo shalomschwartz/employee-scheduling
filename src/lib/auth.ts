@@ -7,6 +7,8 @@ import { Role } from "@prisma/client";
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
+    // Long sessions: shift workers shouldn't re-enter name+phone+code every few weeks
+    maxAge: 180 * 24 * 60 * 60,
   },
   pages: {
     signIn: "/login",
