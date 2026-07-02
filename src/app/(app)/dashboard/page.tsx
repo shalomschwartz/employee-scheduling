@@ -467,7 +467,7 @@ export default function DashboardPage() {
       const { default: html2canvas } = await import("html2canvas");
       const { default: jsPDF } = await import("jspdf");
       if (!printRef.current) return;
-      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#eff6ff", useCORS: true });
+      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
@@ -475,7 +475,8 @@ export default function DashboardPage() {
       const scale = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
       const w = canvas.width * scale;
       const h = canvas.height * scale;
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
+      // JPEG instead of PNG: ~9MB -> ~300KB with no visible quality loss at print size
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.88), "JPEG", margin + ((pageW - margin * 2) - w) / 2, margin + ((pageH - margin * 2) - h) / 2, w, h);
       pdf.save(`סידור-עבודה-${format(weekStart, "dd-MM-yyyy")}.pdf`);
     } finally {
       setPdfLoading(false);
@@ -1249,90 +1250,85 @@ export default function DashboardPage() {
           ref={printRef}
           style={{
             position: "absolute", left: "-9999px", top: 0,
-            width: "860px", backgroundColor: "#eff6ff",
-            padding: "30px 36px", fontFamily: "var(--font-sans), Arial, sans-serif", direction: "rtl",
+            width: "1050px", backgroundColor: "#ffffff",
+            padding: "36px 42px", fontFamily: "var(--font-sans), Arial, sans-serif", direction: "rtl",
           }}
         >
-          {/* Logo + Title */}
-          <div style={{ textAlign: "center", marginBottom: "16px" }}>
-            <img src="/logo.png" alt="ShiftSync" style={{ height: "56px", margin: "0 auto 8px" }} />
-            <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "800", color: "#111827" }}>סידור עבודה שבועי</h2>
-            <p style={{ margin: 0, color: "#6b7280", fontSize: "13px" }}>{weekLabel}</p>
+          {/* Header — title right, logo left, navy rule */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "18px", paddingBottom: "14px", borderBottom: "3px solid #0b2239" }}>
+            <div>
+              <h2 style={{ margin: "0 0 3px", fontSize: "25px", fontWeight: "800", color: "#0b2239", letterSpacing: "-0.01em" }}>סידור עבודה שבועי</h2>
+              <p style={{ margin: 0, color: "#52647d", fontSize: "14px" }}>שבוע {weekLabel}</p>
+            </div>
+            <img src="/logo.png" alt="ShiftSync" style={{ height: "46px" }} />
           </div>
 
-          {/* Table — shifts as rows, days as columns */}
-          <table style={{ width: "100%", borderCollapse: "collapse", backgroundColor: "white", border: "2px solid #60a5fa" }}>
+          {/* Table — navy day header, hairline grid, weekend tint, employee color dots */}
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={{ padding: "12px", textAlign: "center", backgroundColor: "#bfdbfe", border: "1.5px solid #60a5fa", fontWeight: "700", fontSize: "14px", width: "110px", color: "#1e40af" }}>
+                <th style={{ padding: "10px 12px", textAlign: "right", backgroundColor: "#0b2239", color: "#ffffff", fontWeight: "700", fontSize: "13px", width: "128px", borderRadius: "0" }}>
                   משמרת
                 </th>
                 {DAYS.map((day, di) => {
                   const date = format(addDays(weekStart, di), "d/M");
                   return (
-                    <th key={day} style={{ padding: "12px", textAlign: "center", backgroundColor: "#bfdbfe", border: "1.5px solid #60a5fa", fontWeight: "700" }}>
-                      <span style={{ fontSize: "14px", color: "#1e40af" }}>{DAY_LABELS_HE[day as Day]}</span>
+                    <th key={day} style={{ padding: "10px 6px", textAlign: "center", backgroundColor: "#0b2239" }}>
+                      <span style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>{DAY_LABELS_HE[day as Day]}</span>
                       <br />
-                      <span style={{ fontSize: "12px", color: "#3b82f6", fontWeight: "normal" }}>{date}</span>
+                      <span style={{ fontSize: "11px", fontWeight: "400", color: "#93a5bd" }}>{date}</span>
                     </th>
                   );
                 })}
               </tr>
             </thead>
             <tbody>
-              {(() => {
-                // Shift label column: same-role shifts share the same color
-                const rowBgs     = ["#fef9c3","#dcfce7","#fce7f3","#ede9fe","#ffedd5","#fef3c7"];
-                const rowBorders = ["#fde047","#86efac","#f9a8d4","#c4b5fd","#fdba74","#fcd34d"];
-                const labelColors = ["#854d0e","#166534","#9d174d","#5b21b6","#9a3412","#92400e"];
-                const roleColorIdx: Record<string, number> = {};
-                let nextIdx = 0;
-                shiftKeys.forEach(s => {
-                  const cfg = shifts.find(x => x.id === s);
-                  const key = cfg?.role?.trim() || `__${s}`;
-                  if (!(key in roleColorIdx)) roleColorIdx[key] = nextIdx++;
-                });
-                return shiftKeys.map((shift) => {
+              {shiftKeys.map((shift) => {
                 const shiftCfg = shifts.find(s => s.id === shift);
-                const colorKey = shiftCfg?.role?.trim() || `__${shift}`;
-                const ci = roleColorIdx[colorKey] ?? 0;
-                const rowBg      = rowBgs[ci % rowBgs.length];
-                const rowBorder  = rowBorders[ci % rowBorders.length];
-                const labelColor = labelColors[ci % labelColors.length];
+                const rc = shiftCfg?.role ? roleColorMap[shiftCfg.role] : undefined;
                 return (
                   <tr key={shift}>
-                    <td style={{ padding: "12px", textAlign: "center", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
-                      <span style={{ color: labelColor, fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
-                      <br />
+                    <td style={{ padding: "12px", textAlign: "right", verticalAlign: "middle", backgroundColor: "#f1f5f9", borderBottom: "1px solid #e2e8f0" }}>
+                      <span style={{ display: "block", color: "#0b2239", fontSize: "15px", fontWeight: "700" }}>{shiftCfg?.label ?? shift}</span>
                       {shiftCfg?.role?.trim() && (
-                        <>
-                          <span style={{ fontSize: "11px", fontWeight: "600", color: labelColor, opacity: 0.8 }}>{shiftCfg.role}</span>
-                          <br />
-                        </>
+                        <span style={{ display: "inline-block", margin: "3px 0 2px", padding: "1px 8px", fontSize: "10.5px", fontWeight: "600", borderRadius: "999px", background: rc?.bg ?? "#eff6ff", color: rc?.text ?? "#1e40af", border: `1px solid ${rc?.border ?? "#bfdbfe"}` }}>
+                          {shiftCfg.role}
+                        </span>
                       )}
-                      <span style={{ fontSize: "12px", color: "#9ca3af" }} dir="ltr">{shiftCfg?.start} – {shiftCfg?.end}</span>
+                      <span style={{ display: "block", marginTop: "2px", fontSize: "11px", color: "#94a3b8" }} dir="ltr">{shiftCfg?.start} – {shiftCfg?.end}</span>
                     </td>
                     {DAYS.map((day) => {
-                      const names = scheduleData[day]?.[shift]?.employeeNames ?? [];
+                      const slot = scheduleData[day]?.[shift];
+                      const names = slot?.employeeNames ?? [];
+                      const isWeekend = day === "friday" || day === "saturday";
                       return (
-                        <td key={day} style={{ padding: "12px", textAlign: "center", verticalAlign: "middle", backgroundColor: rowBg, border: `1.5px solid ${rowBorder}` }}>
+                        <td key={day} style={{ padding: "10px 6px", textAlign: "center", verticalAlign: "middle", backgroundColor: isWeekend ? "#f8fafc" : "#ffffff", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #eef2f7" }}>
                           {names.length === 0
-                            ? <span style={{ color: "#d1d5db", fontSize: "13px" }}>—</span>
-                            : names.map((name, ni) => (
-                                <div key={ni} style={{ display: "inline-block", margin: "2px 3px", padding: "3px 10px", fontSize: "13px", fontWeight: "700", color: "#111827" }}>
-                                  {name}
-                                </div>
-                              ))}
+                            ? <span style={{ color: "#cbd5e1", fontSize: "13px" }}>—</span>
+                            : names.map((name, ni) => {
+                                const empId = slot?.employeeIds?.[ni];
+                                const dotColor = (empId && colorMap[empId]) || "#94a3b8";
+                                return (
+                                  <div key={ni} style={{ margin: "3px 0", fontSize: "13.5px", fontWeight: "600", color: "#0b2239", whiteSpace: "nowrap" }}>
+                                    <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "999px", backgroundColor: dotColor, marginLeft: "6px", verticalAlign: "1px" }} />
+                                    {name}
+                                  </div>
+                                );
+                              })}
                         </td>
                       );
                     })}
                   </tr>
                 );
-              }); })()}
+              })}
             </tbody>
           </table>
 
-          <div style={{ marginTop: "14px", textAlign: "center", fontSize: "10px", color: "#d1d5db" }}>הופק ע"י ShiftSync</div>
+          {/* Footer */}
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px", fontSize: "10.5px", color: "#94a3b8" }}>
+            <span>הופק ב-ShiftSync</span>
+            <span dir="ltr">{format(new Date(), "d/M/yyyy HH:mm")}</span>
+          </div>
         </div>
       )}
     </div>
