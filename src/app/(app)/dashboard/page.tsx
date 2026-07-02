@@ -1376,16 +1376,11 @@ export default function DashboardPage() {
                         <td key={day} style={{ padding: "10px 6px", textAlign: "center", verticalAlign: "middle", backgroundColor: isWeekend ? "#f8fafc" : "#ffffff", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #eef2f7" }}>
                           {names.length === 0
                             ? <span style={{ color: "#cbd5e1", fontSize: "13px" }}>—</span>
-                            : names.map((name, ni) => {
-                                const empId = slot?.employeeIds?.[ni];
-                                const dotColor = (empId && colorMap[empId]) || "#94a3b8";
-                                return (
-                                  <div key={ni} style={{ margin: "3px 0", fontSize: "13.5px", fontWeight: "600", color: "#0b2239", whiteSpace: "nowrap" }}>
-                                    <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "999px", backgroundColor: dotColor, marginLeft: "6px", verticalAlign: "1px" }} />
-                                    {name}
-                                  </div>
-                                );
-                              })}
+                            : names.map((name, ni) => (
+                                <div key={ni} style={{ margin: "3px 0", fontSize: "13.5px", fontWeight: "600", color: "#0b2239", whiteSpace: "nowrap" }}>
+                                  {name}
+                                </div>
+                              ))}
                         </td>
                       );
                     })}
@@ -1405,7 +1400,6 @@ export default function DashboardPage() {
                   if (entries.length === 0) return null;
                   return (
                     <div key={emp.id} style={{ fontSize: "11.5px", color: "#334155", whiteSpace: "nowrap" }}>
-                      <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "999px", backgroundColor: colorMap[emp.id] ?? "#94a3b8", marginLeft: "5px", verticalAlign: "1px" }} />
                       <span style={{ fontWeight: "700", color: "#0b2239" }}>{(emp.name ?? emp.email).split(" ")[0]}:</span>{" "}
                       {entries.map(e => `${e.dayLabel} ${e.shiftLabel}`).join(" · ")}
                     </div>
