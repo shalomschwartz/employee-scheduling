@@ -51,18 +51,23 @@ export const authOptions: NextAuthOptions = {
           });
           if (!org) return null;
           if ((org.settings as Record<string, unknown>)?.blocked === true) return null;
-          // Normalize phones so formatting (dashes, spaces, +972) doesn't block login
+          // Phone-first matching: phone + org code identify the person; the name is a
+          // soft check, so "אליס" works even when the stored name is "אליס כהן".
           const normPhone = (p: string) => p.replace(/\D/g, "").replace(/^972/, "0");
+          const normName = (n: string) => n.trim().toLowerCase().replace(/\s+/g, " ");
           const enteredPhone = normPhone(credentials.phone);
+          const enteredName = normName(credentials.username);
           const candidates = await prisma.user.findMany({
-            where: {
-              name: { equals: credentials.username, mode: "insensitive" },
-              role: "EMPLOYEE",
-              organizationId: org.id,
-            },
+            where: { role: "EMPLOYEE", organizationId: org.id },
           });
-          const user = candidates.find(u => u.phone && normPhone(u.phone) === enteredPhone);
-          if (!user) return null;
+          const matches = candidates.filter(u => {
+            if (!u.phone || normPhone(u.phone) !== enteredPhone) return false;
+            const full = normName(u.name ?? "");
+            if (!full) return false;
+            return full === enteredName || full.split(" ")[0] === enteredName;
+          });
+          if (matches.length !== 1) return null; // no match, or ambiguous
+          const user = matches[0];
           return { id: user.id, name: user.name, email: user.email };
         }
       },
