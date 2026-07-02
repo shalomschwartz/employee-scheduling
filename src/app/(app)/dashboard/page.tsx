@@ -660,6 +660,7 @@ export default function DashboardPage() {
           <button
             key={id}
             onClick={() => setEmpFilter(id)}
+            title={scheduleData && contract != null && contract > 0 ? `שובצו ${assigned} משמרות · לפי החוזה: ${contract}` : undefined}
             className={cn(
               "px-3 py-1.5 sm:py-1 rounded-lg text-xs font-medium border transition-colors",
               selected ? "text-white border-transparent" : "bg-surface-mid dark:bg-white/[0.06] text-navy-muted dark:text-slate-400 border-surface-high dark:border-white/[0.08] hover:bg-surface-low dark:hover:bg-white/[0.03]"
@@ -667,12 +668,12 @@ export default function DashboardPage() {
             style={selected ? { backgroundColor: empHex(i) } : undefined}
           >
             {label}
-            {scheduleData && contract != null && contract > 0 && (
+            {scheduleData && contract != null && contract > 0 && assigned !== contract && (
               <span className={cn(
                 "ms-1.5 tnum font-semibold",
-                selected ? "text-white/85" : assigned < contract ? "text-amber-600 dark:text-amber-400" : assigned > contract ? "text-rose-600 dark:text-rose-400" : "text-navy-muted dark:text-slate-400"
+                selected ? "text-white/85" : assigned < contract ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"
               )}>
-                {assigned}/{contract}
+                {assigned < contract ? `חסר ${contract - assigned}` : `עודף ${assigned - contract}`}
               </span>
             )}
           </button>
